@@ -162,14 +162,10 @@ az aks get-credentials --resource-group kiamol --name kiamol-aks
 
 ### 1.3.6 在 AWS 中运行一个单节点的 Kubernetes
 
-The managed Kubernetes service in AWS is called the Elastic Kubernetes Service
-(EKS). You can create a single-node EKS cluster with the same caveat as Azure—that
-you’ll be paying for that node and associated resources all the time it’s running.
+AWS 中的托管Kubernetes服务称为 Elastic Kubernetes Service（EKS）。您可以创建一个单节点EKS集群，但需要注意的是您将在该节点运行的所有服务和资源的时间支付费用。
 
-You can use the AWS portal to create an EKS cluster, but the recommended way is
-with a dedicated tool called eksctl. The latest documentation for the tool is at https://
-eksctl.io, but it’s pretty simple to use. First, install the latest version of the tool for your
-operating system as follows:
+您可以使用 AWS 门户创建 EKS 集群，但推荐的方法是使用名为 eksctl 的专用工具。该工具的最新文档位于https://eksctl.io，使用起来很简单。首先，为您的
+操作系安装最新的工具如下：
 
 ```
 # install on macOS:
@@ -184,15 +180,14 @@ curl --silent --location
 sudo mv /tmp/eksctl /usr/local/bin
 ```
 
-Assuming you already have the AWS CLI installed, eksctl will use the credentials from
-the CLI (if not, then check the installation guide for authenticating eksctl). Then create a simple one-node cluster as follows:
+假设您已经安装了AWS CLI，eksctl将使用来自 CLI 的凭证（如果没有，请查看安装指南以验证eksctl）。然后创建一个简单的单节点集群，如下所示：
 
 ```
 # create a single node cluster with 2 CPU cores and 8GB RAM:
 eksctl create cluster --name=kiamol --nodes=1 --node-type=t3.large
 ```
 
-The tool sets up the connection from your local kubectl to the EKS cluster.
+该工具设置从本地 kubectl 到EKS 集群的连接。
 
 ### 1.3.7 验证你的集群
 
