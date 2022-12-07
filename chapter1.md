@@ -93,14 +93,9 @@ Docker Desktop 将会下载 Kubernetes 运行时的所有容器镜像——这�
 
 ### 1.3.3 安装 Docker 社区版本以及 K3s
 
-If you’re using a Linux machine or a Linux VM, you have several options for running
-a single-node cluster. Kind and minikube are popular, but my preference is K3s, which
-is a minimal installation but has all the features you’ll need for the exercises. (The
-name is a play on “K8s,” which is an abbreviation of Kubernetes. K3s trims the Kubernetes codebase, and the name indicates that it’s half the size of K8s.)
+如果您使用的是 Linux机器 或 Linux 虚拟机，您可以有几个选项来运行单节点集群。Kind 和 minikube 很受欢迎，但我更喜欢K3s,它包含最小的安装，但具有练习所需的所有功能。（k3s 是Kubernetes的缩写“K8s”上的一个参照。K3s对Kubernetes代码库进行了精简，名称表明它的大小是K8s的一半。）
 
-K3s works with Docker, so first, you should install Docker Community Edition. You
-can check the full installation steps at https://rancher.com/docs/k3s/latest/en/
-quick-start/, but this will get you up and running:
+K3s 与 Docker 兼容，因此首先，您应该安装 Docker 社区版。你可以在查看完整的安装步骤 https://rancher.com/docs/k3s/latest/en/quick-start/，这将使您快速启动：
 
 ```
 # install Docker:
@@ -113,6 +108,7 @@ curl -sfL https://get.k3s.io | sh -s - --docker --disable=traefik --write-
 If you prefer to run your lab environment in a VM and you’re familiar with using
 Vagrant to manage VMs, you can use the following Vagrant setup with Docker and K3s
 found in the source repository for the book:
+如果您喜欢在 VM 中运行实验室环境，并且您熟悉使用 Vagrant 管理 VM，您可以使用 Docker 和 K3s 的以下 Vagrant 设置，在本书的源存储库中可以找到：
 
 ```
 # from the root of the Kiamol repo:
@@ -123,19 +119,14 @@ vagrant up
 vagrant ssh
 ```
 
-K3s installs everything else you need, so you can skip to section 1.4.7.
+K3s 安装了您需要的所有功能，因此您可以跳到 1.4.7 节。
 
 ### 1.3.4 安装 Kubernetes 命令行工具
 
-You manage Kubernetes with a tool called kubectl (which is pronounced “cube-cuttle”
-as in “cuttlefish”—don’t let anyone tell you different). It connects to a Kubernetes
-cluster and works with the Kubernetes API. Both Docker Desktop and K3s install
-kubectl for you, but if you’re using one of the other options described below, you’ll
-need to install it yourself.
+您可以使用名为kubectl（发音为“cube-cutle”）的工具管理 Kubernetes。它连接到Kubernetes 集群并与 Kubernetes API 交互工作。Docker Desktop 和 K3s 都安装 kubectl，但如果您使用下面描述的其他选项之一，则需要自己安装。
 
-The full installation instructions are at https://kubernetes.io/docs/tasks/tools/
-install-kubectl/. You can use Homebrew on macOS and Chocolatey on Windows, and
-for Linux you can download the binary:
+完整的安装说明位于 https://kubernetes.io/docs/tasks/tools/install-kubectl/。您可以在 macOS 上使用 Homebrew，在 Windows 上使用Chocolatey，以及
+对于Linux，您可以下载二进制文件：
 
 ```
 # macOS:
