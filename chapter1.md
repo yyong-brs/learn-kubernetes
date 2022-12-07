@@ -78,30 +78,18 @@ Windows应用程序。您可以使用相同的API在YAML文件中定义所有类
 
 ### 1.3.2 安装 Docker Desktop
 
-Docker Desktop runs on Windows 10 or macOS Sierra (version 10.12 or higher).
-Browse to https://www.docker.com/products/docker-desktop and choose to install
-the stable version. Download the installer and run it, accepting all the defaults. On
-Windows, that might include a reboot to add new Windows features. When Docker
-Desktop is running, you’ll see Docker’s whale icon near the clock on the Windows
-taskbar or the Mac menu bar. If you’re an experienced Docker Desktop user on Win-
-dows, you’ll need to make sure you’re in Linux container mode (which is the default
-for new installations).
+Docker Desktop 运行在 Windows 10 或者 macOS Sierra (版本 10.12 或者更高版本)。浏览器访问 https://www.docker.com/products/docker-desktop 并选择稳定版本。下载之后运行它，接受所有的默认设置。在 Windows 上，这可能包括重新启动以添加新的 Windows 功能的操作。当 Docker Desktop 成功运行，您将在 Windows 任务栏或Mac菜单栏上的时钟附近看到 Docker 的鲸鱼图标。如果您是 Windows 上经验丰富的 Docker Desktop用户，您需要确保您处于Linux 容器模式（对于新安装时这是默认模式）。
 
-Kubernetes isn’t set up by default, so you’ll need to click the whale icon to open
-the menu and click Settings. That opens the window shown in figure 1.5; select Kubernetes from the menu and select Enable Kubernetes.
+默认情况下，Kubernetes 并未默认设置安装，因此你需要单机鲸鱼图标打开面板，然后点击“设置”，这将打开图 1.5 所示的窗口：从菜单中选择 Kubernetes ,然后选择 Enable Kubernetes。
 
 ![图1.5](./images/Figure1.5.png)
 <center>图1.5 Docker Desktop 创建了一个 Linux 虚拟机去运行容器，同时可以运行 Kubernetes </center>
 
-Docker Desktop downloads all the container images for the Kubernetes runtime—
-which might take a while—and then starts up everything. When you see two green
-dots at the bottom of the Settings screen, your Kubernetes cluster is ready to go.
-Docker Desktop installs everything else you need, so you can skip to section 1.4.7.
+Docker Desktop 将会下载 Kubernetes 运行时的所有容器镜像——这将会花费一些时间，最终会启动所有服务。当你在“设置”屏幕底部看到两个绿色
+的圆点，Kubernetes集群已准备就绪。Docker Desktop 已安装您所需的所有功能，因此您可以跳到 1.4.7 节。
 
-Other Kubernetes distributions can run on top of Docker Desktop, but they don’t
-integrate well with the network setup that Docker Desktop uses, so you’ll encounter
-problems running the exercises. The Kubernetes option in Docker Desktop has all
-the features you need for this book and is definitely the easiest option.
+其他 Kubernetes 发行版可以在 Docker Desktop 上运行，但它们没有与 Docker Desktop 使用的网络设置完美集成，练习时会出现问题。Docker Desktop 中的 Kubernetes 选项具有
+这本书所需要的功能，绝对是最简单的选择。
 
 ### 1.3.3 安装 Docker 社区版本以及 K3s
 
