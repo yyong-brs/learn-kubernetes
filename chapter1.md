@@ -52,37 +52,19 @@ Windows应用程序。您可以使用相同的API在YAML文件中定义所有类
 
 但 Kubernetes 是一个巨大的话题，我不会涵盖所有内容。最大的差距在管理方面，我不会深入讨论集群设置和管理，因为它们在不同的基础设施中有所不同。如果你计划小跑进入云环境中的Kubernetes作为您的生产环境，那么无论如何，托管服务中都会处理这些问题。如果你想获得 Kubernetes 认证，这本书是一个很好的开始，但它不会让你一直受益。有两个主要的Kubernetes认证：Certified Kubernetes Application Developer (CKAD) 以及 Certified Kubernetes Administrator (CKA)。这本书约占 CKAD 课程的 80%，约占 CKA 课程的50%。
 
-此外，你还需要掌握合理数量的背景知识来有效地阅读本书。当我们在讲解 Kubernetes 的特性时，但我不会填补任何关于容器的空白。如果您不熟悉镜像、容器和注册表等概念，我建议从我的
-这本书《一个月学会 Docker》开始。你不需要在使用 Kubernetes 时使用 Docker，但它是打包您的应用程序，以便您可以在Kubernetes的容器中运行它们的工具。
+此外，你还需要掌握合理数量的背景知识来有效地阅读本书。当我们在讲解 Kubernetes 的特性时，但我不会填补任何关于容器的空白。如果您不熟悉镜像、容器和注册表等概念，我建议从我的这本书《一个月学会 Docker》开始。你不需要在使用 Kubernetes 时使用 Docker，但它是打包您的应用程序，以便您可以在Kubernetes的容器中运行它们的工具。
 
-如果您将自己归类为一个全新的或想提升 Kubernetes 知识，那么这就是适合你的书。你的背景角色可能是开发、运维、架构、DevOps或站点可靠性工程（SRE）——Kubernetes涉及所有这些角色，因此他们都受到欢迎，并且
-你会学到很多东西。
+如果您将自己归类为一个全新的或想提升 Kubernetes 知识，那么这就是适合你的书。你的背景角色可能是开发、运维、架构、DevOps或站点可靠性工程（SRE）——Kubernetes涉及所有这些角色，因此他们都受到欢迎，并且你会学到很多东西。
 
 ## 1.3 创建你的实验环境
 
-A Kubernetes cluster can have hundreds of nodes, but for the exercises in this book, a
-single-node cluster is fine. We’ll get your lab environment set up now so you’re ready
-to get started in the next chapter. Dozens of Kubernetes platforms are available, and
-the exercises in this book should work with any certified Kubernetes setup. I’ll describe
-how to create your lab on Linux, Windows, Mac, Amazon Web Services (AWS), and
-Azure, which covers all the major options. I’m using Kubernetes version 1.18, but earlier or later versions should be fine, too.
+每个 Kubernetes 集群可以包含上百个节点，但是对于本书的练习来说，只需要单节点就够了。我们现在将会配置你的实验环境，为下一章做好准备。有数十种 kubernetes 平台可供使用，本书中的练习适用于任何经认证的 Kubernetes。我将会讲解如何在 Linux、Windows、Mac、AWS 以及 Azure 中创建你的实验环境，这些包括了主流的选项。我使用了 Kubernetes 1.18 版本，但是更早或更新的版本也是可以的。
 
-The easiest option to run Kubernetes locally is Docker Desktop, which is a single
-package that gives you Docker and Kubernetes and all the command-line tools. It
-also integrates nicely with your computer’s network and has a handy Reset Kuber-
-netes button, which clears everything, if necessary. Docker Desktop is supported on Windows 10 and macOS, and if that doesn’t work for you, I’ll also walk through
-some alternatives.
+本地运行 Kubernetes 最简单的选择是 Docker Desktop，它是一个软件包为您提供 Docker 和 Kubernetes 以及所有命令行工具。它还可以很好地与您的计算机网络集成，并有一个方便的重置 Kubernetes 按钮，必要时可以清除所有内容。Docker Desktop 在 Windows 10 和 macOS 上受支持，如果这对您不起作用，我也将介绍一些替代方案。
 
-One point you should know: the components of Kubernetes itself need to run as
-Linux containers. You can’t run Kubernetes in Windows (although you can run Win-
-dows apps in containers with a multinode Kubernetes cluster), so you’ll need a Linux
-virtual machine (VM) if you’re working on Windows. Docker Desktop sets that up and
-manages it for you.
+有一点您应该知道：Kubernetes 本身的组件需要作为 Linux 容器运行。您不能在 Windows 中运行 Kubernetes（尽管您可以在带有多节点的 Kubernetes 集群中的容器运行 Windows 应用程序），因此您需要一个 Linux虚拟机（VM）（如果您在Windows上工作）。Docker Desktop 启动该虚拟机并为您管理它。
 
-And one last note for Windows users: please use PowerShell to follow along with
-the exercises. PowerShell supports many Linux commands, and the try-it-now exer-
-cises are built to run on Linux (and Mac) shells and PowerShell. If you try to use the
-classic Windows command terminal, you’re going to run into issues from the start.
+对于 Windows 用户，最后一个注意事项是：请使用 PowerShell 来进行相关练习。PowerShell 支持许多 Linux 命令，如果您尝试使用经典的 Windows 命令终端，您将从一开始就遇到一些问题。
 
 ### 1.3.1 下载本书源码
 
@@ -92,6 +74,9 @@ you have a Git client installed, you can clone the repository onto your computer
 the following command:
 
 `git clone https://github.com/sixeyed/kiamol`
+
+本书的所有例子和练习的源码都存储在 GitHub 仓库中，同时还提供了一些样例解决方案。如果你真在使用 Git 并且已经安装 Git 客户端，你可以通过如下命令 Clone 仓库到你的电脑上：
+
 
 If you’re not a Git user, you can browse to the GitHub page for the book at https://
 github.com/sixeyed/kiamol and click the Clone or Download button to download a
