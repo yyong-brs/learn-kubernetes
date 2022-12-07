@@ -68,28 +68,13 @@ Windows应用程序。您可以使用相同的API在YAML文件中定义所有类
 
 ### 1.3.1 下载本书源码
 
-Every example and exercise is in the book’s source code repository on GitHub,
-together with sample solutions for all of the labs. If you’re comfortable with Git and
-you have a Git client installed, you can clone the repository onto your computer with
-the following command:
-
-`git clone https://github.com/sixeyed/kiamol`
-
 本书的所有例子和练习的源码都存储在 GitHub 仓库中，同时还提供了一些样例解决方案。如果你真在使用 Git 并且已经安装 Git 客户端，你可以通过如下命令 Clone 仓库到你的电脑上：
 
+`git clone https://github.com/yyong-brs/learn-kubernetes.git`
 
-If you’re not a Git user, you can browse to the GitHub page for the book at https://
-github.com/sixeyed/kiamol and click the Clone or Download button to download a
-zip file, which you can expand.
+如果你不熟悉 Git 使用，你可以访问 https://github.com/yyong-brs/learn-kubernetes 点击 Code - Download ZIP 下载源文件。
 
-The root of the source code is a folder called kiamol, and within that is a folder for
-each chapter: ch02, ch03, and so on. The first exercise in the chapter usually asks you
-to open a terminal session and switch to the chXX directory, so you’ll need to navigate
-to your kiamol folder first.
-
-The GitHub repository is the quickest way for me to publish any corrections to the
-exercises, so if you do have any problems, you should check for a README file with
-updates in the chapter folder.
+根目录下有个 kiamol 文件夹包含了源码信息，然后它也包含了每一章的练习内容。
 
 ### 1.3.2 安装 Docker Desktop
 
