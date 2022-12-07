@@ -12,83 +12,38 @@ Kubernetes 很强大。2014 年，在 GitHub 上它被作为开源项目发布�
 
 ## 1.1 了解 Kubernetes
 
-This book provides a hands-on introduction to Kubernetes. Every chapter offers try-it-
-now exercises and labs for you to get lots of experience using Kubernetes. All except
-this one. :) We’ll jump into the practical work in the next chapter, but we need a little
-theory first. Let’s start by understanding what Kubernetes actually is and the problems
-it solves.
-Kubernetes is a platform for running containers. It takes care of starting your con-
-tainerized applications, rolling out updates, maintaining service levels, scaling to meet
-demand, securing access, and much more. The two core concepts in Kubernetes are
-the API, which you use to define your applications, and the cluster, which runs your
-applications. A cluster is a set of individual servers that have all been configured with a
-container runtime like Docker, and then joined into a single logical unit with Kuber-
-netes. Figure 1.1 shows a high-level view of the cluster.
+本书提供了 Kubernetes 的实际使用介绍。每个章节都提供了“现在就试试”的练习，您可以通过练习和实验室获得大量使用 Kubernetes 的经验。我们将在下一章开始实际工作，但我们需要一点
+理论先行。让我们先了解一下 Kubernetes到底是什么以及它解决了什么问题。
+
+Kubernetes 是一个运行容器的平台，它负责启动容器化应用程序、滚动更新、Service 层面维护、扩展以满足需求、安全访问等。在 Kubernetes 中有两个核心概念，一个是 API，用于定义你的应用，另外一个是集群，运行你的应用。集群是一组单独的服务器，它们都配置了容器运行时，如Docker，然后使用Kubernetes 连接到单个逻辑单元中。图 1.1 显示了集群的高层级视图：
 
 ![图1.1](./images/Figure1.1.png)
 <center>图1.1 Kubernetes 集群包含了一组服务器，它们加入到一个组中运行容器 </center>
 
-Cluster administrators manage the individual servers, called nodes in Kubernetes. You
-can add nodes to expand the capacity of the cluster, take nodes offline for servicing, or
-roll out an upgrade of Kubernetes across the cluster. In a managed service like Microsoft
-Azure Kubernetes Service (AKS) or Amazon Elastic Kubernetes Service (EKS), those
-functions are all wrapped in simple web interfaces or command lines. In normal usage
-you forget about the underlying nodes and treat the cluster as a single entity.
+集群管理员负责管理单独的服务器，它们在 Kubernetes 被称作节点（node）。你可以通过添加节点来扩展集群的容量，也可以使节点脱机以维护，或者升级 Kubernetes 集群。在像 Microsoft Azure Kubernetes Sevice（AKS）或 Amazon Elastic Kubernete Service（EKS）这样的托管服务中，这些功能都封装在简单的 web 界面或命令行中。正常使用时您忘记了底层节点，将集群视为单个实体。
 
-The Kubernetes cluster is there to run your applications. You define your apps in
-YAML files and send those files to the Kubernetes API. Kubernetes looks at what
-you’re asking for in the YAML and compares it to what’s already running in the clus-
-ter. It makes any changes it needs to get to the desired state, which could be updating
-a configuration, removing containers, or creating new containers. Containers are dis-
-tributed around the cluster for high availability, and they can all communicate over
-virtual networks managed by Kubernetes. Figure 1.2 shows the deployment process,
-but without the nodes because we don’t really care about them at this level.
+Kubernetes 集群用于运行你的应用程序。你通过 YAML 文件来定义应用，然后将这些文件发送给 Kubernetes API。Kubernetes 会查看你在 Yaml 文件中有什么要求，并将其与集群中已经运行的应用进行比较。它会进行任何必要的更改以达到所需的状态，这可能是更新配置、删除容器或创建新容器。为了高可用，容器将会被分发到集群中去，它们可以通过 Kubernetes 管理的虚拟网络进行通信。图 1.2 显示了部署的过程，但是没有看到节点，因为我们在这个层面上并不真正关心它们。
 
 ![图1.2](./images/Figure1.2.png)
 <center>图1.2 当您将应用程序部署到 Kubernetes 集群时，通常可以忽略实际节点 </center>
 
-Defining the structure of the application is your job, but running and managing everything is down to Kubernetes. If a node in the cluster goes offline and takes some containers with it, Kubernetes sees that and starts replacement containers on other nodes.
-If an application container becomes unhealthy, Kubernetes can restart it. If a component is under stress because of a high load, Kubernetes can start extra copies of the
-component in new containers. If you put the work into your Docker images and
-Kubernetes YAML files, you’ll get a self-healing app that runs in the same way on any
-Kubernetes cluster.
+定义应用的结构是你的工作，但是运行和管理的所有工作都交给了 Kubernetes 。如果某个集群中的节点断线了，然后有一些容器在该节点上，Kubernetes 发现了并开始在其它节点创建替换的容器。如果某个应用容器变成不健康状态，Kubernetes 会去重启它。如果组件由于高负载而承受压力，Kubernetes 可以启动额外的该组件的新容器来降低压力。如果你将你的工作通过 Docker image 以及 Kubernetes YAML 文件进行管理，你将得到可以以同样的方式在不同的集群上运行的自我修复应用程序。
 
-Kubernetes manages more than just containers, which is what makes it a complete
-application platform. The cluster has a distributed database, and you can use that to
-store both configuration files for your applications and secrets like API keys and connection credentials. Kubernetes delivers these seamlessly to your containers, which
-lets you use the same container images in every environment and apply the correct
-configuration from the cluster. Kubernetes also provides storage, so your applications
-can maintain data outside of containers, giving you high availability for stateful apps.
-Kubernetes also manages network traffic coming into the cluster by sending it to the
-right containers for processing. Figure 1.3 shows those other resources, which are the
-main features of Kubernetes.
+Kubernetes 不仅仅管理容器，这促使它成为一个功能完整的应用程序平台。Kubernetes 集群有一个分布式数据库，您可以使用它来存储应用程序的配置文件和API密钥以及连接凭据等机密信息。Kubernetes 将这些信息无缝交付给您的容器
+允许您在每个环境中使用相同的容器镜像，并应用正确的配置。Kubernetes还提供存储，因此您的应用程序可以在容器外维护数据，为有状态应用程序提供高可用性。Kubernetes 还实现将网络流量发送到正确的容器进行处理。图1.3显示了其他资源类型：包括 Kubernetes的主要功能。
 
 ![图1.3](./images/Figure1.3.png)
 <center>图1.3 Kubernetes 不仅仅管理容器，集群还管理其他资源 </center>
 
-I haven’t talked about what those applications in the containers look like; that’s
-because Kubernetes doesn’t really care. You can run a new application built with
-cloud-native design across microservices in multiple containers. You can run a legacy
-application built as a monolith in one big container. They could be Linux apps or
-Windows apps. You define all types of applications in YAML files using the same API,
-and you can run them all on a single cluster. The joy of working with Kubernetes is that it adds a layer of consistency on top of all your apps—old .NET and Java mono-
-liths and new Node.js and Go microservices are all described, deployed, and managed
-in the same way.
+我还没有谈到容器中的应用程序是什么样子的；那是因为 Kubernetes 并不在乎。您可以在多个容器中运行通过云原生理念设计的跨多个微服务的应用。您可以运行作为一个整体构建在一个大容器中的旧版应用程序。它们可能是Linux应用程序或
+Windows应用程序。您可以使用相同的API在YAML文件中定义所有类型的应用程序，你可以在一个集群上运行它们。使用Kubernetes的乐趣在于，它在所有应用之上上增加了一层一致性——老的 .Net和 Java 单体应用以及新的 Node.js和 Go 微服务都是以相同的方式被描述、部署和管理的。
 
-That’s just about all the theory we need to get started with Kubernetes, but before
-we go any further, I want to put some proper names on the concepts I’ve been talking
-about. Those YAML files are properly called application manifests, because they’re a list
-of all the components that go into shipping the app. Those components are Kuberne-
-tes resources; they have proper names, too. Figure 1.4 takes the concepts from figure 1.3
-and applies the correct Kubernetes resource names.
+这正是我们开始使用 Kubernetes 所需要的所有理论，但在此之前我们再深入一点，我想为我所讲的概念取一些恰当的名字。关于这些YAML文件被正确地称为应用程序清单（manifests），因为它们是一个应用程序的所有组件的列表。这些组件是Kubernetes 资源；他们也有自己的名字。图1.4采用了图1.3中的概念并应用正确的Kubernetes资源名称。
 
 ![图1.4](./images/Figure1.4.png)
 <center>图1.4 真实情况：这些是您需要掌握的最基本的 Kubernetes 资源 </center>
 
-I told you Kubernetes was hard. :) But we will cover all of these resources one at a time
-over the next few chapters, layering on the understanding. By the time you’ve finished
-chapter 6, that diagram will make complete sense, and you’ll have had lots of experience in defining those resources in YAML files and running them in your own Kuber-
-netes cluster.
+我告诉过你Kubernetes很难。:)但我们在接下来的几章中将一次覆盖所有这些资源，对理解进行分层。当你完成第6章时，该图将完全有意义，您将在 YAML文件中定义这些资源并在自己的Kubernetes 中运行这些资源拥有很多经验。
 
 ## 1.2 这本书适合你吗?
 
