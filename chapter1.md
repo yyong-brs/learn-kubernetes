@@ -164,8 +164,7 @@ az aks get-credentials --resource-group kiamol --name kiamol-aks
 
 AWS 中的托管Kubernetes服务称为 Elastic Kubernetes Service（EKS）。您可以创建一个单节点EKS集群，但需要注意的是您将在该节点运行的所有服务和资源的时间支付费用。
 
-您可以使用 AWS 门户创建 EKS 集群，但推荐的方法是使用名为 eksctl 的专用工具。该工具的最新文档位于https://eksctl.io，使用起来很简单。首先，为您的
-操作系安装最新的工具如下：
+您可以使用 AWS 门户创建 EKS 集群，但推荐的方法是使用名为 eksctl 的专用工具。该工具的最新文档位于https://eksctl.io，使用起来很简单。首先，为您的操作系安装最新的工具如下：
 
 ```
 # install on macOS:
@@ -191,16 +190,11 @@ eksctl create cluster --name=kiamol --nodes=1 --node-type=t3.large
 
 ### 1.3.7 验证你的集群
 
-Now you have a running Kubernetes cluster, and whichever option you chose, they all
-work in the same way. Run the following command to check that your cluster is up
-and running:
+现在你已经拥有了一个运行的 Kubernetes 集群，不论你如何安装的，它们都以同样的方式工作。运行下面的命令来检查集群运行状态：
 
 `kubectl get nodes`
 
-You should see output like that shown in figure 1.6. It’s a list of all the nodes in your
-cluster, with some basic details like the status and Kubernetes version. The details of
-your cluster may be different, but as long as you see a node listed and in the ready
-state, then your cluster is good to go.
+你应该会看到他 1.6 类似的输出。输出显示了集群中所有的节点列表，同时显示了一些基本信息比如状态以及 kubernetes 版本。你的集群信息跟我的可能会有所不通，但是一旦你看到节点列表并且是 ready 状态，那就说明你的集群已经正常运行。
 
 
 ![图1.6](./images/Figure1.6.png)
@@ -208,14 +202,8 @@ state, then your cluster is good to go.
 
 ## 1.4 立即见效
 
-“Immediately effective” is a core principle of the Month of Lunches series. In all, the
-focus is on learning skills and putting them into practice, in every chapter that follows.
+“立即见效” 是本书的核心原则，总结来说，就是聚焦于能力练习，跟随我在每一章中进行实操。
 
-Each chapter starts with a short introduction to the topic, followed by try-it-now
-exercises where you put the ideas into practice using your own Kubernetes cluster.
-Then there’s a recap with some more detail, to fill in some of the questions you may
-have from diving in. Last, there’s a hands-on lab for you to try by yourself, to really
-gain confidence in your new understanding.
+每一章都以一个简单的主体说明开始，随后跟随的就是“现在就试试”的练习，通过它你可以使用你自己的集群来练习。然后是一个包含更多细节的说明，以解决您可能因为深入学习遇到的一些问题。最后，有一个动手实验室供您自己尝试，请对你的新知识的掌握充满信心。
 
-All the topics center on tasks that are genuinely useful in the real world. You’ll
-learn how to be immediately effective with the topic during the chapter, and you’ll finish by understanding how to apply the new skill. Let’s start running some containerized apps!
+所有的主题都集中在现实世界中真正有用的任务上。你会在本章中学习如何立即有效地处理该主题，您将通过了解如何应用新技能来完成。让我们开始运行一些容器化应用程序！
