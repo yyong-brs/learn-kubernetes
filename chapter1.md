@@ -86,7 +86,7 @@ Docker Desktop 运行在 Windows 10 或者 macOS Sierra (版本 10.12 或者更�
 <center>图1.5 Docker Desktop 创建了一个 Linux 虚拟机去运行容器，同时可以运行 Kubernetes </center>
 
 Docker Desktop 将会下载 Kubernetes 运行时的所有容器镜像——这将会花费一些时间，最终会启动所有服务。当你在“设置”屏幕底部看到两个绿色
-的圆点，Kubernetes集群已准备就绪。Docker Desktop 已安装您所需的所有功能，因此您可以跳到 1.4.7 节。
+的圆点，Kubernetes集群已准备就绪。Docker Desktop 已安装您所需的所有功能，因此您可以跳到 1.3.7 节。
 
 其他 Kubernetes 发行版可以在 Docker Desktop 上运行，但它们没有与 Docker Desktop 使用的网络设置完美集成，练习时会出现问题。Docker Desktop 中的 Kubernetes 选项具有
 这本书所需要的功能，绝对是最简单的选择。
@@ -119,7 +119,7 @@ vagrant up
 vagrant ssh
 ```
 
-K3s 安装了您需要的所有功能，因此您可以跳到 1.4.7 节。
+K3s 安装了您需要的所有功能，因此您可以跳到 1.3.7 节。
 
 ### 1.3.4 安装 Kubernetes 命令行工具
 
@@ -142,16 +142,9 @@ sudo mv ./kubectl /usr/local/bin/kubectl
 
 ### 1.3.5 在 Azure 中运行一个单节点的 Kubernetes
 
-You can run a managed Kubernetes cluster in Microsoft Azure using AKS. This might
-be a good option if you want to access your cluster from multiple machines or if you
-have an MSDN subscription with Azure credits. You can run a minimal single-node
-cluster, which won’t cost a huge amount, but bear in mind that there’s no way to stop
-the cluster and you’ll be paying for it 24/7 until you remove it.
+您可以使用 AKS 在 Microsoft Azure 中运行托管 Kubernetes 集群。如果您想从多台计算机访问集群，或者具有 Azure 信用的MSDN订阅这可能是比较好的选择。您可以运行最小的单个节点集群，这不会花费巨大的费用，但要记住，你没有办法停止集群，您将支付 24*7 的费用，直到您移除它。
 
-The Azure portal has a nice user interface for creating an AKS cluster, but it’s
-much easier to use the az command. You can check the latest docs at https://docs
-.microsoft.com/en-us/azure/aks/kubernetes-walkthrough, but you can get started by
-downloading the az command-line tool and running a few commands, as follows:
+Azure 门户有一个很好的用户界面来创建AKS集群，但它使用 az 命令要容易得多。您可以在查看最新文档https://docs.microsoft.com/en-us/azure/aks/kubenetes-walkthrough，但您可以通过下载az命令行工具并运行一些命令，如下所示：
 
 ```
 # log in to your Azure subscription:
@@ -165,8 +158,7 @@ node-vm-size Standard_DS2_v2 --kubernetes-version 1.18.8 --generate-ssh-keys
 az aks get-credentials --resource-group kiamol --name kiamol-aks
 ```
 
-That final command downloads the credentials to connect to the Kubernetes API
-from your local kubectl command line.
+最后一个命令从本地kubectl命令行下载连接到 Kubernetes API 的凭据。
 
 ### 1.3.6 在 AWS 中运行一个单节点的 Kubernetes
 
