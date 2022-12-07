@@ -1,32 +1,14 @@
 # 第一章 开始之前
 
-Kubernetes is big. Really big. It was released as an open source project on GitHub
-in 2014, and now it averages 200 changes every week from a worldwide community
-of 2,500 contributors. The annual KubeCon conference has grown from 1,000
-attendees in 2016 to more than 12,000 at the most recent event, and it’s now a
-global series with events in America, Europe, and Asia. All the major cloud services
-offer a managed Kubernetes service, and you can run Kubernetes in a data center
-or on your laptop—and they’re all the same Kubernetes.
+Kubernetes 很强大。2014 年，在 GitHub 上它被作为开源项目发布，现如今在全球社区平均每周有 200 次变更提交，拥有2500名贡献者。一年一度的 KubeCon 会议的与会者从 2016年的 1000 多人增加到现在的 12000 多人，现在已经成为美国、欧洲和亚洲举办的全球系列活动。所有主流的云服务商提供托管的 Kubernetes 服务，您可以在数据中心或者在你的笔记本电脑上运行 Kubernete，最终它们都是等同的。
 
-Independence and standardization are the main reasons Kubernetes is so popu-
-lar. Once you have your apps running nicely in Kubernetes, you can deploy them
-anywhere, which is attractive for organizations moving to the cloud, because it
-enables them to move between data centers and other clouds without a rewrite. It’s
-also very attractive for practitioners—once you’ve mastered Kubernetes, you can
-move between projects and organizations and be productive quickly.
+独立性和标准化是 Kubernetes 如此流行的主要原因。一旦您的应用程序在 Kubernetes 中良好运行，就可以部署它们到任何地方，这对迁移到云的组织都很有吸引力，因为
+使它们能够在数据中心和其他云之间移动而无需重写代码。一旦你掌握了Kubernetes，你就可以在项目和组织之间快速移动，提高生产力。
 
-Getting to that point is hard, though, because Kubernetes is hard. Even simple
-apps are deployed as multiple components, described in a custom file format that
-can easily span many hundreds of lines. Kubernetes brings infrastructure-level concerns like load balancing, networking, storage, and compute into app configuration,
-which might be new concepts, depending on your IT background. In addition, Kuber-
-netes is always expanding—new releases come out every quarter, often bringing a
-ton of new functionality.
+但要达到这一点很难，因为 Kubernetes 很难。即使很简单应用程序也需要通过它部署为多个组件，以轻松的就可以跨越数百行的自定义文件格式代码进行描述。Kubernetes 将诸如负载平衡、网络、存储和计算等基础设施级别的问题带入应用程序配置，这可能是新概念，具体取决于您的IT背景。此外，Kubernetes 总是在扩展，它每季度发布新版本，通常会带来大量新功能。
 
-But it’s worth it. I’ve spent many years helping people learn Kubernetes, and a
-common pattern arises: the question “Why is this so complicated?” transforms to “You
-can do that? This is amazing!” Kubernetes truly is an amazing piece of technology.
-The more you learn about it, the more you’ll love it—and this book will accelerate you
-on your journey to Kubernetes mastery.
+但这是值得的。我花了很多年帮助人们学习 Kubernetes，然后一种共同的模式出现了：问题“为什么这么复杂？” 变成 “你能做到吗？这太神奇了！” Kubernetes确实是一项令人惊叹的技术。你对它了解得越多，你就会越喜欢它，这本书会加速你
+的 Kubernetes 精通之旅。
 
 ## 1.1 了解 Kubernetes
 
