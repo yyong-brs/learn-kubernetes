@@ -47,34 +47,16 @@ Windows应用程序。您可以使用相同的API在YAML文件中定义所有类
 
 ## 1.2 这本书适合你吗?
 
-The goal of this book is to fast-track your Kubernetes learning to the point where you
-have confidence defining and running your own apps in Kubernetes, and you under-
-stand what the path to production looks like. The best way to learn Kubernetes is to
-practice, and if you follow all the examples in the chapters and work through the labs,
-then you’ll have a solid understanding of all the most important pieces of Kubernetes
-by the time you finish the book.
+本书的目标是快速跟踪您的 Kubernetes 学习, 让你有信心在 Kubernetes 中定义和运行自己的应用程序，并且让你了解上生产实践之路是怎样的。学习 Kubernetes 的最佳方法是练习，如果你遵循章节中的所有示例并在实验室中工作，
+等你读完这本书，那么您将对Kubernetes的所有最重要的部分有一个坚实的理解。
 
-But Kubernetes is a huge topic, and I won’t be covering everything. The biggest
-gaps are in administration. I won’t cover cluster setup and management in any depth,
-because they vary across different infrastructures. If you’re planning on running
-Kubernetes in the cloud as your production environment, then a lot of those con-
-cerns are taken care of in a managed service anyway. If you want to get a Kubernetes
-certification, this book is a great place to start, but it won’t get you all the way. There
-are two main Kubernetes certifications: Certified Kubernetes Application Developer
-(CKAD) and Certified Kubernetes Administrator (CKA). This book covers about 80%
-of the CKAD curriculum and about 50% of CKA.
+但 Kubernetes 是一个巨大的话题，我不会涵盖所有内容。最大的差距在管理方面，我不会深入讨论集群设置和管理，因为它们在不同的基础设施中有所不同。如果你计划小跑进入云环境中的Kubernetes作为您的生产环境，那么无论如何，托管服务中都会处理这些问题。如果你想获得 Kubernetes 认证，这本书是一个很好的开始，但它不会让你一直受益。有两个主要的Kubernetes认证：Certified Kubernetes Application Developer (CKAD) 以及 Certified Kubernetes Administrator (CKA)。这本书约占 CKAD 课程的 80%，约占 CKA 课程的50%。
 
-There’s also a reasonable amount of background knowledge you’ll need to work
-with this book effectively. I’ll explain lots of core principles as we encounter them in
-Kubernetes features, but I won’t fill in any gaps about containers. If you’re not familiar with ideas like images, containers, and registries, I’d recommend starting with my
-book, Learn Docker in a Month of Lunches (Manning, 2020). You don’t need to use
-Docker with Kubernetes, but it is the easiest and most flexible way to package your
-apps so you can run them in containers with Kubernetes.
+此外，你还需要掌握合理数量的背景知识来有效地阅读本书。当我们在讲解 Kubernetes 的特性时，但我不会填补任何关于容器的空白。如果您不熟悉镜像、容器和注册表等概念，我建议从我的
+这本书《一个月学会 Docker》开始。你不需要在使用 Kubernetes 时使用 Docker，但它是打包您的应用程序，以便您可以在Kubernetes的容器中运行它们的工具。
 
-If you classify yourself as a new or improving Kubernetes user, with a reasonable
-working knowledge of containers, then this is the book for you. Your background
-could be in development, operations, architecture, DevOps, or site reliability engineering (SRE)—Kubernetes touches all those roles, so they’re all welcome here, and
-you are going to learn an absolute ton of stuff.
+如果您将自己归类为一个全新的或想提升 Kubernetes 知识，那么这就是适合你的书。你的背景角色可能是开发、运维、架构、DevOps或站点可靠性工程（SRE）——Kubernetes涉及所有这些角色，因此他们都受到欢迎，并且
+你会学到很多东西。
 
 ## 1.3 创建你的实验环境
 
