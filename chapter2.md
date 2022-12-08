@@ -1,16 +1,8 @@
 # 第二章 Pods & Deployment 在 Kubernetes 中的应用
 
-Kubernetes runs containers for your application workloads, but the containers
-themselves are not objects you need to work with. Every container belongs to a Pod,
-which is a Kubernetes object for managing one or more containers, and Pods, in
-turn, are managed by other resources. These higher-level resources abstract away
-the details of the container, which powers self-healing applications and lets you use
-a desired-state workflow: you tell Kubernetes what you want to happen, and it
-decides how to make it happen.
+Kubernetes 通过容器来运行应用的工作负载，但是容器并不是在 Kubernetes 场景下你需要工作处理的对象。每个容器都属于某个叫做 Pod 的对象，它用于管理一个或多个容器，然后另外一个方面 Pods 被其它类型的资源所管理。这些高层级的对象抽象了具体的容器，它们提供了自我修复的程序并且提供了目标状态的工作流程：你告诉 Kubernetes 你想要实现的内容，然后 Kubernetes 来决定如何实现。
  
- In this chapter, we’ll get started with the basic building blocks of Kubernetes:
-Pods, which run containers, and Deployments, which manage Pods. We’ll use a simple web app for the exercises, and you’ll get hands-on experience using the Kubernetes command-line tool to manage applications and using the Kubernetes YAML
-specification to define applications.
+在本章中，我们将从 Kubernetes 基础的构建块开始：Pods 用于运行容器，以及 Deployments 用于管理 Pods。我们将使用一个简单的 Web app 进行练习，让你亲自动手使用 Kubernetes 命令行工具来管理应用并且使用 Kubernetes YAML 配置文件来定义应用程序。
 
 ## 2.1 Kubernetes 如何运行并管理容器
 
