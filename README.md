@@ -23,3 +23,17 @@
     - 1.3 [创建你的实验环境](./chapter1.md#13-创建你的实验环境)
 
     - 1.4 [立即见效](./chapter1.md#14-立即见效)
+  
+  - 第二章 [Pods & Deployment 在 Kubernetes 中的应用](./chapter2.md)
+
+    - 2.1 [Kubernetes 如何运行并管理容器](./chapter2.md#21-kubernetes-如何运行并管理容器)
+
+    - 2.2 [通过控制器运行 Pods](./chapter2.md#22-通过控制器运行-pods)
+
+    - 2.3 [在清单文件中定义 Deployments](./chapter2.md#23-在清单文件中定义-deployments)
+
+    - 2.4 [应用在 Pods 中运行](./chapter2.md#24-应用在-pods-中运行)
+
+    - 2.5 [了解 Kubernetes 资源管理](./chapter2.md#25-了解-kubernetes-资源管理)
+
+    - 2.6 [实验室](./chapter2.md#26-实验室)
