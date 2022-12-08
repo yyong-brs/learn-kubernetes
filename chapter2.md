@@ -6,14 +6,9 @@ Kubernetes 通过容器来运行应用的工作负载，但是容器并不是在
 
 ## 2.1 Kubernetes 如何运行并管理容器
 
-A container is a virtualized environment that typically runs a single application
-component. Kubernetes wraps the container in another virtualized environment:
-the Pod. A Pod is a unit of compute, which runs on a single node in the cluster. The
-Pod has its own virtual IP address, which is managed by Kubernetes, and Pods in
-the cluster can communicate with other Pods over that virtual network, even if
-they’re running on different nodes. 
+一个容器通常情况下作为虚拟环境来运行单个应用程序的组件。Kubernetes 将容器包装在另一个虚拟环境中： Pod。Pod 是一个计算单元，它在集群中的单个节点上运行。Pod 拥有受 Kubernetes 管理的的虚拟 IP 地址，并且就算Pods 运行在不同节点，它们之间也可以通过 Kubernetes 的虚拟网络进行通信。
  
- You normally run a single container in a Pod, but you can run multiple containers in one Pod, which opens up some interesting deployment options. All the containers in a Pod are part of the same virtual environment, so they share the same network address and can communicate using localhost. Figure 2.1 shows the relationship between containers and Pods.
+正常情况下你只会在一个 Pod 中运行一个容器，但是你可以在一个 Pod 中运行多个容器，这将会开启一些有趣的部署选项。一个 Pod 中的所有容器将拥有相同的虚拟环境，所以它们共享相同的网络地址并且可以通过 localhost 通信。图 2.1 显示了容器与 Pods 之间的关系。
 
 ![图2.1](./images/Figure2.1.png)
 <center>图2.1 Containers run inside Pods. You manage the Pods, and the Pods manage the containers. </center>
