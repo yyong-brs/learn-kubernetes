@@ -105,9 +105,6 @@ curl -sfL https://get.k3s.io | sh -s - --docker --disable=traefik --write-
    kubeconfig-mode=644
 ```
 
-If you prefer to run your lab environment in a VM and you’re familiar with using
-Vagrant to manage VMs, you can use the following Vagrant setup with Docker and K3s
-found in the source repository for the book:
 如果您喜欢在 VM 中运行实验室环境，并且您熟悉使用 Vagrant 管理 VM，您可以使用 Docker 和 K3s 的以下 Vagrant 设置，在本书的源存储库中可以找到：
 
 ```
