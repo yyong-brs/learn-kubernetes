@@ -18,31 +18,22 @@ Kubernetes 通过容器来运行应用的工作负载，但是容器并不是在
 <b>现在就试试</b> 你可以通过 Kubernetes 命令行运行一个简单的 Pod(无需编写 YAML 文件)。语法类似于 Docker 运行容器: 你需要说明你要使用的容器的镜像以及任何用于配置 Pod 行为的其他参数。
 
 ```
-# run a Pod with a single container; the restart flag tells Kubernetes
-# to create just the Pod and no other resources:
+# 运行一个单容器 Pod; restart 参数代表如果退出，不重启:
 kubectl run hello-kiamol --image=kiamol/ch02-hello-kiamol --restart=Never
-# wait for the Pod to be ready:
+# 等待 Pod 就绪:
 kubectl wait --for=condition=Ready pod hello-kiamol
-# list all the Pods in the cluster:
+# 查询所有的 Pod 清单:
 kubectl get pods
-# show detailed information about the Pod:
+# 查看 Pod 详细信息:
 kubectl describe pod hello-kiamol
 ```
 
-You can see my output in figure 2.2, where I’ve abridged the response from the final
-describe pod command. When you run it yourself, you’ll see a whole lot more obscure-
-sounding information in there, like node selectors and tolerations. They’re all part of
-the Pod specification, and Kubernetes has applied default values for everything that
-we didn’t specify in the run command.
+你可以看到图 2.2 是我执行时的输出，当你自己运行它时，你将在其中看到很多看起来晦涩难懂的信息，比如节点选择符和容错。他们都是 Pod 配置规范，Kubernetes 已将缺省值应用于我们没有在 Run 命令中指定的配置。
 
 ![图2.2](./images/Figure2.2.png)
-<center>图2.2 Running the simplest of Pods and checking its status using kubectl </center>
+<center>图2.2 运行最简单的 Pods 并且使用 Kubectl 检查它的状态 </center>
 
-Now you have a single application container in your cluster, running inside a single
-Pod. If you’re used to working with Docker, this is a familiar workflow, and it turns out
-that Pods are not as complicated as they might seem. The majority of your Pods will
-run single containers (until you start to explore more advanced options), and so you
-can effectively think of the Pod as the mechanism Kubernetes uses to run a container.
+现在你的集群中拥有一个应用容器，它运行在一个 Pod 内。如果你之前接触过 Docker，这是一个熟悉的工作流程，事实证明 Pods 并不像看起来那么复杂。你的大多数 Pods 都会运行单个容器(直到您开始探索更高级的选项)，因此你可以有效地将 Pod 视为 Kubernetes 用来运行容器的一种机制。
  
  Kubernetes doesn’t really run containers, though—it passes the responsibility
 for that to the container runtime installed on the node, which could be Docker or
