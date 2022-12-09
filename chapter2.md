@@ -11,17 +11,11 @@ Kubernetes 通过容器来运行应用的工作负载，但是容器并不是在
 正常情况下你只会在一个 Pod 中运行一个容器，但是你可以在一个 Pod 中运行多个容器，这将会开启一些有趣的部署选项。一个 Pod 中的所有容器将拥有相同的虚拟环境，所以它们共享相同的网络地址并且可以通过 localhost 通信。图 2.1 显示了容器与 Pods 之间的关系。
 
 ![图2.1](./images/Figure2.1.png)
-<center>图2.1 Containers run inside Pods. You manage the Pods, and the Pods manage the containers. </center>
+<center>图2.1 容器在 Pod 内运行。你管理 Pods, Pods 管理容器 </center>
 
-This business of multicontainer Pods is a bit much to introduce this early on, but if I
-glossed over it and talked only about single-container Pods, you’d be rightfully asking
-why Kubernetes uses Pods at all instead of just containers. Let’s run a Pod and see
-what it looks like to work with this abstraction over containers. 
+多容器 Pods 的业务在早期介绍有点多，但如果我掩盖它，只谈论单容器 Pods，你会理所当然地问：为什么 Kubernetes 使用 Pods 而不是容器。让我们运行一个Pod，然后看看使用容器上的这种抽象是什么样子的。
 
-TRY IT NOW You can run a simple Pod using the Kubernetes command line
-without needing a YAML specification. The syntax is similar to running a con-
-tainer using Docker: you state the container image you want to use and any
-other parameters to configure the Pod behavior.
+<b>现在就试试</b> 你可以通过 Kubernetes 命令行运行一个简单的 Pod(无需编写 YAML 文件)。语法类似于 Docker 运行容器: 你需要说明你要使用的容器的镜像以及任何用于配置 Pod 行为的其他参数。
 
 ```
 # run a Pod with a single container; the restart flag tells Kubernetes
