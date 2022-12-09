@@ -35,26 +35,18 @@ kubectl describe pod hello-kiamol
 
 现在你的集群中拥有一个应用容器，它运行在一个 Pod 内。如果你之前接触过 Docker，这是一个熟悉的工作流程，事实证明 Pods 并不像看起来那么复杂。你的大多数 Pods 都会运行单个容器(直到您开始探索更高级的选项)，因此你可以有效地将 Pod 视为 Kubernetes 用来运行容器的一种机制。
  
- Kubernetes doesn’t really run containers, though—it passes the responsibility
-for that to the container runtime installed on the node, which could be Docker or
-containerd or something more exotic. That’s why the Pod is an abstraction: it’s the
-resource that Kubernetes manages, whereas the container is managed by something
-outside of Kubernetes. You can get a sense of that by using kubectl to fetch specific
-information about the Pod.
+Kubernetes 并不真正运行容器，它把这个责任交给节点上的容器运行时，可能会是 Docker 或者其他之类的。这就是为什么是抽象的：它是 Kubernetes 管理的资源，而容器则是 Kubernetes 之外的某个东西管理。你可以通过 Kubectl 来获取有关 Pod 的信息。
 
-TRY IT NOW Kubectl returns basic information from the get pod command,
-but you can request more by applying an output parameter. You can name
-individual fields you want to see in the output parameter, and you can use the
-JSONPath query language or Go templates for complex output.
+<b>现在就试试</b> Kubectl 从 get pod 命令返回基本的信息,你可以通过指定输出相关的参数来请求返回更多的内容。你可以说出要在输出参数中看到的各个字段,可以使用 JSONPath 查询语言或者 Go 模板来得到复杂的输出。
 
 ```
-# get the basic information about the Pod:
+# 获取 Pod 基本信息:
 kubectl get pod hello-kiamol
-# specify custom columns in the output, selecting network details:
+# 指定输出的自定义列, 选择了网络相关信息:
 kubectl get pod hello-kiamol --output custom-
     columns=NAME:metadata.name,NODE_IP:status.hostIP,POD_IP:status.podIP 
-# specify a JSONPath query in the output,
-# selecting the ID of the first container in the Pod:
+# 指定查询 JSONPath ,
+# 选择 Pod 中第一个容器的 ID:
 kubectl get pod hello-kiamol -o 
     jsonpath='{.status.containerStatuses[0].containerID}'
 ```
