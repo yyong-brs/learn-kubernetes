@@ -211,150 +211,104 @@ Pod 和 Deployment 是本章中唯一要介绍的资源。您可以使用 kubect
 
 ## 2.3 在清单文件中定义 Deployments
 
-Application manifests are one of the most attractive aspects of Kubernetes, but also
-one of the most frustrating. When you’re wading through hundreds of lines of YAML
-trying to find the small misconfiguration that has broken your app, it can seem like
-the API was deliberately written to confuse and irritate you. At those times, remember
-that Kubernetes manifests are a complete description of your app, which can be ver-
-sioned and tracked in source control, and result in the same deployment on any
-Kubernetes cluster.
- 
  Manifests can be written in JSON or YAML; JSON is the native language of the
 Kubernetes API, but YAML is preferred for manifests because it’s easier to read, lets you
 define multiple resources in a single file, and, most important, can record comments in
-the specification. Listing 2.1 is the simplest app manifest you can write. It defines a sin-
-gle Pod using the same container image we’ve already used in this chapter.
+the specification. Listing 2.1 is the simplest app manifest you can write. It defines a single Pod using the same container image we’ve already used in this chapter.
 
-> Listing 2.1 pod.yaml, a single Pod to run a single container
+应用程序清单是 Kubernetes 最具吸引力的方面之一，但也是最令人沮丧的方面之一。当您在几百行 YAML 中挣扎时，试图找到破坏应用程序的小配置错误，可能会认为 API 是故意写来混淆和激怒您的。在这些时候，请记住 Kubernetes 清单是应用程序的完整描述，可以对其进行版本控制并跟踪源控制，并且在任何 Kubernetes 集群上部署相同的应用程序。
+
+清单可以用 JSON 或 YAML 编写；JSON 是 Kubernetes API 的原生语言，但 YAML 更适合清单，因为它更容易阅读，允许您在单个文件中定义多个资源，最重要的是，它可以在规范中记录注释。清单 2.1 是您可以编写的最简单的应用程序清单。它定义了一个使用本章已经使用过的相同容器镜像的单个 Pod。
+
+> 清单 2.1 pod.yaml, 单个 Pod 运行单个容器
 ```
-# Manifests always specify the version of the Kubernetes API
-# and the type of resource.
+# 清单同时指定了 Kubernetes API 的版本以及资源类型
 apiVersion: v1
 kind: Pod
-# Metadata for the resource includes the name (mandatory) 
-# and labels (optional).
+# 资源的元数据包括名称(必填项)和标签(可选)
 metadata:
   name: hello-kiamol-3
-# The spec is the actual specification for the resource.
-# For a Pod the minimum is the container(s) to run, 
-# with the container name and image.
+# spec 是资源的实际规格，对于 Pod 最小值是要运行的容器：包括容器名称以及镜像
 spec:
   containers:
    - name: web
      image: kiamol/ch02-hello-kiamol
  ```
 
-That’s a lot more information than you need for a kubectl run command, but the big
-advantage of the application manifest is that it’s declarative. Kubectl run and create
-are imperative operations—it’s you telling Kubernetes to do something. Manifests are
-declarative—you tell Kubernetes what you want the end result to be, and it goes off
-and decides what it needs to do to make that happen.
+这比 kubectl run 命令所需的信息要多得多，但应用程序清单的大优势是它是声明性的。Kubectl run 和 create 是命令性操作——你告诉 Kubernetes 做些什么。清单是声明性的——你告诉 Kubernetes 最终结果应该是什么，它就会去决定它需要做什么来使这种情况发生。
 
-TRY IT NOW You still use kubectl to deploy apps from manifest files, but you
-use the apply command, which tells Kubernetes to apply the configuration in
-the file to the cluster. Run another pod for this chapter’s sample app using a
-YAML file with the same contents as listing 2.1.
+<b>现在就试试</b> 您仍然使用 kubectl 从清单文件部署应用程序，但您使用 apply 命令，告诉 Kubernetes 将文件中的配置应用于集群。使用与清单 2.1 相同的内容的 YAML 文件运行本章示例应用程序的另一个 pod。
+
 ```
-# switch from the root of the kiamol repository to the chapter 2 folder:
+# 切换到第二章练习源码目录:
 cd ch02
-# deploy the application from the manifest file:
+# 基于清单文件部署应用:
 kubectl apply -f pod.yaml
-# list running Pods:
+# 查询 Pods:
 kubectl get pods
 ```
 
-The new Pod works in the same way as a Pod created with the kubectl run command:
-it’s allocated to a node, and it runs a container. The output in figure 2.13 shows that
-when I applied the manifest, Kubernetes decided it needed to create a Pod to get the
-current state of the cluster up to my desired state. That’s because the manifest speci-
-fies a Pod named hello-kiamol-3, and no such Pod existed.
+新的 Pod 与使用 kubectl run 命令创建的 Pod 工作方式相同：它分配给一个节点，并运行容器。图2.13 的输出显示，当我应用清单时，Kubernetes 决定需要创建一个 Pod 来使集群的当前状态达到我的期望状态。这是因为清单指定了一个名为 hello-kiamol-3 的 Pod，但没有这样的 Pod。
  
 ![图2.13](./images/Figure2.13.png)
-<center>图2.13 Applying a manifest sends the YAML file to the Kubernetes API, which  applies changes.</center>
+<center>图2.13 应用清单将YAML文件发送到Kubernetes API，该API应用更改</center>
 
-Now that the Pod is running, you can manage it in the same way with kubectl: by list-
-ing the details of the Pod and running a port forward to send traffic to the Pod. The
-big difference is that the manifest is easy to share, and manifest-based Deployment is
-repeatable. I can run the same kubectl apply command with the same manifest any
-number of times, and the result will always be the same: a Pod named hello-kiamol-3
-running my web container.
+现在 Pod 正在运行，您可以使用 kubectl 以相同的方式进行管理：通过列出 Pod 的详细信息并运行端口转发来向 Pod 发送流量。大的不同在于清单易于共享，基于清单的部署是可重复的。我可以多次运行相同的 kubectl apply 命令和相同的清单，结果总是一样的：一个名为 hello-kiamol-3 的 Pod 运行我的 web 容器。
 
-TRY IT NOW Kubectl doesn’t even need a local copy of a manifest file. It can
-read the contents from any public URL. Deploy the same Pod definition
-direct from the file on GitHub.
+<b>现在就试试</b> Kubectl 并不一定需要本地的清单文件，它可以获取远程的 URL 信息，让我们通过 GitHub 中的文件来部署同样的 Pod。
+
 ```
-# deploy the application from the manifest file:
-kubectl apply -f https://raw.githubusercontent.com/sixeyed/kiamol/
-    master/ch02/pod.yaml
+# 从清单文件部署:
+kubectl apply -f https://github.com/yyong-brs/learn-kubernetes/blob/master/kiamol/ch02/pod.yaml
 ```
 
-Figure 2.14 shows the output. The resource definition matches the Pod running in
-the cluster, so Kubernetes doesn’t need to do anything, and kubectl shows that the
-matching resource is unchanged.
+图2.14 显示了输出。资源定义与集群中运行的 Pod 匹配，因此 Kubernetes 不需要做任何事情，而 kubectl 显示匹配的资源未更改。
  
 ![图2.14](./images/Figure2.14.png)
-<center>图2.14 Kubectl can download manifest files from  a web server and send them  to the Kubernetes API.</center>
- 
- Application manifests start to get more interesting when you work with higher-level
-resources. When you define a Deployment in a YAML file, one of the required fields is
-the specification of the Pod that the Deployment should run. That Pod specification is
-the same API for defining a Pod on its own, so the Deployment definition is a compos-
-ite that includes the Pod spec. Listing 2.2 shows the minimal definition for a Deploy-
-ment resource, running yet another version of the same web app.
+<center>图2.14 Kubectl 可以通过从远程服务器下载清单文件，并发送到 Kubernetes API 执行</center>
 
-> Listing 2.2 deployment.yaml, a Deployment and Pod specification
+应用程序清单在与高级资源一起工作时变得更有趣。当您在 YAML 文件中定义 Deployment 时，其中一个必填字段是 Deployment 应运行的 Pod 的规范。该 Pod 规范是独立定义 Pod 的相同 API，因此 Deployment 定义是一个复合体，包括 Pod spec。清单 2.2 显示了运行同一个 web 应用程序的另一个版本的 Deployment 资源的最小定义。
+
+> 清单 2.2 deployment.yaml, Deployment 及 Pod 配置
 
 ```
-# Deployments are part of the apps version 1 API spec.
+# Deployments 是 apps 版本v1 API 规范的一部分
 apiVersion: apps/v1
 kind: Deployment
-# The Deployment needs a name.
+# Deployments 需要一个名称
 metadata:
   name: hello-kiamol-4
-# The spec includes the label selector the Deployment uses 
-# to find its own managed resources—I’m using the app label,
-# but this could be any combination of key-value pairs.
+# spec 包括 Deployment 使用的标签选择器来找到它自己的资源 - 我正在使用 app 标签，但这可能是任何组合的键值对.
 spec:
   selector:
     matchLabels:
       app: hello-kiamol-4
-    # The template is used when the Deployment creates a Pod template.
-    # Pods in a Deployment don’t have a name, 
-    # but they need to specify labels that match the selector
-    # metadata.
+    # template 在 Deployment 创建 Pod 模板时使用.
+    # PDeployment 中的 Pods 没有名称，但它们需要指定与选择器匹配的标签
       labels:
         app: hello-kiamol-4
-  # The Pod spec lists the container name and image spec.
+  # Pod 规范列出容器名称和镜像规范
   containers:
     - name: web
       image: kiamol/ch02-hello-kiamol
 ```
 
-This manifest is for a completely different resource (which just happens to run the
-same application), but all Kubernetes manifests are deployed in the same way using
-kubectl apply. That gives you a nice layer of consistency across all your apps—no mat-
-ter how complex they are, you’ll define them in one or more YAML files and deploy
-them using the same kubectl command.
+这个清单是用于一个完全不同的资源（它只是运行相同应用程序的巧合），但所有 Kubernetes 清单都是使用 kubectl apply 以相同方式部署的。这为您的所有应用程序提供了一个很好的一致性层，无论它们有多复杂，您都可以在一个或多个 YAML 文件中定义它们，并使用相同的 kubectl 命令部署它们。
 
-TRY IT NOW Apply the Deployment manifest to create a new Deployment,
-which in turn will create a new Pod.
+<b>现在就试试</b> 这个指令是要求将 Deployment 清单应用于创建一个新的 Deployment，这样可以创建一个新的 Pod。
 ```
-# run the app using the Deployment manifest:
+# 使用 deployment 清单运行应用程序:
 kubectl apply -f deployment.yaml
-# find Pods managed by the new Deployment:
+# 找到新 deployment 管理的 Pods:
 kubectl get pods -l app=hello-kiamol-4
 ```
 
-The output in figure 2.15 shows the same end result as creating a Deployment with
-kubectl create, but my whole app specification is clearly defined in a single YAML file.
+图 2.15 输出结果与使用 kubectl create 创建的 Deployment 相同，但整个应用程序规范都定义在单个 YAML 文件中。
  
 ![图2.15](./images/Figure2.15.png)
-<center>图2.15 Applying a manifest creates the Deployment because no matching resource existed.</center>
+<center>图2.15 通过 deployment 清单可以创建一个 deployment，因为没有匹配的资源存在</center>
 
-As the app grows in complexity, I need to specify how many replicas I want, what CPU
-and memory limits should apply, how Kubernetes can check whether the app is healthy,
-and where the application configuration settings come from and where it writes data—
-I can do all that just by adding to the YAML. 
+随着应用程序复杂度的增加，我需要指定我想要的副本数量，应用的 CPU 和内存限制，以及 Kubernetes 如何检查应用程序是否健康，应用程序配置设置来自哪里，数据写入哪里——我可以通过添加 YAML 来实现所有这些。
 
 ## 2.4 应用在 Pods 中运行
 
