@@ -51,95 +51,55 @@ kubectl get pod hello-kiamol -o
     jsonpath='{.status.containerStatuses[0].containerID}'
 ```
 
-My output is shown in figure 2.3. I’m running a single-node Kubernetes cluster using
-Docker Desktop on Windows. The node IP in the second command is the IP address
-of my Linux VM, and the Pod IP is the virtual address of the Pod in the cluster. The
-container ID returned in the third command is prefixed by the name of the container runtime; mine is Docker.
+我的输出如图 2.3 所示。我在 windows 上的 Docker Desktop 运行了一个单节点的 Kubernetes 集群，第二条命令中的节点 IP 是我的 Linux 虚机的 Ip 地址，然后 Pod IP 是集群中的 Pod 虚拟地址。第三条命令输出的 container ID 以容器运行时的名字作为前缀，我的是 Docker。
 
 ![图2.3](./images/Figure2.3.png)
-<center>图2.3 Kubectl has many options for customizing its output for Pods and other objects. </center>
+<center>图2.3 Kubectl 有很多选项可以自定义各种对象包括 Pods 的输出 </center>
 
-That may have felt like a pretty dull exercise, but it comes with two important take-
-aways. The first is that kubectl is a hugely powerful tool—as your main point of con-
-tact with Kubernetes, you’ll be spending a lot of time with it, and it’s worth getting a
-solid understanding of what it can do. Querying the output from commands is a use-
-ful way to see the information you care about, and because you can access all the
-details of the resource, it’s great for automation too. The second takeaway is a
-reminder that Kubernetes does not run containers—the container ID in the Pod is a
-reference to another system that runs containers.
- 
- Pods are allocated to one node when they’re created, and it’s that node’s responsi-
-bility to manage the Pod and its containers. It does that by working with the container
-runtime using a known API called the Container Runtime Interface (CRI). The CRI
-lets the node manage containers in the same way for all the different container run-
-times. It uses a standard API to create and delete containers and to query their state.
-While the Pod is running, the node works with the container runtime to ensure the
-Pod has all the containers it needs.
+这可能会让人觉得很枯燥，但它有两个重要的要点。首先，kubectl 是一个非常强大的工具，作为你与 Kubernetes 的主要联系点，你将花费大量时间使用它，非常值得去理解它能做什么。查询命令的输出是查看您关心的信息的有用方法，因为您可以访问所有资源的详细信息，这对自动化也很有用。第二个要点是提醒 Kubernetes不运行容器，Pod 中的容器 ID 是引用自另一个运行容器的系统。
 
-TRY IT NOW All Kubernetes environments use the same CRI mechanism to
-manage containers, but not all container runtimes allow you to access con-
-tainers outside of Kubernetes. This exercise shows you how a Kubernetes
-node keeps its Pod containers running, but you’ll only be able to follow it if
-you’re using Docker as your container runtime.
+Pods 在创建时被分配给一个节点，该节点负责管理 Pod 及其容器，它通过使用容器运行时中的称为容器运行时接口（CRI）的已知API 来实现此操作。CRI 让节点以相同的方式为所有不同的容器运行时管理容器。它使用一个标准API来创建和删除容器并查询它们的状态。当 Pod 运行时，节点与容器运行时一起工作，以确保 Pod 有它需要的所有容器。
+
+<b>现在就试试</b> 所有 Kubernetes 环境都使用相同的 CRI 机制来管理容器，但不是所有的容器运行时都允许您访问 Kubernetes 之外的容器。本练习向您展示Kubernetes 节点如何确保其 Pod 容器的运行，这里使用的是 Docker 容器运行时进行演示。
+
 ```
-# find the Pod’s container:
+# 查询 Pod 中的容器:
 docker container ls -q --filter 
     label=io.kubernetes.container.name=hello-kiamol
-# now delete that container:
+# 现在，删除容器:
 docker container rm -f $(docker container ls -q --filter 
     label=io.kubernetes.container.name=hello-kiamol)
-# check the Pod status:
+# 检查 Pod 状态:
 kubectl get pod hello-kiamol
-# and find the container again:
+# 可以再次看到容器:
 docker container ls -q --filter 
     label=io.kubernetes.container.name=hello-kiamol
 ```
 
-You can see from figure 2.4 that Kubernetes reacted when I deleted my Docker con-
-tainer. For an instant, the Pod had zero containers, but Kubernetes immediately cre-
-ated a replacement to repair the Pod and bring it back to the correct state.
+从图 2.4 中可以看到，当我删除 Docker 容器时，Kubernetes做出了反应，一时间 Pod 没有了容器，但 Kubernetes 立即创建了一个替代容器来修复 Pod 并将其恢复到正确的状态。
 
 ![图2.4](./images/Figure2.4.png)
-<center>图2.4 Kubernetes makes sure Pods have all the containers they need. </center>
- 
- It’s the abstraction from containers to Pods that lets Kubernetes repair issues like
-this. A failed container is a temporary fault; the Pod still exists, and the Pod can be
-brought back up to spec with a new container. This is just one level of self-healing that
-Kubernetes provides, with further abstractions on top of Pods giving your apps even
-more resilience.
+<center>图2.4 Kubernetes 确保 Pods 可以始终拥有它所需的容器 </center>
 
-One of those abstractions is the Deployment, which we’ll look at in the next section.
-Before we move on, let’s see what’s actually running in that Pod. It’s a web application,
-but you can’t browse to it because we haven’t configured Kubernetes to route network
-traffic to the Pod. We can get around that using another feature of kubectl.
+从容器到 Pods 的抽象可以让 Kubernetes 修复此类问题。一个失败的容器可能是临时的故障；Pod 仍然存在，并且 Pod 可以用一个新的容器使其符合目标。这只是 Kubernetes 提供的自我修复的一个级别，Kubernetes 在 Pods 之上提供了进一步的抽象，使你的应用程序更具弹性。
 
-TRY IT NOW Kubectl can forward traffic from a node to a Pod, which is a
-quick way to communicate with a Pod from outside the cluster. You can listen
-on a specific port on your machine—which is the single node in your cluster—
-and forward traffic to the application running in the Pod.
+其中一个抽象是 Deployment，我们将在下一节中讨论。在我们继续之前，让我们看看Pod中到底在运行什么。这是一个 web 应用程序，但你还不能访问它，因为我们还没有配置 Kubernetes 来路由网络到 Pod 的流量。我们可以使用 kubectl 的另一个特性来解决这个问题。
+
+<b>现在就试试</b> Kubectl 可以将流量从节点转发到Pod，这是一个从集群外部与 Pod 通信的快速方式。你可以监听在计算机上的特定端口，该端口是集群中的单个节点上的——并将流量转发到 Pod 中运行的应用程序。
+
 ```
-# listen on port 8080 on your machine and send traffic
-# to the Pod on port 80:
+# 监听你机器的 8080 端口，并将流量发送到 Pod 的 80 端口
 kubectl port-forward pod/hello-kiamol 8080:80
-# now browse to http://localhost:8080
-# when you’re done press ctrl-c to end the port forward
+# 现在访问 http://localhost:8080
+# 当你结束之后，可以通过 ctrl-c 结束端口转发
 ```
 
-My output is shown in figure 2.5, and you can see it’s a pretty basic website (don’t con-
-tact me for web design consultancy). The web server and all the content are packaged
-into a container image on Docker Hub, which is publicly available. All the CRI-
-compatible container runtimes can pull the image and run a container from it, so I
-know that for whichever Kubernetes environment you’re using, when you run the
-app, it will work in the same way for you as it does for me.
+我的输出如图 2.5 所示，你可以发现它是一个非常基本的 web 网站。这个 Web服务器和所有的内容都已打包到 Docker Hub 上的容器镜像中，该镜像是公开可用的。所有CRI-兼容的容器运行时可以提取镜像并从中运行容器，因此当您运行应用程序是，它对你的工作方式与对我的工作方式是相同的。
  
 ![图2.5](./images/Figure2.5.png)
-<center>图2.5 This app isn’t configured to receive network traffic, but kubectl can forward it </center>
- 
- Now we have a good handle on the Pod, which is the smallest unit of compute in
-Kubernetes. You need to understand how that all works, but the Pod is a primitive
-resource, and in normal use, you’d never run a Pod directly; you’d always create a con-
-troller object to manage the Pod for you.
+<center>图 2.5 这个应用并没有配置接收网络流量，但是 Kubectl 可以转发网络流量 </center>
 
+现在我们很好地了解了Pod，它是Kubernetes 中最小的计算单元。你需要了解这一切是如何运作的，但Pod是一个原始的资源，在正常使用中，您永远不会直接运行Pod；您总是创建一个控制器对象来管理 Pod。
 
 ## 2.2 通过控制器运行 Pods
 
