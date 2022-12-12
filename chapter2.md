@@ -312,6 +312,187 @@ kubectl get pods -l app=hello-kiamol-4
 
 ## 2.4 应用在 Pods 中运行
 
+Pods and Deployments are there to keep your app running, but all the real work is
+happening in the container. Your container runtime may not give you access to work
+with containers directly—a managed Kubernetes cluster won’t give you control of
+Docker or containerd—but you can still work with containers in Pods using kubectl.
+The Kubernetes command line lets you run commands in containers, view application
+logs, and copy files.
+
+TRY IT NOW You can run commands inside containers with kubectl and connect a terminal session, so you can connect into a Pod’s container as though
+you were connecting to a remote machine.
+
+```
+# check the internal IP address of the first Pod we ran: 
+kubectl get pod hello-kiamol -o custom-columns=NAME:metadata.name,POD_IP:status.podIP
+# run an interactive shell command in the Pod:
+kubectl exec -it hello-kiamol -- sh
+# inside the Pod, check the IP address:
+hostname -i
+# and test the web app:
+wget -O - http://localhost | head -n 4
+# leave the shell:
+exit
+```
+
+My output is shown in figure 2.16, where you can see that the IP address in the container environment is the one set by Kubernetes, and the web server running in the
+container is available at the localhost address.
+
+![图2.16](./images/Figure2.16.png)
+<center>图2.16 You can use kubectl to run commands inside Pod containers, including interactive shells.</center>
+
+Running an interactive shell inside a Pod container is a useful way of seeing how the
+world looks to that Pod. You can read file contents to check that configuration settings
+are being applied correctly, run DNS queries to verify that services are resolving as
+expected, and ping endpoints to test the network. Those are all good troubleshooting
+techniques, but for ongoing administration, a simpler option is to read the application logs, and kubectl has a dedicated command just for that.
+
+TRY IT NOW Kubernetes fetches application logs from the container runtime.
+You can read logs with kubectl, and if you have access to the container runtime, you can verify that they are the same as the container logs.
+```
+# print the latest container logs from Kubernetes:
+kubectl logs --tail=2 hello-kiamol
+# and compare the actual container logs—if you’re using Docker:
+docker container logs --tail=2 $(docker container ls -q --filter 
+  label=io.kubernetes.container.name=hello-kiamol)
+```
+
+You can see from my output, shown in figure 2.17, that Kubernetes just relays log entries
+exactly as they come from the container runtime.
+
+![图2.17](./images/Figure2.17.png)
+<center>图2.17 Kubernetes reads logs from the container sou you don't need access to the container runtime.</center>
+
+The same features are available for all Pods, no matter how they were created. Pods
+that are managed by controllers have random names, so you don’t refer to them
+directly. Instead, you can access them by their controller or by their labels.
+
+TRY IT NOW You can run commands in Pods that are managed by a Deployment without knowing the Pod name, and you can view the logs of all Pods
+that match a label selector.
+
+# make a call to the web app inside the container for the 
+# Pod we created from the Deployment YAML file:
+```
+kubectl exec deploy/hello-kiamol-4 -- sh -c 'wget -O - http://localhost 
+  > /dev/null'
+# and check that Pod’s logs:
+kubectl logs --tail=1 -l app=hello-kiamol-4
+```
+
+Figure 2.18 shows the command running inside the Pod container, which causes the
+application to write a log entry. We see that in the Pod logs.
+
+![图2.18](./images/Figure2.18.png)
+<center>图2.18 You can work with Pods using kubectl without knowing the Pod's name.</center>
+
+In a production environment, you can have all the logs from all of your Pods collected and sent to a central storage system, but until you get there, this is a useful
+and easy way to read application logs. You also saw in that exercise that there are different ways to get to Pods that are managed by a controller. Kubectl lets you supply a
+label selector to most commands, and some commands—like exec—can be run
+against different targets.
+ 
+ The last function you’re likely to use with Pods is to interact with the filesystem.
+Kubectl lets you copy files between your local machine and containers in Pods.
+
+TRY IT NOW Create a temporary directory on your machine, and copy a file
+into it from the Pod container.
+```
+# create the local directory:
+mkdir -p /tmp/kiamol/ch02
+# copy the web page from the Pod:
+kubectl cp hello-kiamol:/usr/share/nginx/html/index.html 
+  /tmp/kiamol/ch02/index.html
+# check the local file contents:
+cat /tmp/kiamol/ch02/index.html
+```
+
+In figure 2.19, you can see that kubectl copies the file from the Pod container onto my
+local machine. This works whether your Kubernetes cluster is running locally or on
+remote servers, and it’s bidirectional, so you can use the same command to copy a
+local file into a Pod. That can be a useful—if hacky—way to work around an application problem.
+
+![图2.19](./images/Figure2.19.png)
+<center>图2.19.Copying files between Pod containers and the local machine is useful for troubleshooting.</center>
+
+That’s about all we’re going to cover in this chapter, but before we move on, we need
+to delete the Pods we have running, and that is a little bit more involved than you
+might think.
+
+
 ## 2.5 了解 Kubernetes 资源管理
 
+You can easily delete a Kubernetes resource using kubectl, but the resource might not
+stay deleted. If you created a resource with a controller, then it’s the controller’s job to
+manage that resource. It owns the resource life cycle, and it doesn’t expect any external interference. If you delete a managed resource, then its controller will create a
+replacement.
+
+TRY IT NOW Use the kubectl delete command to remove all Pods and verify
+that they’re really gone.
+```
+# list all running Pods:
+kubectl get pods
+# delete all Pods:
+kubectl delete pods --all
+# check again:
+kubectl get pods
+```
+
+You can see my output in figure 20.20. Is it what you expected?
+ 
+![图2.20](./images/Figure2.20.png)
+<center>图2.20  Controllers own their resources. If something else deletes them, the controller replaces them.</center>
+
+
+ Two of those Pods were created directly with the run command and with a YAML
+Pod specification. They don’t have a controller managing them, so when you delete
+them, they stay deleted. The other two were created by Deployments, and when you
+delete the Pod, the Deployment controllers still exist. They see there are no Pods that
+match their label selectors, so they create new ones. 
+ 
+ It seems obvious when you know about it, but it’s a gotcha that will probably keep
+cropping up through all your days with Kubernetes. If you want to delete a resource
+that is managed by a controller, you need to delete the controller instead. Controllers
+clean up their resources when they are deleted, so removing a Deployment is like a
+cascading delete that removes all the Deployment’s Pods, too.
+
+TRY IT NOW Check the Deployments you have running, and then delete them
+and confirm that the remaining Pods have been deleted.
+```
+# view Deployments:
+kubectl get deploy
+# delete all Deployments:
+kubectl delete deploy --all
+# view Pods:
+kubectl get pods
+# check all resources:
+kubectl get all
+```
+
+Figure 2.21 shows my output. I was fast enough to see the Pods being removed, so
+they’re shown in the terminating state. A few seconds later, the Pods and the Deployment were removed, so the only resource I have running is the Kubernetes API
+server itself.
+ 
+![图2.21](./images/Figure2.21.png)
+<center>图2.21 Deleting controllers starts a cascade effect, where the controller deletes all its resources.</center>
+
+Now your Kubernetes cluster isn’t running any applications, and it’s back to its original state. 
+ 
+ We’ve covered a lot in this chapter. You’ve got a good understanding of how
+Kubernetes manages containers with Pods and Deployments, had an introduction to
+YAML specifications, and had lots of experience using kubectl to work with the Kubernetes API. We’ve built on the core concepts gradually, but you probably have a fair
+idea now that Kubernetes is a complex system. If you have time to go through the following lab, that will certainly help cement what you’ve learned.
+
 ## 2.6 实验室
+
+This is your first lab; it’s a challenge for you to complete yourself. The goal is to write a
+Kubernetes YAML spec for a Deployment that will run an application in a Pod, and
+then test the app to make sure it runs as expected. Here are a few hints to get you
+started:
+- In the ch02/lab folder, there’s a file called pod.yaml that you can try out. It runs
+the app but defines a Pod rather than a Deployment.
+- The application container runs a website that listens on port 80.
+- When you forward traffic to the port, the web app responds with the hostname
+of the machine it’s running on.
+- That hostname is actually the Pod name, which you can verify using kubectl.
+If you find this a bit tricky, I have the following sample solution on GitHub that you
+can use for reference: https://github.com/sixeyed/kiamol/blob/master/ch02/lab/
+README.md.
