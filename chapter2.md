@@ -307,14 +307,9 @@ kubectl get pods -l app=hello-kiamol-4
 
 ## 2.4 应用在 Pods 中运行
 
-Pods and Deployments are there to keep your app running, but all the real work is
-happening in the container. Your container runtime may not give you access to work
-with containers directly—a managed Kubernetes cluster won’t give you control of
-Docker or containerd—but you can still work with containers in Pods using kubectl.
-The Kubernetes command line lets you run commands in containers, view application
-logs, and copy files.
+Pods 和 Deployments 只是为了让你的应用程序运行，但真正的工作发生在容器里。容器运行时可能不允许你直接使用容器 ——一个托管的Kubernetes集群不会给你 Docker 或者 Containerd 的控制权-但您仍然可以使用kubectl在Pods中使用容器。Kubernetes命令行允许您在容器中运行命令，查看应用程序日志，复制文件。
 
-TRY IT NOW You can run commands inside containers with kubectl and connect a terminal session, so you can connect into a Pod’s container as though
+TRY IT NOW You can run commands inside containers with kubectl and connect a terminal session, so you can connect into a Pod’s container as though
 you were connecting to a remote machine.
 
 ```
