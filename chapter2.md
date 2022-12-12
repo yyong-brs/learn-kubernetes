@@ -211,11 +211,6 @@ Pod 和 Deployment 是本章中唯一要介绍的资源。您可以使用 kubect
 
 ## 2.3 在清单文件中定义 Deployments
 
- Manifests can be written in JSON or YAML; JSON is the native language of the
-Kubernetes API, but YAML is preferred for manifests because it’s easier to read, lets you
-define multiple resources in a single file, and, most important, can record comments in
-the specification. Listing 2.1 is the simplest app manifest you can write. It defines a single Pod using the same container image we’ve already used in this chapter.
-
 应用程序清单是 Kubernetes 最具吸引力的方面之一，但也是最令人沮丧的方面之一。当您在几百行 YAML 中挣扎时，试图找到破坏应用程序的小配置错误，可能会认为 API 是故意写来混淆和激怒您的。在这些时候，请记住 Kubernetes 清单是应用程序的完整描述，可以对其进行版本控制并跟踪源控制，并且在任何 Kubernetes 集群上部署相同的应用程序。
 
 清单可以用 JSON 或 YAML 编写；JSON 是 Kubernetes API 的原生语言，但 YAML 更适合清单，因为它更容易阅读，允许您在单个文件中定义多个资源，最重要的是，它可以在规范中记录注释。清单 2.1 是您可以编写的最简单的应用程序清单。它定义了一个使用本章已经使用过的相同容器镜像的单个 Pod。
