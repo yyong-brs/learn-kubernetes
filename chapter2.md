@@ -348,8 +348,6 @@ docker container logs --tail=2 $(docker container ls -q --filter
 
 所有 Pod 都可以使用相同的功能，无论它们是如何创建的。由控制器管理的 Pod 名称是随机的，因此您不能直接引用它们。相反，您可以通过它们的控制器或标签来访问它们。
 
-TRY IT NOW You can run commands in Pods that are managed by a Deployment without knowing the Pod name, and you can view the logs of all Pods
-that match a label selector.
 <b>现在就试试</b> 您可以在由 Deployment 管理的 Pod 中运行命令，而无需知道 Pod 名称，并且可以查看与标签选择器匹配的所有 Pod 的日志。
 
 ```
@@ -424,32 +422,22 @@ kubectl get pods
 kubectl get all
 ```
 
-Figure 2.21 shows my output. I was fast enough to see the Pods being removed, so
-they’re shown in the terminating state. A few seconds later, the Pods and the Deployment were removed, so the only resource I have running is the Kubernetes API
-server itself.
+图 2.21 显示了我的输出。我的速度足够快，可以看到Pods正在被删除，因此它们处于终止状态。几秒钟后，Pods和Deployment被删除，因此我运行的唯一资源就是Kubernetes API服务器本身。
  
 ![图2.21](./images/Figure2.21.png)
-<center>图2.21 Deleting controllers starts a cascade effect, where the controller deletes all its resources.</center>
+<center>图2.21 删除控制器启动级联动作，控制器将删除所有它管理的资源</center>
 
-Now your Kubernetes cluster isn’t running any applications, and it’s back to its original state. 
- 
- We’ve covered a lot in this chapter. You’ve got a good understanding of how
-Kubernetes manages containers with Pods and Deployments, had an introduction to
-YAML specifications, and had lots of experience using kubectl to work with the Kubernetes API. We’ve built on the core concepts gradually, but you probably have a fair
-idea now that Kubernetes is a complex system. If you have time to go through the following lab, that will certainly help cement what you’ve learned.
+现在，您的Kubernetes集群没有运行任何应用程序，并且已回到原始状态。
+
+我们在本章中讲了很多内容。您对Kubernetes如何使用Pods和Deployments管理容器有了很好的理解，同时对 YAML 规范有了介绍，并且使用 kubectl 与 Kubernetes API 进行了大量交互。我们逐步建立了核心概念，但是现在您可能已经大致了解Kubernetes是一个复杂的系统。如果您有时间完成以下实验，这将有助于巩固您所学的内容。
 
 ## 2.6 实验室
 
-This is your first lab; it’s a challenge for you to complete yourself. The goal is to write a
-Kubernetes YAML spec for a Deployment that will run an application in a Pod, and
-then test the app to make sure it runs as expected. Here are a few hints to get you
-started:
-- In the ch02/lab folder, there’s a file called pod.yaml that you can try out. It runs
-the app but defines a Pod rather than a Deployment.
-- The application container runs a website that listens on port 80.
-- When you forward traffic to the port, the web app responds with the hostname
-of the machine it’s running on.
-- That hostname is actually the Pod name, which you can verify using kubectl.
-If you find this a bit tricky, I have the following sample solution on GitHub that you
-can use for reference: https://github.com/sixeyed/kiamol/blob/master/ch02/lab/
-README.md.
+这是您的第一个实验，挑战你自己完成它。目标是编写一个 Kubernetes YAML规范，用于在Pod中运行应用程序的Deployment，然后测试应用程序，以确保它按预期运行。以下是一些提示，帮助您开始：
+
+- 在 ch02/lab 文件夹中，有一个名为 pod.yaml 的文件，您可以尝试。它运行应用程序，但定义了Pod 而不是 Deployment。
+- 应用容器运行监听端口 80 的网站。
+- 当您将流量转发到端口时，Web 应用程序会以它正在运行的机器的主机名作为响应。
+- 该主机名实际上是 Pod 名称，您可以使用kubectl验证。
+
+如果您觉得这有点棘手，我在 GitHub 上提供了以下示例解决方案，您可以用作参考：https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch02/lab/README.md。
