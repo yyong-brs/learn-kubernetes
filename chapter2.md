@@ -309,49 +309,42 @@ kubectl get pods -l app=hello-kiamol-4
 
 Pods 和 Deployments 只是为了让你的应用程序运行，但真正的工作发生在容器里。容器运行时可能不允许你直接使用容器 ——一个托管的Kubernetes集群不会给你 Docker 或者 Containerd 的控制权-但您仍然可以使用kubectl在Pods中使用容器。Kubernetes命令行允许您在容器中运行命令，查看应用程序日志，复制文件。
 
-TRY IT NOW You can run commands inside containers with kubectl and connect a terminal session, so you can connect into a Pod’s container as though
-you were connecting to a remote machine.
+<b>现在就试试</b> 您可以使用 kubectl 在容器内运行命令并连接终端会话，这样您就可以像连接远程计算机一样连接到 Pod 的容器。
 
 ```
-# check the internal IP address of the first Pod we ran: 
+# 检查我们运行的第一个 Pod 的内部 IP 地址: 
 kubectl get pod hello-kiamol -o custom-columns=NAME:metadata.name,POD_IP:status.podIP
-# run an interactive shell command in the Pod:
+# 在 Pod 中运行交互式 shell 命令:
 kubectl exec -it hello-kiamol -- sh
-# inside the Pod, check the IP address:
+# 在 Pod 中, 检查 IP address:
 hostname -i
-# and test the web app:
+# 测试 web app:
 wget -O - http://localhost | head -n 4
-# leave the shell:
+# 退出 shell:
 exit
 ```
 
-My output is shown in figure 2.16, where you can see that the IP address in the container environment is the one set by Kubernetes, and the web server running in the
-container is available at the localhost address.
+我的输出如图2.16所示，在图中可以看到，容器环境中的 IP 地址是 Kubernetes 设置的，容器中运行的 Web 服务器可以通过 localhost 地址访问。
 
 ![图2.16](./images/Figure2.16.png)
-<center>图2.16 You can use kubectl to run commands inside Pod containers, including interactive shells.</center>
+<center>图2.16 您可以使用 kubectl 在 Pod 容器内运行命令，包括交互式 shells.</center>
 
-Running an interactive shell inside a Pod container is a useful way of seeing how the
-world looks to that Pod. You can read file contents to check that configuration settings
-are being applied correctly, run DNS queries to verify that services are resolving as
-expected, and ping endpoints to test the network. Those are all good troubleshooting
-techniques, but for ongoing administration, a simpler option is to read the application logs, and kubectl has a dedicated command just for that.
+在 Pod 容器内部运行一个交互式 shell 是查看 Pod 中的世界的样子最有用的办法。你可以查看文件内容以检查相关配置是否正确，运行 DNS 查询以验证服务是否被正常识别，以及 ping 一些端点以测试网络。如上所述的所有都是很好的故障排除方法，但对于持续的管理，一个更简单的选择是读取应用程序日志，kubectl有一个专门的命令就是这个为了日志的目的。
 
-TRY IT NOW Kubernetes fetches application logs from the container runtime.
-You can read logs with kubectl, and if you have access to the container runtime, you can verify that they are the same as the container logs.
+<b>现在就试试</b> Kubernetes从容器运行时获取应用程序日志。您可以使用kubectl阅读日志，如果您有权访问容器运行时，可以验证它们与容器日志是相同的。
+
 ```
-# print the latest container logs from Kubernetes:
+# 打印 kuberneters 容器最新的日志:
 kubectl logs --tail=2 hello-kiamol
-# and compare the actual container logs—if you’re using Docker:
+# 和 Docker 原生的日志对比:
 docker container logs --tail=2 $(docker container ls -q --filter 
   label=io.kubernetes.container.name=hello-kiamol)
 ```
 
-You can see from my output, shown in figure 2.17, that Kubernetes just relays log entries
-exactly as they come from the container runtime.
+从我的输出中可以看出，如图2.17所示，Kubernetes只是将日志条目完全转发自容器运行时。
 
 ![图2.17](./images/Figure2.17.png)
-<center>图2.17 Kubernetes reads logs from the container sou you don't need access to the container runtime.</center>
+<center>图2.17 kubernetes 从容器读取日志，所以你不需要自己去访问容器运行时</center>
 
 The same features are available for all Pods, no matter how they were created. Pods
 that are managed by controllers have random names, so you don’t refer to them
@@ -359,6 +352,7 @@ directly. Instead, you can access them by their controller or by their labels.
 
 TRY IT NOW You can run commands in Pods that are managed by a Deployment without knowing the Pod name, and you can view the logs of all Pods
 that match a label selector.
+<b>现在就试试</b> 
 
 # make a call to the web app inside the container for the 
 # Pod we created from the Deployment YAML file:
