@@ -408,29 +408,19 @@ kubectl get pods
 ![图2.20](./images/Figure2.20.png)
 <center>图2.20  控制器拥有它们的资源，如果其它操作删除了它们，控制器将创建替换对象 </center>
 
-
- Two of those Pods were created directly with the run command and with a YAML
-Pod specification. They don’t have a controller managing them, so when you delete
-them, they stay deleted. The other two were created by Deployments, and when you
-delete the Pod, the Deployment controllers still exist. They see there are no Pods that
-match their label selectors, so they create new ones. 
+这其中的两个 Pod 是通过 run 命令和 YAML Pod 规范直接创建的。它们没有控制器来管理它们，因此当您删除它们时，它们会保持删除状态。另外两个 Pod 是由 Deployment 创建的，当您删除 Pod 时，Deployment 控制器仍然存在。它们会发现没有匹配它们标签选择器的 Pod，因此它们会创建新的 Pod。
  
- It seems obvious when you know about it, but it’s a gotcha that will probably keep
-cropping up through all your days with Kubernetes. If you want to delete a resource
-that is managed by a controller, you need to delete the controller instead. Controllers
-clean up their resources when they are deleted, so removing a Deployment is like a
-cascading delete that removes all the Deployment’s Pods, too.
+当您了解它时，这似乎是显而易见的问题，但这是一个很容易让人误解的地方，在您与 Kubernetes 合作的所有日子里都会出现。如果您想删除一个由控制器管理的资源，您需要删除控制器。当删除控制器时，它们会清理它们的资源，因此删除 Deployment 就像是一个级联删除，它也会删除 Deployment 的所有 Pod。
 
-TRY IT NOW Check the Deployments you have running, and then delete them
-and confirm that the remaining Pods have been deleted.
+<b>现在就试试</b> 检查你运行的 Deployments，然后删除它们，最后确认剩余的 Pod 已经被删除。
 ```
-# view Deployments:
+# 查看 Deployments:
 kubectl get deploy
-# delete all Deployments:
+# 删除所有的 Deployments:
 kubectl delete deploy --all
-# view Pods:
+# 查看 Pods:
 kubectl get pods
-# check all resources:
+# 检查所有的 resources:
 kubectl get all
 ```
 
