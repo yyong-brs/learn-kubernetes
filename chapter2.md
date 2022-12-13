@@ -346,84 +346,67 @@ docker container logs --tail=2 $(docker container ls -q --filter
 ![图2.17](./images/Figure2.17.png)
 <center>图2.17 kubernetes 从容器读取日志，所以你不需要自己去访问容器运行时</center>
 
-The same features are available for all Pods, no matter how they were created. Pods
-that are managed by controllers have random names, so you don’t refer to them
-directly. Instead, you can access them by their controller or by their labels.
+所有 Pod 都可以使用相同的功能，无论它们是如何创建的。由控制器管理的 Pod 名称是随机的，因此您不能直接引用它们。相反，您可以通过它们的控制器或标签来访问它们。
 
 TRY IT NOW You can run commands in Pods that are managed by a Deployment without knowing the Pod name, and you can view the logs of all Pods
 that match a label selector.
-<b>现在就试试</b> 
+<b>现在就试试</b> 您可以在由 Deployment 管理的 Pod 中运行命令，而无需知道 Pod 名称，并且可以查看与标签选择器匹配的所有 Pod 的日志。
 
-# make a call to the web app inside the container for the 
-# Pod we created from the Deployment YAML file:
 ```
+# 调用我们通过 Deployment YAML 创建的 POD 容器中的 web app:
 kubectl exec deploy/hello-kiamol-4 -- sh -c 'wget -O - http://localhost 
   > /dev/null'
-# and check that Pod’s logs:
+# 然后查看 Pod 日志:
 kubectl logs --tail=1 -l app=hello-kiamol-4
 ```
 
-Figure 2.18 shows the command running inside the Pod container, which causes the
-application to write a log entry. We see that in the Pod logs.
+图 2.18 显示了在 Pod 容器内运行的命令，该命令导致应用程序写入日志条目。我们可以在 Pod 日志中看到信息。
 
 ![图2.18](./images/Figure2.18.png)
-<center>图2.18 You can work with Pods using kubectl without knowing the Pod's name.</center>
+<center>图2.18 通过 Kubect 命令无需知道 POD 的名称也可以操作 Pod.</center>
 
-In a production environment, you can have all the logs from all of your Pods collected and sent to a central storage system, but until you get there, this is a useful
-and easy way to read application logs. You also saw in that exercise that there are different ways to get to Pods that are managed by a controller. Kubectl lets you supply a
-label selector to most commands, and some commands—like exec—can be run
-against different targets.
+在生产环境中，您可以收集所有 Pod 的所有日志，并将它们发送到中央存储系统，但在这之前，这是一种读取应用程序日志的有用且简单的方法。您还在那个练习中看到，有不同的方法可以访问由控制器管理的 Pod。Kubectl 可以在大多数命令中提供标签选择器，并且一些命令 - 比如 exec - 可以针对不同的目标运行。
  
- The last function you’re likely to use with Pods is to interact with the filesystem.
-Kubectl lets you copy files between your local machine and containers in Pods.
+您最有可能使用的最后一个 Pod 功能是与文件系统交互。Kubectl 允许您在本地计算机和 Pod 中的容器之间复制文件。
 
-TRY IT NOW Create a temporary directory on your machine, and copy a file
-into it from the Pod container.
+<b>现在就试试</b> 创建您的计算机上的临时目录，并从 Pod 容器中复制文件到该目录。
 ```
-# create the local directory:
+# 创建本地目录:
 mkdir -p /tmp/kiamol/ch02
-# copy the web page from the Pod:
+# 从 Pod 中拷贝 web 界面源文件:
 kubectl cp hello-kiamol:/usr/share/nginx/html/index.html 
   /tmp/kiamol/ch02/index.html
-# check the local file contents:
+# 检查本地文件内容:
 cat /tmp/kiamol/ch02/index.html
 ```
 
-In figure 2.19, you can see that kubectl copies the file from the Pod container onto my
-local machine. This works whether your Kubernetes cluster is running locally or on
-remote servers, and it’s bidirectional, so you can use the same command to copy a
-local file into a Pod. That can be a useful—if hacky—way to work around an application problem.
+在图2.19中，您可以看到 kubectl 将文件从 Pod 容器复制到我的本地计算机上。无论您的 Kubernetes 集群是在本地运行还是在远程服务器上运行，它都是双向的，因此您可以使用相同的命令将本地文件复制到 Pod 中。这可能是一种有用的解决应用程序问题的方法。
 
 ![图2.19](./images/Figure2.19.png)
-<center>图2.19.Copying files between Pod containers and the local machine is useful for troubleshooting.</center>
+<center>图2.19. 在本地文件系统与 POD 之间拷贝文件可能会帮你解决一些问题</center>
 
-That’s about all we’re going to cover in this chapter, but before we move on, we need
-to delete the Pods we have running, and that is a little bit more involved than you
-might think.
+
+在本章中，这就是我们要涵盖的所有内容，但在我们继续之前，我们需要删除我们正在运行的 Pod，这比你想象的要复杂一些。
 
 
 ## 2.5 了解 Kubernetes 资源管理
 
-You can easily delete a Kubernetes resource using kubectl, but the resource might not
-stay deleted. If you created a resource with a controller, then it’s the controller’s job to
-manage that resource. It owns the resource life cycle, and it doesn’t expect any external interference. If you delete a managed resource, then its controller will create a
-replacement.
+您可以使用 kubectl 轻松删除 Kubernetes 资源，但该资源可能无法被真正删除掉。如果您使用控制器创建了资源，那么管理该资源就是控制器的工作。它拥有资源生命周期，并且不希望有任何外部干涉。如果您删除了受管资源，那么它的控制器将创建替代品。
 
-TRY IT NOW Use the kubectl delete command to remove all Pods and verify
-that they’re really gone.
+<b>现在就试试</b> 使用 kubectl delete 命令删除所有 Pod 并验证它们是否真的已被删除。
 ```
-# list all running Pods:
+# 查询所有运行的 Pods:
 kubectl get pods
-# delete all Pods:
+# 删除所有的 Pods:
 kubectl delete pods --all
-# check again:
+# 再次检查:
 kubectl get pods
 ```
 
-You can see my output in figure 20.20. Is it what you expected?
+你可以看到 图 2.20 是我的输出，是你期望看到的结果吗？
  
 ![图2.20](./images/Figure2.20.png)
-<center>图2.20  Controllers own their resources. If something else deletes them, the controller replaces them.</center>
+<center>图2.20  控制器拥有它们的资源，如果其它操作删除了它们，控制器将创建替换对象 </center>
 
 
  Two of those Pods were created directly with the run command and with a YAML
