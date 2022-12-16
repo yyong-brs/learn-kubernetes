@@ -39,3 +39,17 @@
     - 2.5 [了解 Kubernetes 资源管理](./chapter2.md#25-了解-kubernetes-资源管理)
 
     - 2.6 [实验室](./chapter2.md#26-实验室)
+  
+  - 第三章 [通过 Service 网络连接 Pods](./chapter3.md)
+
+    - 3.1 [Kubernetes 如何路由网络流量](./chapter3.md#31-kubernetes-如何路由网络流量)
+
+    - 3.2 [在 Pods 间路由流量](./chapter3.md#32-在-pods-间路由流量)
+
+    - 3.3 [路由外部流量到 Pods](./chapter3.md#33-路由外部流量到-pods)
+
+    - 3.4 [将流量路由到 Kubernetes 外面](./chapter3.md#34-将流量路由到-kubernetes-外面)
+
+    - 3.5 [理解 Kubernetes Service 解析](./chapter3.md#35-理解-kubernetes-service-解析)
+
+    - 3.6 [实验室](./chapter3.md#36-实验室)
