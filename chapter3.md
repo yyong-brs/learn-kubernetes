@@ -555,4 +555,140 @@ finish the chapter.
 
 ## 3.5 理解 Kubernetes Service 解析
 
+Kubernetes supports all the network configurations your app is likely to need using
+Services, which build on established networking technologies. Application components run in Pods and communicate with other Pods using standard transfer protocols and DNS names for discovery. You don’t need any special code or libraries; your
+apps work in the same way in Kubernetes as if you deployed them on physical servers
+or VMs.
+
+We’ve covered all the Service types and their typical use cases in this chapter, so
+now you have a good understanding of the patterns you can use. If you’re feeling that
+there’s an awful lot of detail here, be assured that the majority of times you’ll be
+deploying ClusterIP Services, which require little configuration. They mostly work
+seamlessly, but it is useful to go one level deeper to understand the stack. Figure 3.16
+shows that next level of detail.
+
+![图3.16 Kubernetes runs a DNS server and a proxy and uses them with standard network tools.](./images/Figure3.16.png)
+
+The key takeaway is that the ClusterIP is a virtual IP address that doesn’t exist on the
+network. Pods access the network through the kube-proxy running on the node, and
+that uses packet filtering to send the virtual IP to the real endpoint. Kubernetes Services
+keep their IP addresses as long as they exist, and Services can exist independently of any
+other parts of your app. Services have a controller that keeps the endpoint list updated
+whenever there are changes to Pods, so clients always use the static virtual IP address and
+the kube-proxy always has the up-to-date endpoint list.
+
+TRY IT NOW You can see how Kubernetes keeps the endpoint list immediately
+updated when Pods change by listing the endpoints for a Service between Pod
+changes. Endpoints use the same name as Services, and you can view end-
+point details using kubectl.
+
+```
+# show the endpoints for the sleep-2 Service:
+kubectl get endpoints sleep-2
+# delete the Pod:
+kubectl delete pods -l app=sleep-2
+# check the endpoint is updated with the IP of the replacement Pod:
+kubectl get endpoints sleep-2
+# delete the whole Deployment:
+kubectl delete deploy sleep-2
+# check the endpoint still exists, with no IP addresses:
+kubectl get endpoints sleep-2
+```
+
+You can see my output in figure 3.17, and it’s the answer to the first question—
+Kubernetes DNS returns the cluster IP address and not the endpoint, because end-
+point addresses change.
+
+![图3.17 The cluster IP address for a Service doesn’t change, but the endpoint list is always being updated.](./images/Figure3.17.png)
+
+Using a static virtual IP means clients can cache the DNS lookup response indefinitely
+(which many apps do as misguided performance-saving), and that IP address will continue to work no matter how many Pod replacements occur over time. The second
+question—about the domain name suffix—needs to be answered with a sideways step
+to look at Kubernetes namespaces.
+
+Every Kubernetes resource lives inside a namespace, which is a resource you can
+use to group other resources. Namespaces are a way to logically partition a Kubernetes
+cluster—you could have one namespace per product, one per team, or a single shared
+namespace. We won’t use namespaces for a while yet, but I’m introducing them here
+because they have a part to play in DNS resolution. Figure 3.18 shows where the namespace comes into the Service name.
+
+![图3.18 Namespaces logically partition a cluster, but Services are accessible across namespaces.](./images/Figure3.18.png)
+
+You already have several namespaces in your cluster—all the resources we’ve deployed
+so far have been created in the default namespace (which is the default; that’s why
+we haven’t needed to specify a namespace in our YAML files). Internal Kubernetes
+components like the DNS server and the Kubernetes API also run in Pods in the
+kube-system namespace.
+
+TRY IT NOW
+Kubectl is namespace-aware—you can use the namespace flag to
+work with resources outside of the default namespace.
+
+```
+# check the Services in the default namespace:
+kubectl get svc --namespace default
+# check Services in the system namespace:
+kubectl get svc -n kube-system
+# try a DNS lookup to a fully qualified Service name:
+kubectl exec deploy/sleep-1 -- sh -c 'nslookup numbers-
+  api.default.svc.cluster.local | grep "^[^*]"'
+# and for a Service in the system namespace:
+kubectl exec deploy/sleep-1 -- sh -c 'nslookup kube-dns.kube-
+  system.svc.cluster.local | grep "^[^*]"'
+```
+
+My output, shown in figure 3.19, answers the second question—the local domain
+name for a Service is just the Service name, but that’s an alias for the fully qualified
+domain name that includes the Kubernetes namespace.
+
+![图3.19 You can use the same kubectl commands to view resources in different namespaces.](./images/Figure3.19.png)
+
+It’s important to know about namespaces early in your Kubernetes journey, if only
+because it helps you see that core Kubernetes features run as Kubernetes applications
+too, but you don’t see them in kubectl unless you explicitly set the namespace. Namespaces are a powerful way to subdivide your cluster to increase utilization without
+compromising security, and we’ll return to them in chapter 11.
+
+For now we’re done with namespaces and Services. In this chapter, you’ve learned
+that every Pod has its own IP address, and Pod communication ultimately uses that
+address with standard TCP and UDP protocols. You never use the Pod IP address
+directly, though—you always create a Service resource, which Kubernetes uses to provide Service discovery with DNS. Services support multiple networking patterns, with
+different Service types configuring network traffic between Pods, into Pods from the
+outside world, and from Pods to the world outside. You also learned that Services have
+their own life cycle, independent of Pods and Deployments, so the last thing to do is
+clean up before we move on.
+
+TRY IT NOW Deleting a Deployment also deletes all its Pods, but there’s no
+cascading delete for Services. They’re independent objects that need to be
+removed separately.
+```
+# delete Deployments:
+kubectl delete deploy --all
+# and Services:
+kubectl delete svc --all
+# check what’s running:
+kubectl get all
+```
+
+Now your cluster is clear again, although, as you can see in figure 3.20, you need to be
+careful with some of these kubectl commands.
+
+![图3.20 You need to explicitly delete any Services you create, but watch out with the all parameter.](./images/Figure3.20.png)
+
 ## 3.6 实验室
+
+This lab is going to give you some practice creating Services, but it’s also going to get
+you thinking about labels and selectors, which are powerful features of Kubernetes.
+The goal is to deploy Services for an updated version of the random-number app,
+which has had a UI makeover. Here are your hints:
+- The lab folder for this chapter has a deployments.yaml file. Use that to deploy
+the app with kubectl.
+- Check the Pods—there are two versions of the web application running.
+- Write a Service that will make the API available to other Pods at the domain
+name numbers-api.
+- Write a Service that will make version 2 of the website available externally, on
+port 8088.
+- You’ll need to look closely at the Pod labels to get the correct result.
+
+This lab is an extension of the exercises in the chapter, and if you want to check my
+solution, it’s up on GitHub in the repository for the book: https://github.com/sixeyed/
+kiamol/blob/master/ch03/lab/README.md.
