@@ -149,7 +149,7 @@ kubectl get pods -l app=hello-kiamol-2
 使用标签来识别资源之间的关系是 Kubernetes 中的核心模式，因此值得显示一个图表来确保它是明确的。资源在创建时可以应用标签，然后在其生命周期内添加、删除或编辑。控制器使用标签选择器来识别其管理的资源。这可以是一个匹配具有特定标签的资源的简单查询，如图 2.9 所示。
  
 ![图2.9](./images/Figure2.9.png)
-<center>图2.9 Controllers identify the resources they manage by using labels and selectors.</center>
+<center>图2.9 控制器通过使用标签和选择器来识别他们管理的资源.</center>
 
 这个过程是灵活的，因为这意味着控制器不需要维护它们管理的所有资源的列表；标签选择器是控制器规范的一部分，控制器可以通过查询 Kubernetes API 来随时找到匹配的资源。这也是您需要小心的地方，因为您可以编辑资源的标签，最终导致它与其控制器之间的关系中断。
 
