@@ -1,16 +1,8 @@
 # 第三章 通过 Service 网络连接 Pods
 
-Pods are the basic building blocks of an application running in Kubernetes. Most
-applications are distributed across multiple components, and you model those in
-Kubernetes using a Pod for each component. For example, you may have a website
-Pod and an API Pod, or you may have dozens of Pods in a microservice architecture. They all need to communicate, and Kubernetes supports the standard networking protocols, TCP and UDP. Both protocols use IP addresses to route traffic,
-but IP addresses change when Pods are replaced, so Kubernetes provides a network
-address discovery mechanism with Services.
+Pods 是 Kubernetes 中运行的应用程序的基本构建块。大多数应用是跨多组件分布式运行的，你通过在 kubernetes 中模式化pods 来对应每个组件。例如，你可能有一个 web 站点 Pod 以及一个 API Pod，或者你有一打微服务架构的 Pods。它们之间需要通信，kubernetes 支持标准的网络协议，tcp 以及 UDP，它们都通过 IP 地址来路由流量，但是当 Pods 被替换之后 IP 就变了，所以 Kubernetes 通过 Services 对象来提供网络地址发现机制。
  
- Services are flexible resources that support routing traffic between Pods, into
-Pods from the world outside the cluster, and from Pods to external systems. In
-this chapter, you’ll learn all the different Service configurations Kubernetes provides to glue systems together, and you’ll understand how they work transparently
-for your apps.
+Services 是支持 Pods 之间路由流量的灵活资源，可实现路由集群外的流量到 Pods 中，以及 Pods 到外部系统的流量。在本章，您将了解 Kubernetes 为将系统粘合在一起提供的所有不同 Service 配置, 你将会明白它们是如何透明地为你的应用程序工作的。
 
 ## 3.1 Kubernetes 如何路由网络流量
 
