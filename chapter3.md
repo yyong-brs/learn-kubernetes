@@ -6,136 +6,95 @@ Services 是支持 Pods 之间路由流量的灵活资源，可实现路由集�
 
 ## 3.1 Kubernetes 如何路由网络流量
 
-You learned two important things about Pods in the previous chapter: a Pod is a virtual environment that has an IP address assigned by Kubernetes, and Pods are disposable resources whose lifetime is controlled by another resource. If one Pod
-wants to communicate with another, it can use the IP address. That’s problematic
-for two reasons, however: first, the IP address changes if the Pod is replaced, and
-second, there’s no easy way to find a Pod’s IP address—it can be discovered only
-using the Kubernetes API.
+在前一章，你学到了两个关于 Pods 的重点：一个 Pod 一个拥有 Kubernetes 指定的 IP 地址的虚拟环境，以及 Pods 的生命周期是可以被其它类型资源自由控制的。如果一个 Pod 想要和其它 Pod 通信，可以使用 Ip 地址。然而这么干是有问题的，两个原因：第一，当 Pod 被替换时 Ip 会改变，第二，查找 Pod 的IP地址没有简单的方法，只能通过 Kubernetes API。
 
-TRY IT NOW If you deploy two Pods, you can ping one Pod from the other,
-but you first need to find its IP address.
+<b>现在就试试</b> 如果你部署了两个 Pods，你可以由其中一个 Ping 另外一个，前提是需要知道 IP 地址。
 
 ```
-# start up your lab environment—run Docker Desktop if it's not running—
-# and switch to this chapter’s directory in your copy of the source code:
+# 启动你的实验环境— 运行 Docker Desktop ，然后进入本章的源码目录:
 cd ch03
-# create two Deployments, which each run one Pod:
+# 创建两个 Deployments, 它们每一个都运行了一个 Pod:
 kubectl apply -f sleep/sleep1.yaml -f sleep/sleep2.yaml
-# wait for the Pod to be ready:
+# 等待 Pod 到达 ready 状态:
 kubectl wait --for=condition=Ready pod -l app=sleep-2
-# check the IP address of the second Pod:
+# 检查第二个 Pod 的 Ip 地址:
 kubectl get pod -l app=sleep-2 --output 
     jsonpath='{.items[0].status.podIP}'
-# use that address to ping the second Pod from the first:
+# 使用返回的 ip 地址，在 第一个 Pod ping 该 ip 地址:
 kubectl exec deploy/sleep-1 -- ping -c 2 $(kubectl get pod -l app=sleep-2 
     --output jsonpath='{.items[0].status.podIP}')
 ```
 
-My output appears in figure 3.1. The ping inside the container works fine, and the
-first Pod is able to successfully reach the second Pod, but I had to find the IP address
-using kubectl and pass it into the ping command.
+我的输出如图 3.1 所示. 容器中的 Ping 工作的很好, 第一个 Pod 成功 ping 通第二个 Pod, 前提是我必须使用 kubectl 获取ip地址，并作为 ping命令的入参。
 
-![图3.1  Pod networking with IP addresses—you can discover an address only from the Kubernetes API.](./images/Figure3.1.png)
+![图3.1  使用 IP 地址实现 Pod 网络通信—你可以使用 kubernetes API 获取 ip 地址.](./images/Figure3.1.png)
 
-The virtual network in Kubernetes spans the whole cluster, so Pods can communicate
-via IP address even if they’re running on different nodes. This example works in the
-same way on a single-node K3s cluster and a 100-node AKS cluster. It’s a useful exercise to help you see that Kubernetes doesn’t do any special networking magic; it just
-uses the standard protocols your apps already use. You wouldn’t normally do this,
-because the IP address is specific to one Pod, and when the Pod is replaced, the
-replacement will have a new IP address.
+Kubernetes 中的虚拟网络覆盖整个集群，因此 Pods 即使在不同的节点上运行，也可以通过IP地址进行通信。此示例在单节点 K3s 集群和 100 节点AKS集群上的工作方式相同。这是一个有用的练习，可以帮助您了解Kubernetes没有任何特殊的网络魔力；它只是使用你的应用程序已经使用的标准协议。但是您通常不会这样做，因为IP地址是特定于一个Pod的，并且当Pod被替换时，替换将具有新的IP地址。
 
-TRY IT NOW These Pods are managed by Deployment controllers. If you delete
-the second Pod, its controller will start a replacement with a new IP address.
+<b>现在就试试</b> 这些 Pods 由 Deployment 控制器管理。如果您删除了第二个Pod，它的控制器将开始使用新的IP地址进行 POD 替换。
 
 ```
-# check the current Pod’s IP address:
+# 检查当前 Pod 的 IP 地址:
 kubectl get pod -l app=sleep-2 --output 
     jsonpath='{.items[0].status.podIP}'
-# delete the Pod so the Deployment replaces it:
+# 删除 pod，deployment 将替换创建新的 pod:
 kubectl delete pods -l app=sleep-2
-# check the IP address of the replacement Pod:
+# 检查替换产生的 POD ip:
 kubectl get pod -l app=sleep-2 --output 
     jsonpath='{.items[0].status.podIP}'
 ```
 
-In figure 3.2, my output shows that the replacement Pod has a different IP address,
-and if I tried to ping the old address, the command would fail.
+在图 3.2, 我的输出显示了新的 POD 拥有了新的 IP 地址，如果你 ping 旧的地址，将会失败。
 
-![图3.2  The Pod IP address is not part of its specification; a replacement Pod has a new address.](./images/Figure3.2.png)
+![图3.2 Pod IP 地址并不是其配置的一部分; 替换的 Pod 拥有新的地址.](./images/Figure3.2.png)
 
-The problem of needing a permanent address for resources that can change is an old
-one—the internet solved it using DNS (the Domain Name System), mapping friendly
-names to IP addresses, and Kubernetes uses the same system. A Kubernetes cluster has
-a DNS server built in, which maps Service names to IP addresses. Figure 3.3 shows how
-a domain name lookup works for Pod-to-Pod communication.
+需要一个可以更改的资源的永久地址的问题是一个老问题，互联网使用DNS（域名系统）解决了这个问题，将友好名称映射到IP地址，Kubernetes使用相同的系统。Kubernetes集群内置了DNS服务器，它将服务名称映射到IP地址。图3.3显示了域名查找如何用于Pod-to-Pod通信。
 
-![图3.3  Services allow Pods to communicate using a fixed domain name.](./images/Figure3.3.png)
+![图3.3  Services 允许 Pods 使用固定的域名通信.](./images/Figure3.3.png)
 
-This type of Service is an abstraction over a Pod and its network address, just like a
-Deployment is an abstraction over a Pod and its container. The Service has its own
-IP address, which is static. When consumers make a network request to that address,
-Kubernetes routes it to the actual IP address of the Pod. The link between the Service and its Pods is set up with a label selector, just like the link between Deployments and Pods. 
- 
- Listing 3.1 shows the minimal YAML specification for a Service, using the app label
-to identify the Pod which is the ultimate target of the network traffic.
+这种类型的 Service 是对Pod及其网络地址的抽象，就像 Deployment 是对Pod及其容器的抽象一样。Service 有自己的IP地址，它是静态的。当消费者向该地址发出网络请求时，Kubernetes将其路由到Pod的实际IP地址。Service 和它的Pod之间的链接是用标签选择器设置的，就像Deployments和Pods之间的链接一样。
 
-> Listing 3.1 sleep2-service.yaml, the simplest Service definition
+ 清单 3.1 显示了 Service 的最小YAML规范，使用 app 标签标识Pod，Pod是网络流量的最终目标。
+
+> 清单 3.1 sleep2-service.yaml, 最简单的 Service 定义
 ```
-apiVersion: v1 # Services use the core v1 API.
+apiVersion: v1 
 kind: Service
 metadata:
-  name: sleep-2 # The name of a Service is used as the DNS domain name.
-# The specification requires a selector and a list of ports.
+  name: sleep-2 # Service 的名称用作DNS域名
+# 该spec 配置需要一个选择器和一个端口列表。
 spec:
   selector:
-    app: sleep-2 # Matches all Pods with an app label set to sleep-2.
+    app: sleep-2 # 匹配所有 app 标签值为 sleep-2 的 pods
   ports:
-    - port: 80 # Listens on port 80 and sends to port 80 on the Pod
+    - port: 80 # 监听端口 80 并发送到 Pod 上的端口80
 ```
 
-This Service definition works with one of the Deployments we have running from the
-previous exercise. When you deploy it, Kubernetes creates a DNS entry called sleep-2,
-which routes traffic into the Pod created by the sleep-2 Deployment. Other Pods can
-send traffic to that Pod using the Service name as the domain name.
+此 Service 定义适用于我们在上一练习中运行的一个 Deployments。当您部署它时，Kubernetes会创建一个名为sleep-2的DNS条目，将流量路由到sleep-2 Deployment 创建的Pod中。其他Pod可以使用 Service 名称作为域名向该Pod发送流量。
 
-TRY IT NOW You deploy a Service using a YAML file and the usual kubectl
-apply command. Deploy the Service, and verify the network traffic is routed
-to the Pod.
+<b>现在就试试</b> 使用 YAML 文件和通常的kubectl apply命令部署 Service，并验证网络流量是否路由到Pod。
 
 ```
-# deploy the Service defined in listing 3.1:
+# 部署清单 3.1 中的 Service :
 kubectl apply -f sleep/sleep2-service.yaml
-# show the basic details of the Service:
+# 查看 service 基本信息:
 kubectl get svc sleep-2
-# run a ping command to check connectivity—this will fail:
+# 运行 ping 命令检查连通性—这将会失败:
 kubectl exec deploy/sleep-1 -- ping -c 1 sleep-2
 ```
-My output is shown in figure 3.4, where you can see that the name resolution worked
-correctly, although the ping command didn’t work as expected because ping uses a
-network protocol that isn’t supported in Kubernetes Services.
+我的输出如图 3.4 所示, 你可以看到名称查找正常, ping命令没有按预期工作，因为ping使用的是Kubernetes Services不支持的网络协议。
 
-![图3.4  Deploying a Service creates a DNS entry, giving the Service name a fixed IP address.](./images/Figure3.4.png)
+![图3.4 部署一个 Service 以创建一个 DNS 入口, 为 Service 名称提供固定的IP地址.](./images/Figure3.4.png)
 
-That’s the basic concept behind Service discovery in Kubernetes: deploy a Service
-resource and use the name of the Service as the domain name for components to
-communicate. 
+这是Kubernetes中服务发现背后的基本概念：部署Service 资源，并使用 Service 名称作为组件通信的域名。
 
- Different types of Service support different networking patterns, but you work with
-them all in the same way. Next, we’ll look more closely at Pod-to-Pod networking, with
-a working example of a simple distributed app.
+不同类型的 Service 支持不同的网络模式，但您可以以相同的方式使用它们。接下来，我们将通过一个简单的分布式应用程序的工作示例，更深入地研究Pod到Pod的网络。
 
 ## 3.2 在 Pods 间路由流量
 
-The default type of Service in Kubernetes is called ClusterIP. It creates a clusterwide
-IP address that Pods on any node can access. The IP address works only within the
-cluster, so ClusterIP Services are useful only for communicating between Pods. That’s
-exactly what you want for a distributed system where some components are internal
-and shouldn’t be accessible outside of the cluster. We’ll use a simple website that uses
-an internal API component to demonstrate that.
+The default type of Service in Kubernetes is called ClusterIP. It creates a clusterwide IP address that Pods on any node can access. The IP address works only within the cluster, so ClusterIP Services are useful only for communicating between Pods. That’s exactly what you want for a distributed system where some components are internal and shouldn’t be accessible outside of the cluster. We’ll use a simple website that uses an internal API component to demonstrate that.
 
-TRY IT NOW Run two Deployments, one for the web application and one for
-the API. This app has no Services yet, and it won’t work correctly because the
-website can’t find the API.
+TRY IT NOW Run two Deployments, one for the web application and one for the API. This app has no Services yet, and it won’t work correctly because the website can’t find the API.
 
 ```
 # run the website and API as separate Deployments: 
@@ -152,11 +111,7 @@ ctrl-c
 
 You can see from my output shown in figure 3.5 that the app fails with a message stating the API is unavailable.
  
- The error page also shows the domain name where the site is expecting to find the
-API—http:/ /numbers-api. That’s not a fully qualified domain name (like blog.sixeyed
-.com); it’s an address that should be resolved by the local network, but the DNS server
-in Kubernetes doesn’t resolve it because there is no Service with the name numbersapi. The specification in listing 3.2 shows a Service with the correct name and a label
-selector that matches the API Pod.
+The error page also shows the domain name where the site is expecting to find the API—http:/ /numbers-api. That’s not a fully qualified domain name (like blog.sixeyed.com); it’s an address that should be resolved by the local network, but the DNS server in Kubernetes doesn’t resolve it because there is no Service with the name numbersapi. The specification in listing 3.2 shows a Service with the correct name and a label selector that matches the API Pod.
 
 ![图3.5   The web app runs but doesn’t function correctly because the network call to the API fails.](./images/Figure3.5.png)
 
@@ -173,14 +128,10 @@ spec:
     app: numbers-api # Traffic is routed to Pods with this label.
   type: ClusterIP # This Service is available only to other Pods.
 ```
-This Service is similar to that in listing 3.1, except that the names have changed and
-the Service type of ClusterIP is explicitly stated. That can be omitted because it’s the
-default Service type, but I think it makes the spec clearer if you include it. Deploying
-the Service will route the traffic between the web Pod and the API Pod, fixing the app
-without any changes to the Deployments or Pods.
+This Service is similar to that in listing 3.1, except that the names have changed and the Service type of ClusterIP is explicitly stated. That can be omitted because it’s the default Service type, but I think it makes the spec clearer if you include it. Deploying
+the Service will route the traffic between the web Pod and the API Pod, fixing the app without any changes to the Deployments or Pods.
 
-TRY IT NOW Create a Service for the API so the domain lookup works and
-traffic is sent from the web Pod to the API Pod.
+TRY IT NOW Create a Service for the API so the domain lookup works and traffic is sent from the web Pod to the API Pod.
 
 ```
 # deploy the Service from listing 3.2:
@@ -197,17 +148,9 @@ My output, shown in figure 3.6, shows the app working correctly, with the websit
 
 ![图3.6 Deploying a Service fixes the broken link between the web app and the API.](./images/Figure3.6.png)
 
-The important lesson here, beyond Services, Deployments, and Pods, is that your
-YAML specifications describe your whole application in Kubernetes—that’s all the
-components and the networking between them. Kubernetes doesn’t make assumptions about your application architecture; you need to specify it in the YAML. This
-simple web app needs three Kubernetes resources defined for it to work in its current
-state—two Deployments and a Service—but the advantage of having all these moving
-parts is increased resilience.
+The important lesson here, beyond Services, Deployments, and Pods, is that your YAML specifications describe your whole application in Kubernetes—that’s all the components and the networking between them. Kubernetes doesn’t make assumptions about your application architecture; you need to specify it in the YAML. This simple web app needs three Kubernetes resources defined for it to work in its current state—two Deployments and a Service—but the advantage of having all these moving parts is increased resilience.
 
-TRY IT NOW The API Pod is managed by a Deployment controller, so you can
-delete the Pod and a replacement will be created. The replacement is also a
-match for the label selector in the API Service, so traffic is routed to the new
-Pod, and the app keeps working.
+TRY IT NOW The API Pod is managed by a Deployment controller, so you can delete the Pod and a replacement will be created. The replacement is also a match for the label selector in the API Service, so traffic is routed to the new Pod, and the app keeps working.
 
 ```
 # check the name and IP address of the API Pod:
@@ -223,23 +166,13 @@ kubectl port-forward deploy/numbers-web 8080:80
 ctrl-c
 ```
 
-Figure 3.7 shows that a replacement Pod is created by the Deployment controller. It’s
-the same API Pod spec but running in a new Pod with a new IP address. The IP
-address of the API Service hasn’t changed, though, and the web Pod can reach the
-new API Pod at the same network address.
+Figure 3.7 shows that a replacement Pod is created by the Deployment controller. It’s the same API Pod spec but running in a new Pod with a new IP address. The IP address of the API Service hasn’t changed, though, and the web Pod can reach the new API Pod at the same network address.
 
 ![图3.7  The Service isolates the web Pod from the API Pod, so it doesn’t matter whether the API Pod changes.](./images/Figure3.7.png)
 
-We’re manually deleting Pods in these exercises to trigger the controller to create a
-replacement, but in the normal life cycle of a Kubernetes application, Pod replacement happens all the time. Anytime you update a component of your app—to add
-features, fix bugs, or release an update to a dependency—you’re replacing Pods. Any
-time a node goes down, its Pods are replaced on other nodes. The Service abstraction
-keeps apps communicating through these replacements.
+We’re manually deleting Pods in these exercises to trigger the controller to create a replacement, but in the normal life cycle of a Kubernetes application, Pod replacement happens all the time. Anytime you update a component of your app—to add features, fix bugs, or release an update to a dependency—you’re replacing Pods. Any time a node goes down, its Pods are replaced on other nodes. The Service abstraction keeps apps communicating through these replacements.
 
- This demo app isn’t complete yet because it doesn’t have anything configured to
-receive traffic from outside the cluster and send it in to the web Pod. We’ve used port
-forwarding so far, but that’s really a trick for debugging. The real solution is to deploy
-a Service for the web Pod, too.
+This demo app isn’t complete yet because it doesn’t have anything configured to receive traffic from outside the cluster and send it in to the web Pod. We’ve used port forwarding so far, but that’s really a trick for debugging. The real solution is to deploy a Service for the web Pod, too.
 
 ## 3.3 路由外部流量到 Pods
 
