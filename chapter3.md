@@ -256,109 +256,105 @@ spec:
 
 ## 3.4 将流量路由到 Kubernetes 外面
 
-You can run almost any server software in Kubernetes, but that doesn’t mean you should. Storage components like databases are typical candidates for running outside of Kubernetes, especially if you’re deploying to the cloud and you can use a managed database service instead. Or you may be running in the datacenter and need to integrate with existing systems that won’t be migrating to Kubernetes. Whatever architecture you’re using, you can still use Kubernetes Services for domain name resolution to components outside the cluster.
+您可以在 Kubernetes 中运行几乎任何服务器软件，但这并不意味着您应该这样做。像数据库这样的存储组件是在Kubernetes之外运行的典型候选组件，特别是如果您部署到云，并且可以使用托管数据库服务。或者您可能正在数据中心运行，需要与不会迁移到Kubernetes的现有系统集成。无论您使用的是什么架构，您仍然可以使用Kubernetes Services对集群外部的组件进行域名解析。
 
-The first option for that is to use an ExternalName Service, which is like an alias from one domain to another. ExternalName Services let you use local names in your application Pods, and the DNS server in Kubernetes resolves the local name to a fully qualified external name when the Pod makes a lookup request. Figure 3.12 shows how that works, with a Pod using a local name that resolves to an external system address.
+第一个选项是使用 ExternalName 类型 Service，它就像一个域到另一个域的别名。ExternalName Services允许您在应用程序Pod中使用本地名称，当Pod发出查找请求时，Kubernetes中的DNS服务器将本地名称解析为完全限定的外部名称。图3.12显示了如何工作，Pod使用解析为外部系统地址的本地名称。
 
-![图3.12 Using an ExternalName Service lets you use local cluster addresses for remote components.](./images/Figure3.12.png)
+![图3.12 使用ExternalName Service 可以为远程组件使用本地群集地址.](./images/Figure3.12.png)
 
-The demo app for this chapter expects to use a local API to generate random numbers, but it can be switched to read a static number from a text file on GitHub just by deploying an ExternalName Service.
+本章的演示应用程序希望使用本地 API 生成随机数，但只需部署ExternalName服务，即可切换为从GitHub上的文本文件读取静态数。
 
-TRY IT NOW You can’t switch a Service from one type to another in every version of Kubernetes, so you’ll need to delete the original ClusterIP Service for the API before you can deploy the ExternalName Service.
+<b>现在就试试</b> 在Kubernetes的每个版本中，您不能将服务从一种类型切换到另一种类型，因此在部署ExternalName服务之前，您需要删除API的原始ClusterIP服务。
 
 ```
-# delete the current API Service:
+# 删除当前的 API Service:
 kubectl delete svc numbers-api
-# deploy a new ExternalName Service:
+# 部署一个新的 ExternalName 类型 Service:
 kubectl apply -f numbers-services/api-service-externalName.yaml
-# check the Service configuration:
+# 检查 Service 配置:
 kubectl get svc numbers-api
-# refresh the website in your browser and test with the Go button
+# 刷新网站，通过 Go 按钮进行测试
 ```
 
-My output is shown in figure 3.13. You can see the app works in the same way, and it’s using the same URL for the API. If you refresh the page, however, you’ll find that it always returns the same number because it’s not using the random-number API anymore.
+我的输出如图3.13所示。您可以看到该应用程序以相同的方式工作，并且它使用相同的API URL。然而，如果您刷新页面，您会发现它总是返回相同的数字，因为它不再使用随机数API。
 
-![图3.13 ExternalName Services can be used as a redirect to send requests outside of the cluster.](./images/Figure3.13.png)
+![图3.13 ExternalName Services可以用作重定向，以在集群外部发送请求.](./images/Figure3.13.png)
 
-ExternalName Services can be a useful way to deal with differences between environments that you can’t work around in your app configuration. Maybe you have an app component that uses a hardcoded string for the name of the database server. In development environments, you could create a ClusterIP Service with the expected domain name, which resolves to a test database running in a Pod; in production environments, you can use an ExternalName Service that resolves to the real domain name of the database server. Listing 3.5 shows the YAML spec for the API external name.
+ExternalName Services是处理应用程序配置中无法解决的环境之间差异的有用方法。也许您有一个应用程序组件，它使用硬编码字符串作为数据库服务器的名称。在开发环境中，您可以使用预期的域名创建ClusterIP服务，该域名解析为在Pod中运行的测试数据库；在生产环境中，可以使用解析为数据库服务器的真实域名的ExternalName Service。清单3.5显示了API外部名称的YAML规范。
 
-> Listing 3.5 api-service-externalName.yaml, an ExternalName Service
+> 清单 3.5 api-service-externalName.yaml, 一个 ExternalName 类型 Service
 ```
 apiVersion: v1
 kind: Service
 metadata:
-  name: numbers-api # The local domain name of the Service in the cluster
+  name: numbers-api # 集群中 Service 的本地域名
 spec:
   type: ExternalName
-  externalName: raw.githubusercontent.com # The domain to resolve
+  externalName: raw.githubusercontent.com # 要解析的域名
 ```
-Kubernetes implements ExternalName Services using a standard feature of DNS—canonical names (CNAMEs). When the web Pod makes a DNS lookup for the numbers-api domain name, the Kubernetes DNS server returns with the CNAME, which is raw.githubusercontent.com. Then the DNS resolution continues using the DNS server configured on the node, so it will reach out to the internet to find the IP
-address of the GitHub servers.
+Kubernetes使用DNS规范名称（CNAME）的标准特性实现ExternalName Services。当web Pod对 numbers-api 域名进行DNS查找时，Kubernetes DNS服务器返回CNAME，即raw.githubusercontent.com。然后，DNS解析将继续使用节点上配置的DNS服务器，因此它将连接到互联网以查找IP-即GitHub服务器的地址。
 
-TRY IT NOW Services are part of the clusterwide Kubernetes Pod network, so any Pod can use a Service. The sleep Pods from the first exercise in this chapter have a DNS lookup command in the container image, which you can use to check the resolution of the API Service.
+<b>现在就试试</b> Services 是集群范围Kubernetes Pod网络的一部分，因此任何Pod都可以使用 Service。本章第一个练习中的sleep Pods在容器镜像中有一个DNS查找命令，您可以使用它来检查API Service。
 
 ```
-# run the DNS lookup tool to resolve the Service name:
+# 运行DNS查找工具以解析 Service 名称:
 kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | tail -n 5’
 ```
 
-When you try this, you may get scrambled results that look like errors, because the Nslookup tool returns a lot of information and it’s not in the same order every time you run it. The data you want is in there, though. I repeated the command a few times to get the fit-for-print output you see in figure 3.14.
+当你尝试这样做时，你可能会得到看起来像错误的混乱结果，因为Nslokup工具会返回很多信息，而且每次运行它的顺序都不一样。不过你想要的数据就在那里。我重复了该命令几次，以获得如图3.14所示的适合打印输出的效果。
 
-![图3.14 Apps aren’t isolated by default in Kubernetes, so any Pod can do a lookup for any Service.](./images/Figure3.14.png)
+![图3.14 在Kubernetes中，应用程序默认不会被隔离，因此任何Pod都可以查找任何 Service.](./images/Figure3.14.png)
 
-There’s one important thing to understand about ExternalName Services, which you can see from this exercise: they ultimately just give your app an address to use, but they don’t actually change the requests your application makes. That’s fine for components like databases, which communicate over TCP, but it’s not so simple for HTTP services. HTTP requests include the target host name in a header field, and that won’t match the actual domain from the ExternalName response, so the client call will probably fail. The random-number app in this chapter has some hacky code to get around this issue, manually setting the host header, but this approach is best for non-
-HTTP services.
+关于ExternalName Services，有一件重要的事情需要了解，您可以从本练习中看到：它们最终只是为应用程序提供一个使用地址，但实际上并不会改变应用程序发出的请求。这对于通过TCP通信的数据库等组件来说很好，但对于HTTP服务来说就不那么简单了。HTTP请求在头字段中包含目标主机名，这与ExternalName响应中的实际域不匹配，因此客户端调用可能会失败。本章中的随机数应用程序有一些黑客代码来解决这个问题，手动设置主机标头，但这种方法最适合非HTTP服务。
 
-There’s one other option for routing local domain names in the cluster to external systems. It doesn’t fix the HTTP header issue, but it does let you use a similar approach to ExternalName Services when you want to route to an IP address rather than a domain name. These are headless Services, which are defined as a ClusterIP Service type but without a label selector so they will never match any Pods. Instead, the service is deployed with an endpoint resource that explicitly lists the IP addresses the Service should resolve.
+还有一个选项用于将集群中的本地域名路由到外部系统。它不能解决HTTP头问题，但当您希望路由到IP地址而不是域名时，它允许您使用与ExternalName Services类似的方法。他们是 headless 类型 Service，它们被定义为ClusterIP Service 类型，但没有设置标签选择器，因此它们永远不会匹配任何Pod。相反，Service 部署有一个端点资源，该资源明确列出了 Service 应该解析的IP地址。
 
-Listing 3.6 shows a headless Service with a single IP address in the endpoint. It also shows a new use of YAML, with multiple resources defined, separated by three dashes.
+清单3.6显示了一个 headless Service 以及拥有一个 ip地址的 endpoint 。它还显示了YAML的新用法，定义了多个资源，用三个破折号分隔。
 
-> Listing 3.6 api-service-headless.yaml, a Service with explicit addresses
+> 清单 3.6 api-service-headless.yaml, 具有显式地址的 Service
 ```
 apiVersion: v1
 kind: Service
 metadata:
   name: numbers-api
 spec:
-  type: ClusterIP # No selector field makes this a headless Service.
+  type: ClusterIP # 没有选择器字段使其成为 headless Service.(另外可以指定 ClusterIP: None,来提供 headless service,可以具备 selector)
   ports:
     - port: 80
 ---
-kind: Endpoints # The endpoint is a separate resource.
+kind: Endpoints # Endpoints 是新的资源类型.
 apiVersion: v1
 metadata:
   name: numbers-api
 subsets:
-  - addresses: # It has a static list of IP addresses . . .
+  - addresses: # 静态 ip 地址集合
     - ip: 192.168.123.234
     ports:
-      - port: 80 # and the ports they listen on.
+      - port: 80 # 以及它们监听的 端口.
 ```
 
-The IP address in that endpoint specification is a fake one, but Kubernetes doesn’t validate that the address is reachable, so this code will deploy without errors.
+该端点规范中的 IP地址是假的，但Kubernetes不会验证该地址是否可访问，因此该代码将无错误地部署。
 
-TRY IT NOW Replace the ExternalName Service with this headless Service. It will cause the app to fail because the API domain name now resolves to an inaccessible IP address.
-
+<b>现在就试试</b>  使用此无头服务替换ExternalName服务。这将导致应用程序失败，因为API域名现在解析为无法访问的IP地址。
 ```
-# remove the existing Service:
+# 删除之前的 Service:
 kubectl delete svc numbers-api
-# deploy the headless Service:
+# 部署 headless Service:
 kubectl apply -f numbers-services/api-service-headless.yaml
-# check the Service:
+# 检查 Service:
 kubectl get svc numbers-api
-# check the endpoint:
+# 检查 endpoint:
 kubectl get endpoints numbers-api
-# verify the DNS lookup:
+# 检查 DNS lookup:
 kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | grep
     "^[^*]"’
-# browse to the app—it will fail when you try to get a number
+# 访问网站—当你尝试获取数字时返回失败
 ```
-My output, shown in figure 3.15, confirms that Kubernetes will happily let you deploy a Service change that breaks your application. The domain name resolves the internal cluster IP address, but any network calls to that address fail because they are routed to
-the actual IP address in the endpoint that doesn’t exist.
 
-![图3.15 A misconfiguration in a Service can break your apps, even without deploying an app change.](./images/Figure3.15.png)
+我的输出（如图3.15所示）证实了Kubernetes将很乐意让您部署一个破坏应用程序的服务变更。域名解析内部群集IP地址，但对该地址的任何网络调用都会失败，因为它们被路由到端点中不存在的实际IP地址。
+![图3.15 Service 中的错误配置可能会破坏您的应用程序，即使不部署应用程序更改.](./images/Figure3.15.png)
 
-The output from that exercise raises a couple of interesting questions: How come the DNS lookup returns the cluster IP address instead of the endpoint address? Why does the domain name end with .default.svc.cluster.local? You don’t need a background in network engineering to work with Kubernetes Services, but it will help you track down issues if you understand how Service resolution actually works—and that’s how we’ll finish the chapter.
+该练习的输出提出了几个有趣的问题：DNS查找如何返回集群IP地址而不是端点地址？为什么域名以.default.svc.cluster.local结尾？使用Kubernetes服务不需要网络工程背景，但如果您了解服务解决方案的实际工作方式，这将有助于您跟踪问题，这就是我们将如何完成本章的内容。
 
 ## 3.5 理解 Kubernetes Service 解析
 
@@ -372,7 +368,7 @@ The key takeaway is that the ClusterIP is a virtual IP address that doesn’t ex
 keep their IP addresses as long as they exist, and Services can exist independently of any other parts of your app. Services have a controller that keeps the endpoint list updated whenever there are changes to Pods, so clients always use the static virtual IP address and the kube-proxy always has the up-to-date endpoint list.
 
 TRY IT NOW You can see how Kubernetes keeps the endpoint list immediately updated when Pods change by listing the endpoints for a Service between Pod changes. Endpoints use the same name as Services, and you can view endpoint details using kubectl.
-
+<b>现在就试试</b> 
 ```
 # show the endpoints for the sleep-2 Service:
 kubectl get endpoints sleep-2
@@ -400,7 +396,7 @@ namespace. We won’t use namespaces for a while yet, but I’m introducing them
 You already have several namespaces in your cluster—all the resources we’ve deployed so far have been created in the default namespace (which is the default; that’s why we haven’t needed to specify a namespace in our YAML files). Internal Kubernetes components like the DNS server and the Kubernetes API also run in Pods in the kube-system namespace.
 
 TRY IT NOW Kubectl is namespace-aware—you can use the namespace flag to work with resources outside of the default namespace.
-
+<b>现在就试试</b> 
 ```
 # check the Services in the default namespace:
 kubectl get svc --namespace default
@@ -423,6 +419,7 @@ It’s important to know about namespaces early in your Kubernetes journey, if o
 For now we’re done with namespaces and Services. In this chapter, you’ve learned that every Pod has its own IP address, and Pod communication ultimately uses that address with standard TCP and UDP protocols. You never use the Pod IP address directly, though—you always create a Service resource, which Kubernetes uses to provide Service discovery with DNS. Services support multiple networking patterns, with different Service types configuring network traffic between Pods, into Pods from the outside world, and from Pods to the world outside. You also learned that Services have their own life cycle, independent of Pods and Deployments, so the last thing to do is clean up before we move on.
 
 TRY IT NOW Deleting a Deployment also deletes all its Pods, but there’s no cascading delete for Services. They’re independent objects that need to be removed separately.
+<b>现在就试试</b> 
 ```
 # delete Deployments:
 kubectl delete deploy --all
