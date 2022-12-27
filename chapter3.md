@@ -431,12 +431,11 @@ kubectl get all
 ## 3.6 实验室
 
 This lab is going to give you some practice creating Services, but it’s also going to get you thinking about labels and selectors, which are powerful features of Kubernetes.The goal is to deploy Services for an updated version of the random-number app,which has had a UI makeover. Here are your hints:
-- The lab folder for this chapter has a deployments.yaml file. Use that to deploy the app with kubectl.
-- Check the Pods—there are two versions of the web application running.
-- Write a Service that will make the API available to other Pods at the domain name numbers-api.
-- Write a Service that will make version 2 of the website available externally, on port 8088.
-- You’ll need to look closely at the Pod labels to get the correct result.
+这个实验室将为您提供一些创建 Service 的实践，但它也将让您思考标签和选择器，这是Kubernetes的强大功能。目标是为更新版本的随机数应用程序部署服务，该应用程序已经进行了UI改造。以下是您的提示：
+- 本章的实验室文件夹包含deployments.yaml文件。通过它来使用kubectl部署应用程序。
+- 检查Pods，有两个版本的web应用程序正在运行.
+- 编写一个 Service，使API可用于域名 numbers-api w为其他Pod 服务.
+- 在端口8088上编写一个 Service，使网站的版本2可以从外部访问。.
+- 您需要仔细查看Pod标签以获得正确的结果.
 
-This lab is an extension of the exercises in the chapter, and if you want to check my
-solution, it’s up on GitHub in the repository for the book: https://github.com/sixeyed/
-kiamol/blob/master/ch03/lab/README.md.
+这个实验室是本章练习的扩展，如果你想检查我的解决方案，它可以在GitHub上的仓库中找到：https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch03/lab/README.md 。
