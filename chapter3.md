@@ -226,12 +226,10 @@ kubectl get svc numbers-web -o
 
 这是我们将在其他Kubernetes特性中再次看到的模式，其中发行版具有不同的可用资源和不同的目标。最终，YAML清单是相同的，最终结果是一致的，但Kubernetes允许发行版在到达目的地的方式上有所不同。
 
-Back in the world of standard Kubernetes, there’s another Service type you can use that listens for network traffic coming into the cluster and directs it to a Pod—the NodePort. NodePort Services don’t require an external load balancer—every node in the cluster listens on the port specified in the Service and sends traffic to the target port on the Pod. Figure 3.11 shows how it works.、
 回到标准Kubernetes的世界，您可以使用另一种 NodePort Service 类型来监听进入集群的网络流量，并将其引导到 Pod。NodePort 类型 Service 不需要外部负载均衡器，集群中的每个节点都侦听 Service 中指定的端口，并将流量发送到Pod上的目标端口。图3.11显示了它的工作原理。
 
 ![图3.11 NodePort 类型 Service 还将外部流量路由到Pod，但它们不需要负载均衡器.](./images/Figure3.11.png)
 
-NodePort Services don’t have the flexibility of LoadBalancer Services because you need a different port for each Service, your nodes need to be publicly accessible,and you don’t achieve load-balancing across a multinode cluster. NodePort Services also have different levels of support in the distributions, so they work as expected in K3s and Docker Desktop but not so well in Kind. Listing 3.4 shows a NodePort spec for reference.
 NodePort Services 没有 LoadBalancer Services 的灵活性，因为您需要为每个 Service 提供不同的端口，您的节点需要可公开访问，并且无法跨多节点集群实现负载均衡。NodePort Services在发行版中也有不同级别的支持，因此它们在K3s和Docker Desktop中的工作效果与预期一致，但在Kind中却不太好。清单3.4显示了一个NodePort规范以供参考。
 
 > 清单 3.4 web-service-nodePort.yaml, NodePort 类型 Service 配置
@@ -430,7 +428,6 @@ kubectl get all
 
 ## 3.6 实验室
 
-This lab is going to give you some practice creating Services, but it’s also going to get you thinking about labels and selectors, which are powerful features of Kubernetes.The goal is to deploy Services for an updated version of the random-number app,which has had a UI makeover. Here are your hints:
 这个实验室将为您提供一些创建 Service 的实践，但它也将让您思考标签和选择器，这是Kubernetes的强大功能。目标是为更新版本的随机数应用程序部署服务，该应用程序已经进行了UI改造。以下是您的提示：
 - 本章的实验室文件夹包含deployments.yaml文件。通过它来使用kubectl部署应用程序。
 - 检查Pods，有两个版本的web应用程序正在运行.
