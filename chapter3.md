@@ -176,23 +176,13 @@ ctrl-c
 
 ## 3.3 路由外部流量到 Pods
 
-You have several options to configure Kubernetes to listen for traffic coming into the
-cluster and forward it to a Pod. We’ll start with a simple and flexible approach, which
-is fine for everything from local development to production. It’s a type of a Service
-called LoadBalancer, which solves the problem of getting traffic to a Pod that might
-be running on a different node from the one that received the traffic; figure 3.8 shows
-how it looks.
+您有几个选项来配置 Kubernetes 以监听进入集群的流量并将其转发到Pod。我们将从一种简单而灵活的方法开始。这是一种叫做LoadBalancer 类型的 Service，它解决了将流量发送到Pod的问题，Pod可能运行在与接收流量的节点不同的节点上；图3.8显示了它的工作方式。
 
-![图3.8  LoadBalancer Services route external traffic from any node into a matching Pod.](./images/Figure3.8.png)
+![图3.8 LoadBalancer 类型 Service 将外部流量从任何节点路由到匹配的Pod.](./images/Figure3.8.png)
 
-It looks like a tricky problem, especially because you might have many Pods that
-match the label selector for the Service, so the cluster needs to choose a node to
-send the traffic to and then choose a Pod on that node. All that trickiness is taken
-care of by Kubernetes—that’s world-class orchestration for you—so all you need to
-do is deploy a LoadBalancer Service. Listing 3.3 shows the Service specification for
-the web application.
+这看起来是一个棘手的问题，特别是因为您可能有许多Pod与 Service 的标签选择器匹配，所以集群需要选择一个节点来发送流量，然后在该节点上选择一个Pod。Kubernetes为您提供了世界级的编排，因此您需要做的就是部署LoadBalancer Service。清单3.3显示了web应用程序的 Service 配置。
 
-> Listing 3.3 web-service.yaml, a LoadBalancer Service for external traffic
+> 清单 3.3 web-service.yaml, 一个 LoadBalancer Service 用于外部流量
 ```
 apiVersion: v1
 kind: Service
@@ -200,88 +190,51 @@ metadata:
   name: numbers-web
 spec:
   ports:
-    - port: 8080 # The port the Service listens on
-      targetPort: 80 # The port the traffic is sent to on the Pod
+    - port: 8080 # Service 监听的端口
+      targetPort: 80 # 发送到的目标 POD 流量端口
   selector:
     app: numbers-web
-  type: LoadBalancer # This Service is available for external traffic.
+  type: LoadBalancer # LoadBalancer 类型.
 ```
 
-This Service listens on port 8080 and sends traffic to the web Pod on port 80. When
-you deploy it, you’ll be able to use the web app without setting up a port forward in
-kubectl, but the exact details of how you reach the app will depend on how you’re
-running Kubernetes.
+该 Service 在端口8080上侦听，并在端口 80 上向web Pod发送流量。当您部署它时，您将能够使用web应用程序，而无需在kubectl中设置端口转发，但如何访问该应用程序的确切细节将取决于您运行Kubernetes的方式。
 
-TRY IT NOW Deploy the Service, and then use kubectl to find the address of
-the Service.
+<b>现在就试试</b> 部署 Service，然后使用 kubectl 查找 Service 的地址
 
 ```
-# deploy the LoadBalancer Service for the website—if your firewall checks
-# that you want to allow traffic, then it is OK to say yes:
+# 为网站部署LoadBalancer Service:
 kubectl apply -f numbers/web-service.yaml
-# check the details of the Service:
+# 查看 Service 信息:
 kubectl get svc numbers-web
-# use formatting to get the app URL from the EXTERNAL-IP field:
+# 使用格式设置从 EXTERNAL-IP 字段获取应用程序URL:
 kubectl get svc numbers-web -o
     jsonpath=’http://{.status.loadBalancer.ingress[0].*}:8080’
 ```
+图3.9显示了我在Docker Desktop Kubernetes集群上运行该练习的结果，在这里我可以浏览到地址为 http://localhost:8080.
 
-Figure 3.9 shows my output from running the exercise on my Docker Desktop Kuber-
-netes cluster, where I can browse to the website at the address http://localhost:8080.
+![图3.9 Kubernetes从其运行的平台请求LoadBalancer Services的IP地址](./images/Figure3.9.png)
 
-![图3.9 Kubernetes requests an IP address for LoadBalancer Services from the platform on which it’s running](./images/Figure3.9.png)
-
-The output is different using K3s or a managed Kubernetes cluster in the cloud,
-where the Service deployment creates a dedicated external IP address for the load
-balancer. Figure 3.10 shows the output of the same exercise (using the same YAML
-specifications) using the K3s cluster on my Linux VM—here the website is at http://
-172.28.132.127:8080.
+使用K3s或云中的托管Kubernetes集群，输出是不同的，其中Service部署为负载平衡器创建了一个专用的外部IP地址。图3.10显示了在我的LinuxVM上使用K3s集群的相同练习（使用相同的YAML规范）的输出，网站位于http://172.28.132.127:8080.
 
 ![图3.10 Different Kubernetes platforms use different addresses for LoadBalancer Services](./images/Figure3.10.png)
 
-How can the results be different with the same application manifests? I said in
-chapter 1 that you can deploy Kubernetes in different ways and it’s all the same Kubernetes
-(my emphasis), but that’s not strictly true. Kubernetes contains a lot of extension
-points, and distributions have flexibility in how they implement certain features.
-LoadBalancer Services represent a good example of where implementations differ,
-suited to the goals of the distribution.
-- Docker Desktop is a local development environment. It runs on a single machine
-and integrates with the network stack so LoadBalancer Services are available at
-the localhost address. Every LoadBalancer Service publishes to localhost, so you’ll
-need to use different ports if you deploy many load balancers.
-- K3s supports LoadBalancer Services with a custom component that sets up rout-
-ing tables on your machine. Every LoadBalancer Service publishes to the IP
-address of your machine (or VM), so you can access Services with localhost or
-from a remote machine on your network. Like Docker Desktop, you’ll need to
-use different ports for each load balancer.
-- Cloud Kubernetes platforms like AKS and EKS are highly available multinode
-clusters. Deploying a Kubernetes LoadBalancer Service creates an actual load
-balancer in your cloud, which spans all the nodes in your cluster—the cloud
-load balancer sends incoming traffic to one of the nodes and then Kubernetes
-routes it to a Pod. You’ll get a different IP address for each LoadBalancer Ser-
-vice, and it will be a public address, accessible from the internet.
+对于相同的应用程序清单，结果如何不同？我在第1章中说过，您可以以不同的方式部署Kubernetes，这都是相同的Kubernete（我的重点），但这并不是绝对正确的。Kubernetes包含许多扩展点，发行版在如何实现某些特性方面具有灵活性。LoadBalancer Services是一个很好的例子，说明了实现的不同之处，适合于发行版的目标。
 
-This is a pattern we’ll see again in other Kubernetes features where distributions have
-different resources available and different aims. Ultimately, the YAML manifests are
-the same and the end results are consistent, but Kubernetes allows distributions to
-diverge in how they get there.
+- Docker Desktop是一个本地开发环境。它在一台机器上运行，并与网络堆栈集成，因此LoadBalancer Service 在本地主机地址可用。每个LoadBalancer Service 都发布到localhost，因此如果部署许多 LoadBalancer Service，则需要使用不同的端口。
+- K3s支持带有自定义组件的LoadBalancer Services，该组件在您的计算机上设置路由表。每个LoadBalancer Service 都发布到您的计算机（或VM）的IP地址，因此您可以使用本地主机或从网络上的远程计算机访问服务。像Docker Desktop一样，您需要为每个 load balancer 使用不同的端口。
+- 像AKS和EKS这样的云Kubernetes平台是高度可用的多节点集群。部署Kubernetes LoadBalancer 服务会在云中创建一个实际的负载均衡器，它跨越集群中的所有节点。云负载均衡器将传入流量发送到其中一个节点，然后Kubernete将其路由到Pod。您将为每个LoadBalancer服务获得不同的IP地址，并且它将是一个公共地址，可从internet访问。
 
-Back in the world of standard Kubernetes, there’s another Service type you can use
-that listens for network traffic coming into the cluster and directs it to a Pod—the
-NodePort. NodePort Services don’t require an external load balancer—every node in
-the cluster listens on the port specified in the Service and sends traffic to the target
-port on the Pod. Figure 3.11 shows how it works.
+这是我们将在其他Kubernetes特性中再次看到的模式，其中发行版具有不同的可用资源和不同的目标。最终，YAML清单是相同的，最终结果是一致的，但Kubernetes允许发行版在到达目的地的方式上有所不同。
 
-![图3.11 NodePort Services also route external traffic to Pods, but they don’t require a load balancer.](./images/Figure3.11.png)
+Back in the world of standard Kubernetes, there’s another Service type you can use that listens for network traffic coming into the cluster and directs it to a Pod—the NodePort. NodePort Services don’t require an external load balancer—every node in the cluster listens on the port specified in the Service and sends traffic to the target port on the Pod. Figure 3.11 shows how it works.、
+回到标准Kubernetes的世界，您可以使用另一种 NodePort Service 类型来监听进入集群的网络流量，并将其引导到 Pod。NodePort 类型 Service 不需要外部负载均衡器，集群中的每个节点都侦听 Service 中指定的端口，并将流量发送到Pod上的目标端口。图3.11显示了它的工作原理。
 
-NodePort Services don’t have the flexibility of LoadBalancer Services because you
-need a different port for each Service, your nodes need to be publicly accessible,
-and you don’t achieve load-balancing across a multinode cluster. NodePort Services
-also have different levels of support in the distributions, so they work as expected in
-K3s and Docker Desktop but not so well in Kind. Listing 3.4 shows a NodePort spec
-for reference.
+![图3.11 NodePort 类型 Service 还将外部流量路由到Pod，但它们不需要负载均衡器.](./images/Figure3.11.png)
 
-> Listing 3.4 web-service-nodePort.yaml, a NodePort Service specification
+NodePort Services don’t have the flexibility of LoadBalancer Services because you need a different port for each Service, your nodes need to be publicly accessible,and you don’t achieve load-balancing across a multinode cluster. NodePort Services also have different levels of support in the distributions, so they work as expected in K3s and Docker Desktop but not so well in Kind. Listing 3.4 shows a NodePort spec for reference.
+NodePort Services 没有 LoadBalancer Services 的灵活性，因为您需要为每个 Service 提供不同的端口，您的节点需要可公开访问，并且无法跨多节点集群实现负载均衡。NodePort Services在发行版中也有不同级别的支持，因此它们在K3s和Docker Desktop中的工作效果与预期一致，但在Kind中却不太好。清单3.4显示了一个NodePort规范以供参考。
+
+> 清单 3.4 web-service-nodePort.yaml, NodePort 类型 Service 配置
 ```
 apiVersion: v1
 kind: Service
@@ -289,56 +242,29 @@ metadata:
   name: numbers-web-node
 spec:
   ports:
-    - port: 8080 # The port on which the Service is available to
-                 # other Pods
-      targetPort: 80 # The port on which the traffic is sent to on
-      # the Pod
-      nodePort: 30080 # The port on which the Service is available
-                      # externally
+    - port: 8080 # Service 侦听端口
+      targetPort: 80 # 目标 Pod 端口
+      nodePort: 30080 # 外部访问使用端口
   selector:
     app: numbers-web
-  type: NodePort # This Service is available on node IP addresses.
+  type: NodePort # Node 节点的 IP 可直接用于访问.
 ```
 
-There isn’t an exercise to deploy this NodePort Service (although the YAML file is in
-the chapter’s folder if you want to try it out). This is partly because it doesn’t work in the
-same way on every distribution, so this section would end with lots of if branches that
-you’d need to try to make sense of. But there’s a more important reason—you don’t
-typically use NodePorts in production, and it’s good to keep your manifests as consis-
-tent as possible across different environments. Sticking with LoadBalancer Services
-means you have the same specs from development up to production, which means
-fewer YAML files to maintain and keep in sync.
+没有部署这个 NodePort Service 的练习（尽管如果您想尝试，YAML文件在章节的文件夹中）。这部分是因为它在每个发行版上的工作方式不同，因此本节将以许多if 分支结尾;你需要试着弄明白。但有一个更重要的原因是，您通常不会在生产中使用NodePort，而且最好在不同的环境中保持清单尽可能一致。坚持使用LoadBalancer 服务意味着从开发到生产都有相同的规范，这意味着需要维护和保持同步的YAML文件更少。
 
-We’ll finish this chapter by digging into how Services work under the hood, but
-before that, we’ll look at one more way you can use Services, which is to communicate
-from Pods to components outside of the cluster.
-
+我们将通过深入了解 Service 在幕后的工作方式来完成本章，但在此之前，我们将再看一种使用服务的方式，即从Pods到集群外部组件的通信。
 
 ## 3.4 将流量路由到 Kubernetes 外面
 
-You can run almost any server software in Kubernetes, but that doesn’t mean you
-should. Storage components like databases are typical candidates for running outside
-of Kubernetes, especially if you’re deploying to the cloud and you can use a managed
-database service instead. Or you may be running in the datacenter and need to inte-
-grate with existing systems that won’t be migrating to Kubernetes. Whatever architec-
-ture you’re using, you can still use Kubernetes Services for domain name resolution to
-components outside the cluster.
+You can run almost any server software in Kubernetes, but that doesn’t mean you should. Storage components like databases are typical candidates for running outside of Kubernetes, especially if you’re deploying to the cloud and you can use a managed database service instead. Or you may be running in the datacenter and need to integrate with existing systems that won’t be migrating to Kubernetes. Whatever architecture you’re using, you can still use Kubernetes Services for domain name resolution to components outside the cluster.
 
-The first option for that is to use an ExternalName Service, which is like an alias
-from one domain to another. ExternalName Services let you use local names in your
-application Pods, and the DNS server in Kubernetes resolves the local name to a fully
-qualified external name when the Pod makes a lookup request. Figure 3.12 shows how
-that works, with a Pod using a local name that resolves to an external system address.
+The first option for that is to use an ExternalName Service, which is like an alias from one domain to another. ExternalName Services let you use local names in your application Pods, and the DNS server in Kubernetes resolves the local name to a fully qualified external name when the Pod makes a lookup request. Figure 3.12 shows how that works, with a Pod using a local name that resolves to an external system address.
 
 ![图3.12 Using an ExternalName Service lets you use local cluster addresses for remote components.](./images/Figure3.12.png)
 
-The demo app for this chapter expects to use a local API to generate random num-
-bers, but it can be switched to read a static number from a text file on GitHub just by
-deploying an ExternalName Service.
+The demo app for this chapter expects to use a local API to generate random numbers, but it can be switched to read a static number from a text file on GitHub just by deploying an ExternalName Service.
 
-TRY IT NOW You can’t switch a Service from one type to another in every ver-
-sion of Kubernetes, so you’ll need to delete the original ClusterIP Service for
-the API before you can deploy the ExternalName Service.
+TRY IT NOW You can’t switch a Service from one type to another in every version of Kubernetes, so you’ll need to delete the original ClusterIP Service for the API before you can deploy the ExternalName Service.
 
 ```
 # delete the current API Service:
@@ -350,21 +276,11 @@ kubectl get svc numbers-api
 # refresh the website in your browser and test with the Go button
 ```
 
-My output is shown in figure 3.13. You can see the app works in the same way, and
-it’s using the same URL for the API. If you refresh the page, however, you’ll find that
-it always returns the same number because it’s not using the random-number API
-anymore.
+My output is shown in figure 3.13. You can see the app works in the same way, and it’s using the same URL for the API. If you refresh the page, however, you’ll find that it always returns the same number because it’s not using the random-number API anymore.
 
 ![图3.13 ExternalName Services can be used as a redirect to send requests outside of the cluster.](./images/Figure3.13.png)
 
-ExternalName Services can be a useful way to deal with differences between envi-
-ronments that you can’t work around in your app configuration. Maybe you have an
-app component that uses a hardcoded string for the name of the database server. In
-development environments, you could create a ClusterIP Service with the expected
-domain name, which resolves to a test database running in a Pod; in production
-environments, you can use an ExternalName Service that resolves to the real domain
-name of the database server. Listing 3.5 shows the YAML spec for the API external
-name.
+ExternalName Services can be a useful way to deal with differences between environments that you can’t work around in your app configuration. Maybe you have an app component that uses a hardcoded string for the name of the database server. In development environments, you could create a ClusterIP Service with the expected domain name, which resolves to a test database running in a Pod; in production environments, you can use an ExternalName Service that resolves to the real domain name of the database server. Listing 3.5 shows the YAML spec for the API external name.
 
 > Listing 3.5 api-service-externalName.yaml, an ExternalName Service
 ```
@@ -376,50 +292,26 @@ spec:
   type: ExternalName
   externalName: raw.githubusercontent.com # The domain to resolve
 ```
-Kubernetes implements ExternalName Services using a standard feature of DNS—
-canonical names (CNAMEs). When the web Pod makes a DNS lookup for the numbers-
-api domain name, the Kubernetes DNS server returns with the CNAME, which is
-raw.githubusercontent.com. Then the DNS resolution continues using the DNS
-server configured on the node, so it will reach out to the internet to find the IP
+Kubernetes implements ExternalName Services using a standard feature of DNS—canonical names (CNAMEs). When the web Pod makes a DNS lookup for the numbers-api domain name, the Kubernetes DNS server returns with the CNAME, which is raw.githubusercontent.com. Then the DNS resolution continues using the DNS server configured on the node, so it will reach out to the internet to find the IP
 address of the GitHub servers.
 
-TRY IT NOW Services are part of the clusterwide Kubernetes Pod network, so
-any Pod can use a Service. The sleep Pods from the first exercise in this chap-
-ter have a DNS lookup command in the container image, which you can use to
-check the resolution of the API Service.
+TRY IT NOW Services are part of the clusterwide Kubernetes Pod network, so any Pod can use a Service. The sleep Pods from the first exercise in this chapter have a DNS lookup command in the container image, which you can use to check the resolution of the API Service.
 
 ```
 # run the DNS lookup tool to resolve the Service name:
 kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | tail -n 5’
 ```
 
-When you try this, you may get scrambled results that look like errors, because the
-Nslookup tool returns a lot of information and it’s not in the same order every time
-you run it. The data you want is in there, though. I repeated the command a few times
-to get the fit-for-print output you see in figure 3.14.
+When you try this, you may get scrambled results that look like errors, because the Nslookup tool returns a lot of information and it’s not in the same order every time you run it. The data you want is in there, though. I repeated the command a few times to get the fit-for-print output you see in figure 3.14.
 
 ![图3.14 Apps aren’t isolated by default in Kubernetes, so any Pod can do a lookup for any Service.](./images/Figure3.14.png)
 
-There’s one important thing to understand about ExternalName Services, which you
-can see from this exercise: they ultimately just give your app an address to use, but
-they don’t actually change the requests your application makes. That’s fine for compo-
-nents like databases, which communicate over TCP, but it’s not so simple for HTTP
-services. HTTP requests include the target host name in a header field, and that won’t
-match the actual domain from the ExternalName response, so the client call will
-probably fail. The random-number app in this chapter has some hacky code to get
-around this issue, manually setting the host header, but this approach is best for non-
+There’s one important thing to understand about ExternalName Services, which you can see from this exercise: they ultimately just give your app an address to use, but they don’t actually change the requests your application makes. That’s fine for components like databases, which communicate over TCP, but it’s not so simple for HTTP services. HTTP requests include the target host name in a header field, and that won’t match the actual domain from the ExternalName response, so the client call will probably fail. The random-number app in this chapter has some hacky code to get around this issue, manually setting the host header, but this approach is best for non-
 HTTP services.
 
-There’s one other option for routing local domain names in the cluster to external
-systems. It doesn’t fix the HTTP header issue, but it does let you use a similar
-approach to ExternalName Services when you want to route to an IP address rather
-than a domain name. These are headless Services, which are defined as a ClusterIP Service
-type but without a label selector so they will never match any Pods. Instead, the service
-is deployed with an endpoint resource that explicitly lists the IP addresses the Service
-should resolve.
+There’s one other option for routing local domain names in the cluster to external systems. It doesn’t fix the HTTP header issue, but it does let you use a similar approach to ExternalName Services when you want to route to an IP address rather than a domain name. These are headless Services, which are defined as a ClusterIP Service type but without a label selector so they will never match any Pods. Instead, the service is deployed with an endpoint resource that explicitly lists the IP addresses the Service should resolve.
 
-Listing 3.6 shows a headless Service with a single IP address in the endpoint. It also
-shows a new use of YAML, with multiple resources defined, separated by three dashes.
+Listing 3.6 shows a headless Service with a single IP address in the endpoint. It also shows a new use of YAML, with multiple resources defined, separated by three dashes.
 
 > Listing 3.6 api-service-headless.yaml, a Service with explicit addresses
 ```
@@ -443,12 +335,9 @@ subsets:
       - port: 80 # and the ports they listen on.
 ```
 
-The IP address in that endpoint specification is a fake one, but Kubernetes doesn’t
-validate that the address is reachable, so this code will deploy without errors.
+The IP address in that endpoint specification is a fake one, but Kubernetes doesn’t validate that the address is reachable, so this code will deploy without errors.
 
-TRY IT NOW Replace the ExternalName Service with this headless Service. It
-will cause the app to fail because the API domain name now resolves to an
-inaccessible IP address.
+TRY IT NOW Replace the ExternalName Service with this headless Service. It will cause the app to fail because the API domain name now resolves to an inaccessible IP address.
 
 ```
 # remove the existing Service:
@@ -464,48 +353,25 @@ kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | grep
     "^[^*]"’
 # browse to the app—it will fail when you try to get a number
 ```
-My output, shown in figure 3.15, confirms that Kubernetes will happily let you deploy
-a Service change that breaks your application. The domain name resolves the internal
-cluster IP address, but any network calls to that address fail because they are routed to
+My output, shown in figure 3.15, confirms that Kubernetes will happily let you deploy a Service change that breaks your application. The domain name resolves the internal cluster IP address, but any network calls to that address fail because they are routed to
 the actual IP address in the endpoint that doesn’t exist.
 
 ![图3.15 A misconfiguration in a Service can break your apps, even without deploying an app change.](./images/Figure3.15.png)
 
-The output from that exercise raises a couple of interesting questions: How come the
-DNS lookup returns the cluster IP address instead of the endpoint address? Why does
-the domain name end with .default.svc.cluster.local? You don’t need a background in
-network engineering to work with Kubernetes Services, but it will help you track down
-issues if you understand how Service resolution actually works—and that’s how we’ll
-finish the chapter.
+The output from that exercise raises a couple of interesting questions: How come the DNS lookup returns the cluster IP address instead of the endpoint address? Why does the domain name end with .default.svc.cluster.local? You don’t need a background in network engineering to work with Kubernetes Services, but it will help you track down issues if you understand how Service resolution actually works—and that’s how we’ll finish the chapter.
 
 ## 3.5 理解 Kubernetes Service 解析
 
-Kubernetes supports all the network configurations your app is likely to need using
-Services, which build on established networking technologies. Application components run in Pods and communicate with other Pods using standard transfer protocols and DNS names for discovery. You don’t need any special code or libraries; your
-apps work in the same way in Kubernetes as if you deployed them on physical servers
-or VMs.
+Kubernetes supports all the network configurations your app is likely to need using Services, which build on established networking technologies. Application components run in Pods and communicate with other Pods using standard transfer protocols and DNS names for discovery. You don’t need any special code or libraries; your apps work in the same way in Kubernetes as if you deployed them on physical servers or VMs.
 
-We’ve covered all the Service types and their typical use cases in this chapter, so
-now you have a good understanding of the patterns you can use. If you’re feeling that
-there’s an awful lot of detail here, be assured that the majority of times you’ll be
-deploying ClusterIP Services, which require little configuration. They mostly work
-seamlessly, but it is useful to go one level deeper to understand the stack. Figure 3.16
-shows that next level of detail.
+We’ve covered all the Service types and their typical use cases in this chapter, so now you have a good understanding of the patterns you can use. If you’re feeling that there’s an awful lot of detail here, be assured that the majority of times you’ll be deploying ClusterIP Services, which require little configuration. They mostly work seamlessly, but it is useful to go one level deeper to understand the stack. Figure 3.16 shows that next level of detail.
 
 ![图3.16 Kubernetes runs a DNS server and a proxy and uses them with standard network tools.](./images/Figure3.16.png)
 
-The key takeaway is that the ClusterIP is a virtual IP address that doesn’t exist on the
-network. Pods access the network through the kube-proxy running on the node, and
-that uses packet filtering to send the virtual IP to the real endpoint. Kubernetes Services
-keep their IP addresses as long as they exist, and Services can exist independently of any
-other parts of your app. Services have a controller that keeps the endpoint list updated
-whenever there are changes to Pods, so clients always use the static virtual IP address and
-the kube-proxy always has the up-to-date endpoint list.
+The key takeaway is that the ClusterIP is a virtual IP address that doesn’t exist on the network. Pods access the network through the kube-proxy running on the node, and that uses packet filtering to send the virtual IP to the real endpoint. Kubernetes Services
+keep their IP addresses as long as they exist, and Services can exist independently of any other parts of your app. Services have a controller that keeps the endpoint list updated whenever there are changes to Pods, so clients always use the static virtual IP address and the kube-proxy always has the up-to-date endpoint list.
 
-TRY IT NOW You can see how Kubernetes keeps the endpoint list immediately
-updated when Pods change by listing the endpoints for a Service between Pod
-changes. Endpoints use the same name as Services, and you can view end-
-point details using kubectl.
+TRY IT NOW You can see how Kubernetes keeps the endpoint list immediately updated when Pods change by listing the endpoints for a Service between Pod changes. Endpoints use the same name as Services, and you can view endpoint details using kubectl.
 
 ```
 # show the endpoints for the sleep-2 Service:
@@ -520,34 +386,20 @@ kubectl delete deploy sleep-2
 kubectl get endpoints sleep-2
 ```
 
-You can see my output in figure 3.17, and it’s the answer to the first question—
-Kubernetes DNS returns the cluster IP address and not the endpoint, because end-
-point addresses change.
+You can see my output in figure 3.17, and it’s the answer to the first question—Kubernetes DNS returns the cluster IP address and not the endpoint, because endpoint addresses change.
 
 ![图3.17 The cluster IP address for a Service doesn’t change, but the endpoint list is always being updated.](./images/Figure3.17.png)
 
-Using a static virtual IP means clients can cache the DNS lookup response indefinitely
-(which many apps do as misguided performance-saving), and that IP address will continue to work no matter how many Pod replacements occur over time. The second
-question—about the domain name suffix—needs to be answered with a sideways step
-to look at Kubernetes namespaces.
+Using a static virtual IP means clients can cache the DNS lookup response indefinitely (which many apps do as misguided performance-saving), and that IP address will continue to work no matter how many Pod replacements occur over time. The second question—about the domain name suffix—needs to be answered with a sideways step to look at Kubernetes namespaces.
 
-Every Kubernetes resource lives inside a namespace, which is a resource you can
-use to group other resources. Namespaces are a way to logically partition a Kubernetes
-cluster—you could have one namespace per product, one per team, or a single shared
-namespace. We won’t use namespaces for a while yet, but I’m introducing them here
-because they have a part to play in DNS resolution. Figure 3.18 shows where the namespace comes into the Service name.
+Every Kubernetes resource lives inside a namespace, which is a resource you can use to group other resources. Namespaces are a way to logically partition a Kubernetes cluster—you could have one namespace per product, one per team, or a single shared
+namespace. We won’t use namespaces for a while yet, but I’m introducing them here because they have a part to play in DNS resolution. Figure 3.18 shows where the namespace comes into the Service name.
 
 ![图3.18 Namespaces logically partition a cluster, but Services are accessible across namespaces.](./images/Figure3.18.png)
 
-You already have several namespaces in your cluster—all the resources we’ve deployed
-so far have been created in the default namespace (which is the default; that’s why
-we haven’t needed to specify a namespace in our YAML files). Internal Kubernetes
-components like the DNS server and the Kubernetes API also run in Pods in the
-kube-system namespace.
+You already have several namespaces in your cluster—all the resources we’ve deployed so far have been created in the default namespace (which is the default; that’s why we haven’t needed to specify a namespace in our YAML files). Internal Kubernetes components like the DNS server and the Kubernetes API also run in Pods in the kube-system namespace.
 
-TRY IT NOW
-Kubectl is namespace-aware—you can use the namespace flag to
-work with resources outside of the default namespace.
+TRY IT NOW Kubectl is namespace-aware—you can use the namespace flag to work with resources outside of the default namespace.
 
 ```
 # check the Services in the default namespace:
@@ -562,29 +414,15 @@ kubectl exec deploy/sleep-1 -- sh -c 'nslookup kube-dns.kube-
   system.svc.cluster.local | grep "^[^*]"'
 ```
 
-My output, shown in figure 3.19, answers the second question—the local domain
-name for a Service is just the Service name, but that’s an alias for the fully qualified
-domain name that includes the Kubernetes namespace.
+My output, shown in figure 3.19, answers the second question—the local domain name for a Service is just the Service name, but that’s an alias for the fully qualified domain name that includes the Kubernetes namespace.
 
 ![图3.19 You can use the same kubectl commands to view resources in different namespaces.](./images/Figure3.19.png)
 
-It’s important to know about namespaces early in your Kubernetes journey, if only
-because it helps you see that core Kubernetes features run as Kubernetes applications
-too, but you don’t see them in kubectl unless you explicitly set the namespace. Namespaces are a powerful way to subdivide your cluster to increase utilization without
-compromising security, and we’ll return to them in chapter 11.
+It’s important to know about namespaces early in your Kubernetes journey, if only because it helps you see that core Kubernetes features run as Kubernetes applications too, but you don’t see them in kubectl unless you explicitly set the namespace. Namespaces are a powerful way to subdivide your cluster to increase utilization without compromising security, and we’ll return to them in chapter 11.
 
-For now we’re done with namespaces and Services. In this chapter, you’ve learned
-that every Pod has its own IP address, and Pod communication ultimately uses that
-address with standard TCP and UDP protocols. You never use the Pod IP address
-directly, though—you always create a Service resource, which Kubernetes uses to provide Service discovery with DNS. Services support multiple networking patterns, with
-different Service types configuring network traffic between Pods, into Pods from the
-outside world, and from Pods to the world outside. You also learned that Services have
-their own life cycle, independent of Pods and Deployments, so the last thing to do is
-clean up before we move on.
+For now we’re done with namespaces and Services. In this chapter, you’ve learned that every Pod has its own IP address, and Pod communication ultimately uses that address with standard TCP and UDP protocols. You never use the Pod IP address directly, though—you always create a Service resource, which Kubernetes uses to provide Service discovery with DNS. Services support multiple networking patterns, with different Service types configuring network traffic between Pods, into Pods from the outside world, and from Pods to the world outside. You also learned that Services have their own life cycle, independent of Pods and Deployments, so the last thing to do is clean up before we move on.
 
-TRY IT NOW Deleting a Deployment also deletes all its Pods, but there’s no
-cascading delete for Services. They’re independent objects that need to be
-removed separately.
+TRY IT NOW Deleting a Deployment also deletes all its Pods, but there’s no cascading delete for Services. They’re independent objects that need to be removed separately.
 ```
 # delete Deployments:
 kubectl delete deploy --all
@@ -594,24 +432,17 @@ kubectl delete svc --all
 kubectl get all
 ```
 
-Now your cluster is clear again, although, as you can see in figure 3.20, you need to be
-careful with some of these kubectl commands.
+Now your cluster is clear again, although, as you can see in figure 3.20, you need to be careful with some of these kubectl commands.
 
 ![图3.20 You need to explicitly delete any Services you create, but watch out with the all parameter.](./images/Figure3.20.png)
 
 ## 3.6 实验室
 
-This lab is going to give you some practice creating Services, but it’s also going to get
-you thinking about labels and selectors, which are powerful features of Kubernetes.
-The goal is to deploy Services for an updated version of the random-number app,
-which has had a UI makeover. Here are your hints:
-- The lab folder for this chapter has a deployments.yaml file. Use that to deploy
-the app with kubectl.
+This lab is going to give you some practice creating Services, but it’s also going to get you thinking about labels and selectors, which are powerful features of Kubernetes.The goal is to deploy Services for an updated version of the random-number app,which has had a UI makeover. Here are your hints:
+- The lab folder for this chapter has a deployments.yaml file. Use that to deploy the app with kubectl.
 - Check the Pods—there are two versions of the web application running.
-- Write a Service that will make the API available to other Pods at the domain
-name numbers-api.
-- Write a Service that will make version 2 of the website available externally, on
-port 8088.
+- Write a Service that will make the API available to other Pods at the domain name numbers-api.
+- Write a Service that will make version 2 of the website available externally, on port 8088.
 - You’ll need to look closely at the Pod labels to get the correct result.
 
 This lab is an extension of the exercises in the chapter, and if you want to check my
