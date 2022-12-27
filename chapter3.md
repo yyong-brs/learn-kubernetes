@@ -358,80 +358,75 @@ kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | grep
 
 ## 3.5 理解 Kubernetes Service 解析
 
-Kubernetes supports all the network configurations your app is likely to need using Services, which build on established networking technologies. Application components run in Pods and communicate with other Pods using standard transfer protocols and DNS names for discovery. You don’t need any special code or libraries; your apps work in the same way in Kubernetes as if you deployed them on physical servers or VMs.
+Kubernetes支持您的应用程序可能需要的所有网络配置，这些配置使用基于已建立的网络技术的服务。应用程序组件在Pod中运行，并使用标准传输协议和DNS名称与其他Pod进行通信以进行发现。您不需要任何特殊的代码或库；您的应用程序在Kubernetes中的工作方式与您在物理服务器或虚拟机上部署的方式相同。
 
-We’ve covered all the Service types and their typical use cases in this chapter, so now you have a good understanding of the patterns you can use. If you’re feeling that there’s an awful lot of detail here, be assured that the majority of times you’ll be deploying ClusterIP Services, which require little configuration. They mostly work seamlessly, but it is useful to go one level deeper to understand the stack. Figure 3.16 shows that next level of detail.
+在本章中，我们已经介绍了所有 Service 类型及其典型用例，因此现在您已经很好地了解了可以使用的模式。如果您觉得这里有太多的细节，请放心，大多数时候您都会部署 ClusterIP 类型服务，这几乎不需要配置。它们大部分都是无缝工作的，但深入一层来理解堆栈是很有用的。图3.16显示了下一层次的细节。
 
-![图3.16 Kubernetes runs a DNS server and a proxy and uses them with standard network tools.](./images/Figure3.16.png)
+![图3.16 Kubernetes运行DNS服务器和代理，并将它们与标准网络工具一起使用。](./images/Figure3.16.png)
 
-The key takeaway is that the ClusterIP is a virtual IP address that doesn’t exist on the network. Pods access the network through the kube-proxy running on the node, and that uses packet filtering to send the virtual IP to the real endpoint. Kubernetes Services
-keep their IP addresses as long as they exist, and Services can exist independently of any other parts of your app. Services have a controller that keeps the endpoint list updated whenever there are changes to Pods, so clients always use the static virtual IP address and the kube-proxy always has the up-to-date endpoint list.
+关键是 ClusterIP 是网络上不存在的虚拟IP地址。Pods通过运行在节点上的 kube-proxy 访问网络，并使用数据包过滤将虚拟IP发送到真实端点。Kubernetes services  只要它们存在，就保留它们的IP地址，并且 Service 可以独立于应用程序的任何其他部分而存在。Service 有一个控制器，每当Pods发生更改时，该控制器会更新端点列表，因此客户端始终使用静态虚拟IP地址，kube-proxy 始终拥有最新的端点列表。
 
-TRY IT NOW You can see how Kubernetes keeps the endpoint list immediately updated when Pods change by listing the endpoints for a Service between Pod changes. Endpoints use the same name as Services, and you can view endpoint details using kubectl.
-<b>现在就试试</b> 
+<b>现在就试试</b> 您可以看到Kubernetes如何在Pod更改时通过列出Pod更改之间 Service 的端点来保持端点列表的即时更新。端点使用与 Service 相同的名称，您可以使用kubectl查看端点详细信息。
 ```
-# show the endpoints for the sleep-2 Service:
+# 查看 sleep-2 Service 端点信息:
 kubectl get endpoints sleep-2
-# delete the Pod:
+# 删除 pod:
 kubectl delete pods -l app=sleep-2
-# check the endpoint is updated with the IP of the replacement Pod:
+# 检查 端点使用了新的 POD ip 进行了更新:
 kubectl get endpoints sleep-2
-# delete the whole Deployment:
+# 删除整个 Deployment:
 kubectl delete deploy sleep-2
-# check the endpoint still exists, with no IP addresses:
+# 检查 endpoint 仍然存在, 没有 IP 地址清单:
 kubectl get endpoints sleep-2
 ```
 
-You can see my output in figure 3.17, and it’s the answer to the first question—Kubernetes DNS returns the cluster IP address and not the endpoint, because endpoint addresses change.
+您可以在图3.17中看到我的输出，这是第一个问题的答案Kubernetes DNS返回Cluster IP地址，而不是端点，因为端点地址发生了变化。
 
-![图3.17 The cluster IP address for a Service doesn’t change, but the endpoint list is always being updated.](./images/Figure3.17.png)
+![图3.17 Service 的Cluster IP地址不会更改，但端点列表始终在更新。.](./images/Figure3.17.png)
 
-Using a static virtual IP means clients can cache the DNS lookup response indefinitely (which many apps do as misguided performance-saving), and that IP address will continue to work no matter how many Pod replacements occur over time. The second question—about the domain name suffix—needs to be answered with a sideways step to look at Kubernetes namespaces.
+使用静态虚拟IP意味着客户端可以无限期地缓存DNS查找响应（许多应用程序这样做是错误的性能节省），并且无论一段时间内发生多少Pod替换，IP地址都将继续工作。关于域名后缀的第二个问题需要通过横向步骤来回答，以查看Kubernetes命名空间。
 
-Every Kubernetes resource lives inside a namespace, which is a resource you can use to group other resources. Namespaces are a way to logically partition a Kubernetes cluster—you could have one namespace per product, one per team, or a single shared
-namespace. We won’t use namespaces for a while yet, but I’m introducing them here because they have a part to play in DNS resolution. Figure 3.18 shows where the namespace comes into the Service name.
+每个Kubernetes资源都位于一个命名空间中，这是一个可以用来对其他资源进行分组的资源。命名空间是对Kubernetes集群进行逻辑分区的一种方式，您可以为每个产品、每个团队或单个共享命名空间。我们暂时还不会使用名称空间，但我在这里介绍它们，因为它们在DNS解析中发挥作用。图3.18显示了命名空间在服务名称中的位置。
 
-![图3.18 Namespaces logically partition a cluster, but Services are accessible across namespaces.](./images/Figure3.18.png)
+![图3.18 命名空间对集群进行逻辑分区，但 Service 可以跨命名空间访问.](./images/Figure3.18.png)
 
-You already have several namespaces in your cluster—all the resources we’ve deployed so far have been created in the default namespace (which is the default; that’s why we haven’t needed to specify a namespace in our YAML files). Internal Kubernetes components like the DNS server and the Kubernetes API also run in Pods in the kube-system namespace.
+您的集群中已经有多个命名空间，到目前为止我们部署的所有资源都是在默认名称空间中创建的（称为 default；这就是为什么我们不需要在YAML文件中指定命名空间）。内部Kubernetes组件（如DNS服务器和KubernetesAPI）也在kube-system 命名空间的Pods中运行。
 
-TRY IT NOW Kubectl is namespace-aware—you can use the namespace flag to work with resources outside of the default namespace.
-<b>现在就试试</b> 
+<b>现在就试试</b> Kurectl支持命名空间，您可以使用命名空间标志处理默认命名空间之外的资源。
 ```
-# check the Services in the default namespace:
+# 在 default 命名空间检查 Service:
 kubectl get svc --namespace default
-# check Services in the system namespace:
+# 检查 system 命名空间 Service :
 kubectl get svc -n kube-system
-# try a DNS lookup to a fully qualified Service name:
+# 尝试DNS查找完全限定的服务名称:
 kubectl exec deploy/sleep-1 -- sh -c 'nslookup numbers-
   api.default.svc.cluster.local | grep "^[^*]"'
-# and for a Service in the system namespace:
+# 以及 kube-system 下 的 Service:
 kubectl exec deploy/sleep-1 -- sh -c 'nslookup kube-dns.kube-
   system.svc.cluster.local | grep "^[^*]"'
 ```
 
-My output, shown in figure 3.19, answers the second question—the local domain name for a Service is just the Service name, but that’s an alias for the fully qualified domain name that includes the Kubernetes namespace.
+我的输出如图3.19所示，回答了第二个问题：Service 的本地域名只是服务名称，但这是包含Kubernetes命名空间的完全限定域名的别名。
 
-![图3.19 You can use the same kubectl commands to view resources in different namespaces.](./images/Figure3.19.png)
+![图3.19 可以使用相同的kubectl命令查看不同命名空间中的资源.](./images/Figure3.19.png)
 
-It’s important to know about namespaces early in your Kubernetes journey, if only because it helps you see that core Kubernetes features run as Kubernetes applications too, but you don’t see them in kubectl unless you explicitly set the namespace. Namespaces are a powerful way to subdivide your cluster to increase utilization without compromising security, and we’ll return to them in chapter 11.
+在Kubernetes之旅的早期了解命名空间很重要，因为它可以帮助您看到Kubernete的核心功能也可以作为Kubernets应用程序运行，但除非您明确设置了命名空间，否则在kubectl中看不到它们。命名空间是细分集群以提高利用率而不损害安全性的一种强大方式，我们将在第11章中再次讨论它们。
 
-For now we’re done with namespaces and Services. In this chapter, you’ve learned that every Pod has its own IP address, and Pod communication ultimately uses that address with standard TCP and UDP protocols. You never use the Pod IP address directly, though—you always create a Service resource, which Kubernetes uses to provide Service discovery with DNS. Services support multiple networking patterns, with different Service types configuring network traffic between Pods, into Pods from the outside world, and from Pods to the world outside. You also learned that Services have their own life cycle, independent of Pods and Deployments, so the last thing to do is clean up before we move on.
+现在我们已经完成了命名空间和Service。在本章中，您已经了解到每个Pod都有自己的IP地址，Pod通信最终使用标准TCP和UDP协议的IP地址。您永远不会直接使用Pod IP地址，尽管您总是创建一个Service 资源，Kubernetes使用它通过DNS提供服务发现。服务支持多种网络模式，不同的服务类型配置Pod之间的网络流量，从外部世界进入Pod，以及从Pod到外部世界。您还了解到，服务有自己的生命周期，独立于Pod和Deployments，因此在我们继续之前，最后要做的就是清理。
 
-TRY IT NOW Deleting a Deployment also deletes all its Pods, but there’s no cascading delete for Services. They’re independent objects that need to be removed separately.
-<b>现在就试试</b> 
+<b>现在就试试</b> 删除 Deployment 也会删除其所有Pod，但 Service 没有级联删除。它们是需要单独删除的独立对象。
 ```
-# delete Deployments:
+# 删除 Deployments:
 kubectl delete deploy --all
-# and Services:
+# 删除 Services:
 kubectl delete svc --all
-# check what’s running:
+# 检查还有什么在运行:
 kubectl get all
 ```
 
-Now your cluster is clear again, although, as you can see in figure 3.20, you need to be careful with some of these kubectl commands.
+现在集群又干净了，尽管如图3.20所示，您需要小心使用其中一些kubectl命令。
 
-![图3.20 You need to explicitly delete any Services you create, but watch out with the all parameter.](./images/Figure3.20.png)
+![图3.20 您需要显式删除创建的任何服务，但要注意all参数.](./images/Figure3.20.png)
 
 ## 3.6 实验室
 
