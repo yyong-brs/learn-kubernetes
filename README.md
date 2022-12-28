@@ -52,4 +52,18 @@
 
     - 3.5 [理解 Kubernetes Service 解析](./chapter3.md#35-理解-kubernetes-service-解析)
 
-    - 3.6 [实验室](./chapter3.md#36-实验室)
+    - 3.6 [实验室](./chapter3.md#36-实验室)  
+
+  - 第四章 [通过 ConfigMaps 和 Secrets 配置应用程序](./chapter4.md)
+
+    - 4.1 [Kubernetes 如何为应用提供配置](./chapter4.md#41-kubernetes-如何为应用提供配置)
+
+    - 4.2 [在 ConfigMaps 中存储和使用配置文件](./chapter4.md#42-在-configmaps-中存储和使用配置文件)
+
+    - 4.3 [从 ConfigMaps 中查找配置数据](./chapter4.md#43-从-configmaps-中查找配置数据)
+
+    - 4.4 [使用 Secrets 配置敏感数据](./chapter4.md#44-使用-secrets-配置敏感数据)
+
+    - 4.5 [管理 Kubernetes 中的应用程序配置](./chapter4.md#45-管理-kubernetes-中的应用程序配置)
+
+    - 4.6 [实验室](./chapter4.md#46-实验室)
