@@ -1,15 +1,14 @@
  # 第四章 通过 ConfigMaps 和 Secrets 配置应用程序
 
- One of the great advantages of running apps in containers is that you eliminate the gaps between environments. The deployment process promotes the same container image through all your test environments up to production, so each deployment uses the exact same set of binaries as the previous environment. You’ll never again see a production deployment fail because the servers are missing a dependency that someone manually installed on the test servers and forgot to document.Of course, differences do occur between environments, and you provide for that by injecting configuration settings into containers.
+ 在容器中运行应用程序的最大优势之一是消除了环境之间的差距。部署过程在所有测试环境直到生产环境中都使用相同的容器镜像，因此每个部署都使用与前一个环境完全相同的二进制文件集。您再也不会看到生产部署失败，因为服务器缺少某人手动安装在测试服务器上并且忘记记录的依赖项。当然，环境之间确实存在差异，您可以通过将配置设置注入到容器中来提供这种差异。
 
-Kubernetes supports configuration injection with two resource types: ConfigMaps and Secrets. Both types can store data in any reasonable format, and that data lives in the cluster independent of any other resources. Pods can be defined with access to the data in ConfigMaps and Secrets, with different options for how that data gets surfaced. In this chapter, you’ll learn all the ways to manage configuration in Kubernetes, which are flexible enough to meet the requirements for any application.
+Kubernetes支持两种资源类型的配置注入:ConfigMap和Secrets。这两种类型都可以以任何合理的格式存储数据，并且这些数据独立于任何其他资源存在于集群中。可以通过访问ConfigMaps和Secrets中的数据来定义Pods，并为数据如何展现提供不同的选项。在本章中，您将学习在Kubernetes中管理配置的所有方法，这些方法足够灵活，可以满足任何应用程序的需求。
 
  ## 4.1 Kubernetes 如何为应用提供配置
 
- You create ConfigMap and Secret objects like other resources in Kubernetes—using kubectl, either with create commands or by applying a YAML specification.Unlike other resources, they don’t do anything; they’re just storage units intended for small amounts of data. Those storage units can be loaded into a Pod, becoming part of the container environment, so the application in the container can read the data. Before we even get to those objects, we’ll look at the simplest way to provide configuration settings: using environment variables.
+ 使用 kubectl 创建ConfigMap和Secret对象，就像在kubernete中创建其他资源一样，可以使用create命令，也可以应用YAML规范。不像其他资源，它们什么都不做;它们只是存储少量数据的存储单元。这些存储单元可以加载到Pod中，成为容器环境的一部分，因此容器中的应用程序可以读取数据。在讨论这些对象之前，我们先来看看提供配置设置的最简单方法:使用环境变量。
 
-TRY IT NOW
-Environment variables are a core operating system feature in Linux and Windows, and they can be set at the machine level so any app can read them. They’re commonly used, and all containers have some, which are set by the operating system inside the container and by Kubernetes. Make sure your Kubernetes lab is up and running.
+<b>现在就试试</b> 环境变量是Linux和Windows中的核心操作系统特性，它们可以在机器级别设置，以便任何应用程序都可以读取它们。环境变量是常用的，所有容器都有一些环境变量，由容器内的操作系统和Kubernetes设置。确保您的Kubernetes实验室已经启动并运行。
 
 ```
 # switch to the exercise directory for this chapter:
