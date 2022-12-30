@@ -11,104 +11,91 @@ Kubernetes支持两种资源类型的配置注入:ConfigMap和Secrets。这两�
 <b>现在就试试</b> 环境变量是Linux和Windows中的核心操作系统特性，它们可以在机器级别设置，以便任何应用程序都可以读取它们。环境变量是常用的，所有容器都有一些环境变量，由容器内的操作系统和Kubernetes设置。确保您的Kubernetes实验室已经启动并运行。
 
 ```
-# switch to the exercise directory for this chapter:
+# 切换到本章练习目录:
 cd ch04
-# deploy a Pod using the sleep image with no extra configuration:
+# 使用 sleep image 部署一个没有额外配置的 Pod:
 kubectl apply -f sleep/sleep.yaml
-# wait for the Pod to be ready:
+# 等待 pod ready:
 kubectl wait --for=condition=Ready pod -l app=sleep
-# check some of the environment variables in the Pod container:
+# 检查容器中的一些环境变量:
 kubectl exec deploy/sleep -- printenv HOSTNAME KIAMOL_CHAPTER
 ```
 
-You can see from my output shown in figure 4.1 that the hostname variable exists in the container and is populated by Kubernetes, but the custom Kiamol variable doesn’t exist.
+从图4.1所示的输出中可以看到，容器中存在hostname变量，并由Kubernetes填充，但自定义Kiamol变量不存在。
 
-![图4.1  All Pod containers have some environment variables set by Kubernetes and the container OS.](./images/Figure4.1.png)
+![图4.1 所有Pod容器都有Kubernetes和容器操作系统设置的一些环境变量.](./images/Figure4.1.png)
 
-In this exercise, the application is just the Linux printenv tool, but the principle is the same for any application. Many technology stacks use environment variables as a basic
-configuration system. The simplest way to provide those settings in Kubernetes is by adding environment variables in the Pod specification. Listing 4.1 shows an updated
-Pod spec for the sleep Deployment, which adds the Kiamol environment variable.
+在本练习中，应用程序只是Linux printenv工具，但原理对任何应用程序都是相同的。许多技术栈使用环境变量作为基本配置系统。在Kubernetes中提供这些设置的最简单方法是在Pod Spec 中添加环境变量。清单4.1显示了 sleep Deployment 的更新后的 Pod Spec，其中添加了Kiamol环境变量。
 
-> Listing 4.1 sleep-with-env.yaml, a Pod spec with environment variables
+> Listing 4.1 sleep-with-env.yaml, 一个 Pod Spec 带了环境变量
 
 ```
 spec:
   containers:
     - name: sleep
       image: kiamol/ch03-sleep
-      env:                    # Sets environment variables
-      - name: KIAMOL_CHAPTER  # Defines the name of the variable to create
-        value: "04"           # Defines the value to set for the variable
+      env:                    # 设置环境变量
+      - name: KIAMOL_CHAPTER  # 定义环境变量名称
+        value: "04"           # 定义环境变量值
 ```
 
-Environment variables are static for the life of the Pod; you can’t update any values while the Pod is running. If you need to make configuration changes, you need to perform an update with a replacement Pod. You should get used to the idea that deployments aren’t just for new feature releases; you’ll also use them for configuration changes and software patches, and you must design your apps to handle frequent Pod replacements.
+环境变量在Pod的生命周期中是静态的;在Pod运行时，你不能更新任何值。如果需要更改配置，则需要使用替换Pod执行更新。你应该习惯这样的想法:部署不仅仅是为了新特性的发布;你也会使用它们来进行配置更改和软件补丁，你必须设计你的应用程序来处理频繁的Pod更换。
 
-TRY IT NOW
-Update the sleep Deployment with the new Pod spec from listing 4.1, adding an environment variable that is visible inside the Pod container.
+<b>现在就试试</b> 使用清单4.1中的新Pod 配置更新 sleep Deployment，添加一个Pod容器内可见的环境变量。
 
 ```
-# update the Deployment:
+# 更新 Deployment:
 kubectl apply -f sleep/sleep-with-env.yaml
-# check the same environment variables in the new Pod:
+# 在新的 Pod 中检查同样的环境变量:
 kubectl exec deploy/sleep -- printenv HOSTNAME KIAMOL_CHAPTER
 ```
 
-My output, in figure 4.2, shows the result—a new container with the Kiamol environ-
-ment variable set, running in a new Pod.
+我的输出(如图4.2所示)显示了结果——一个设置了Kiamol环境变量的新容器，在一个新的Pod中运行。
 
-![图4.2 Adding environment variables to a Pod spec makes the values available in the Pod container.](./images/Figure4.2.png)
+![图4.2 将环境变量添加到Pod Spec 中可以在Pod容器中使用这些值.](./images/Figure4.2.png)
 
-The important thing about the previous exercise is that the new app is using the same Docker image; it’s the same application with all the same binaries—only the configuration settings have changed between deployments. Setting environment values inline in the Pod specification is fine for simple settings, but real applications usually have
-more complex configuration requirements, which is when you use ConfigMaps.
+关于前面的练习，重要的是新应用程序使用相同的Docker 镜像;这是一个具有相同二进制文件的相同应用程序——只是配置设置在部署之间发生了更改。在Pod Spec 中内联设置环境值对于简单设置很好，但实际应用程序通常有更复杂的配置需求，这就是使用ConfigMaps时的情况。
 
-A ConfigMap is just a resource that stores some data that can be loaded into a Pod. The data can be a set of key-value pairs, a blurb of text, or even a binary file. You can
-use key-value pairs to load Pods with environment variables, text to load any type of config file—JSON, XML, YAML, TOML, INI—and binary files to load license keys.
-One Pod can use many ConfigMaps, and each ConfigMap can be used by many Pods. Figure 4.3 shows some of those options.
+ConfigMap只是一个资源，它存储了一些可以加载到Pod中的数据。数据可以是一组键-值对、文本简介，甚至是二进制文件。您可以使用键-值对加载带有环境变量的Pods，使用文本加载任何类型的配置文件—json、XML、YAML、TOML、ini—以及二进制文件加载许可密钥。一个Pod可以使用多个ConfigMap，每个ConfigMap可以被多个Pod使用。图4.3显示了其中的一些选项。
 
-![图4.3 ConfigMaps are separate resources, which can be attached to zero or more Pods..](./images/Figure4.3.png)
+![图4.3 configmap是单独的资源，可以附加到0个或多个pod.](./images/Figure4.3.png)
 
-We’ll stick with the simple sleep Deployment to show the basics of creating and using ConfigMaps. Listing 4.2 shows the environment section of an updated Pod specification, which uses one environment variable defined in the YAML and a second loaded from a ConfigMap.
+我们将继续使用简单的 sleep Deployment，以展示创建和使用configmap的基础知识。清单4.2显示了更新后Pod Spec的环境部分，其中使用了一个在YAML中定义的环境变量和一个从ConfigMap中加载的环境变量。
 
-> Listing 4.2 sleep-with-configMap-env.yaml, loading a ConfigMap into a Pod
+> 清单 4.2 sleep-with-configMap-env.yaml, 加载 ConfigMap 到 Pod 中
 
 ```
-env:                             # The environment section of the container spec
+env:                             # 容器 Spec 环境变量配置部分
 - name: KIAMOL_CHAPTER
-  value: "04"                    # This is the variable value.
+  value: "04"                    # 变量值.
 - name: KIAMOL_SECTION
   valueFrom:
-    configMapKeyRef:             # This value comes from a ConfigMap.
-      name: sleep-config-literal # Names the ConfigMap
-      key: kiamol.section        # Names the data item to load
+    configMapKeyRef:             # 值来自于 ConfigMap.
+      name: sleep-config-literal # ConfigMap 名称
+      key: kiamol.section        # 加载的数据项名称
 ```
+如果在 Pod Spec 中引用了ConfigMap，那么在部署Pod之前，ConfigMap必须已经存在。该配置期望在数据中找到一个名为sleep-config-literal的具有键值对的ConfigMap，最简单的创建方法是将键和值传递给kubectl命令。
 
-If you reference a ConfigMap in a Pod specification, the ConfigMap needs to exist before you deploy the Pod. This spec expects to find a ConfigMap called sleep-config-literal with key-value pairs in the data, and the easiest way to create that is by passing the key and value to a kubectl command.
-
-TRY IT NOW
-Create a ConfigMap by specifying the data in the command, then check the data and deploy the updated sleep app to use the ConfigMap.
+<b>现在就试试</b> 通过指定命令中的数据创建ConfigMap，然后检查数据并部署更新后的sleep 应用程序来使用ConfigMap。
 
 ```
-# create a ConfigMap with data from the command line:
-kubectl create configmap sleep-config-literal --from-
-literal=kiamol.section='4.1'
-# check the ConfigMap details:
+# 基于命令行创建 ConfigMap:
+kubectl create configmap sleep-config-literal --from-literal=kiamol.section='4.1'
+# 检查 ConfigMap 详情:
 kubectl get cm sleep-config-literal
-# show the friendly description of the ConfigMap:
+# 显示 ConfigMap 友好的描述信息:
 kubectl describe cm sleep-config-literal
-# deploy the updated Pod spec from listing 4.2:
+# 基于 清单 4.2 部署更新后的 Pod 配置:
 kubectl apply -f sleep/sleep-with-configMap-env.yaml
-# check the Kiamol environment variables:
+# 检查 Kiamol 环境变量:
 kubectl exec deploy/sleep -- sh -c 'printenv | grep "^KIAMOL"'
 ```
 
-We won’t use kubectl describe commands much in this book because the output is usually verbose and would use up most of a chapter, but it’s definitely something to
-experiment with. Describing Services and Pods gives you a lot of useful information in a readable format. You can see my output in figure 4.4, which includes the key-value
-data shown from describing the ConfigMap.
+在本书中，我们不会经常使用kubectl describe 命令，因为输出通常很冗长，会占用大部分屏幕，但它绝对是值得尝试的东西。描述Services和Pods以可读的格式为您提供了许多有用的信息。您可以在图4.4中看到我的输出，其中包括描述ConfigMap时显示的键值数据。
 
-![图4.4 Pods can load individual data items from ConfigMaps and rename the key.](./images/Figure4.4.png)
+![图4.4 Pods可以从ConfigMaps加载单独的数据项并重命名键.](./images/Figure4.4.png)
 
-Creating ConfigMaps from literal values is fine for individual settings, but it gets cumbersome fast if you have a lot of configuration data. As well as specifying literal
-values on the command line, Kubernetes lets you load ConfigMaps from files.
+从文字值创建 ConfigMap 对于单独的设置来说很好，但是如果您有很多配置数据，它会变得非常麻烦。除了在命令行上指定文本值外，Kubernetes还允许你从文件中加载configmap。
 
  ## 4.2 在 ConfigMaps 中存储和使用配置文件
 
