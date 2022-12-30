@@ -230,60 +230,60 @@ kubectl apply -f todo-list/todo-web-dev.yaml
 
  ## 4.3 从 ConfigMaps 中查找配置数据
 
- The alternative to loading configuration items into environment variables is to present them as files inside directories in the container. The container filesystem is a virtual construct, built from the container image and other sources. Kubernetes can use ConfigMaps as a filesystem source—they are mounted as a directory, with a file for each data item. Figure 4.8 shows the setup you’ve just deployed, where the data item in the ConfigMap is surfaced as a file.
+ 将配置项加载到环境变量中的替代方法是将它们作为容器目录中的文件表示。容器文件系统是一个虚拟构造，由容器镜像和其他源构建。Kubernetes可以使用ConfigMaps作为文件系统源——它们作为一个目录挂载，每个数据项都有一个文件。图4.8显示了您刚刚部署的设置，其中ConfigMap中的数据项显示为一个文件。
 
-![图4.8 ConfigMaps can be loaded as directories in the container filesystem..](./images/Figure4.8.png)
+![图4.8 configmap可以作为容器文件系统中的目录加载.](./images/Figure4.8.png)
 
-Kubernetes manages this strange magic with two features of the Pod spec: volumes, which make the contents of the ConfigMap available to the Pod, and volume mounts,which load the contents of the ConfigMap volume into a specified path in the Pod container. Listing 4.7 shows the volumes and mounts you deployed in the previous exercise.
+Kubernetes通过Pod 配置 Spec 的两个特性来管理这个奇怪的魔法:卷，它使ConfigMap的内容对Pod可用，卷挂载，它将ConfigMap卷的内容加载到Pod容器的指定路径中。清单4.7显示了在前面的练习中部署的卷和挂载。
 
-> Listing 4.7 todo-web-dev.yaml, loading a ConfigMap as a volume mount
+> 清单 4.7 todo-web-dev.yaml, 将 ConfigMap 作为卷挂载
 
 ```
 spec:
   containers:
     - name: web
       image: kiamol/ch04-todo-list
-      volumeMounts:                  # Mounts a volume into the container
-        - name: config               # Names the volume
-          mountPath: "/app/config"   # Directory path to mount the volume
-          readOnly: true             # Flags the volume as read-only
-  volumes:                           # Volumes are defined at the Pod level.
-    - name: config                   # Name matches the volume mount.
-      configMap:                     # Volume source is a ConfigMap.
-        name: todo-web-config-dev    # ConfigMap name
+      volumeMounts:                  # 挂载卷到容器中
+        - name: config               # 卷名称
+          mountPath: "/app/config"   # 卷挂载的目录
+          readOnly: true             # 卷 read-only 配置
+  volumes:                           # Pod 层面定义卷
+    - name: config                   # 匹配 volumeMount 部分的名称.
+      configMap:                     # 卷来源是一个 ConfigMap.
+        name: todo-web-config-dev    # ConfigMap 名称
 ```
-The important thing to realize here is that the ConfigMap is treated like a directory, with multiple data items, which each become files in the container filesystem. In this example, the application loads its default settings from the file at /app/appsettings.json, and then it looks for a file at /app/config/config.json, which can contain settings to override the defaults. The /app/config directory doesn’t exist in the container image; it is created and populated by Kubernetes.
 
-TRY IT NOW
-The container filesystem appears as a single storage unit to the application, but it has been built from the image and the ConfigMap. Those sources have different behaviors.
+这里需要意识到的重要一点是，ConfigMap被视为一个目录，具有多个数据项，每个数据项都成为容器文件系统中的文件。在这个例子中，应用程序从/app/appsettings.json文件中加载它的默认设置，然后它在/app/config 目录下寻找一个文件config.Json，它可以包含覆盖默认值的设置。容器镜像中不存在/app/config目录;它是由Kubernetes创建和填充的。
+
+<b>现在就试试</b> 容器文件系统对于应用程序来说是一个单独的存储单元，但是它是由镜像和ConfigMap构建的。这些源有不同的行为。
 
 ```
-# show the default config file:
+# 显示默认的 config 文件:
 kubectl exec deploy/todo-web -- sh -c 'ls -l /app/app*.json'
-# show the config file in the volume mount:
+# 显示卷挂载进来的 config 文件:
 kubectl exec deploy/todo-web -- sh -c 'ls -l /app/config/*.json'
-# check it really is read-only:
+# 检查它是否真的只读:
 kubectl exec deploy/todo-web -- sh -c 'echo ch04 >> /app/config/config.json'
 ```
 
-My output, in figure 4.9, shows that the JSON configuration files exist in the expected locations for the app, but the ConfigMap files are managed by Kubernetes and delivered as read-only files.
+如图4.9所示，我的输出显示JSON配置文件存在于应用程序的预期位置，但ConfigMap文件由Kubernetes管理，并作为只读文件交付。
 
-![图4.9 The container filesystem is built by Kubernetes from the image and the ConfigMap.](./images/Figure4.9.png)
+![图4.9 容器文件系统由Kubernetes从镜像和ConfigMap构建。.](./images/Figure4.9.png)
 
-Loading ConfigMaps as directories is flexible, and you can use it to support different approaches to app configuration. If your configuration is split across multiple files,you can store it all in a single ConfigMap and load it all into the container. Listing 4.8 shows the data items for an update to the to-do ConfigMap with two JSON files that separate the settings for application behavior and logging.
+将ConfigMaps加载为目录是很灵活的，你可以使用它来支持不同的应用配置方法。如果您的配置被拆分到多个文件中，您可以将其全部存储在一个ConfigMap中，并将其全部加载到容器中。清单4.8显示了使用两个JSON文件更新to-do ConfigMap的数据项，这些JSON文件分离了应用程序行为和日志记录的设置。
 
-> Listing 4.8 todo-web-config-dev-with-logging.yaml, a ConfigMap with two files
+> 清单 4.8 todo-web-config-dev-with-logging.yaml, 包含两个文件的 ConfigMap
 
 ```
 data:
-  config.json: |-                 # The original app config file
+  config.json: |-                 # 原始的 app 配置文件
     {
       "ConfigController": {
         "Enabled" : true
       }
     }
-  logging.json: |-                # A second JSON file, which will be
-    {                             # surfaced in the volume mount
+  logging.json: |-                # 第二个 JSON file, 将会出现在卷挂载中
+    {                             
       "Logging": {
         "LogLevel": {
           "ToDoList.Pages" : "Debug"
@@ -292,33 +292,31 @@ data:
     }
 ```
 
-What happens when you deploy an update to a ConfigMap that a live Pod is using?Kubernetes delivers the updated files to the container, but what happens next depends on the application. Some apps load configuration files into memory when they start and then ignore any changes in the config directory, so changing the ConfigMap won’t actually change the app configuration until the Pods are replaced. This application is more thoughtful—it watches the config directory and reloads any file changes, so deploying an update to the ConfigMap will update the application configuration.
+当您将一个更新部署到一个live Pod正在使用的ConfigMap时会发生什么?Kubernetes将更新后的文件交付到容器，但接下来会发生什么取决于应用程序。一些应用程序在启动时将配置文件加载到内存中，然后忽略配置目录中的任何更改，因此更改ConfigMap实际上不会改变应用程序的配置，直到替换Pods。这个应用程序更加周到——它监视配置目录并重新加载任何文件更改，因此将更新部署到ConfigMap将更新应用程序配置。
 
-TRY IT NOW
-Update the app configuration with the ConfigMap from listing 4.9.That increases the logging level, so the same Pod will now start writing more log entries.
+<b>现在就试试</b> 使用清单4.9中的ConfigMap更新应用程序配置。这增加了日志记录级别，所以同一个Pod现在将开始写入更多的日志条目。
 
 ```
-# check the current app logs:
+# 检查当前应用日志:
 kubectl logs -l app=todo-web
-# deploy the updated ConfigMap:
-kubectl apply -f todo-list/configMaps/todo-web-config-dev-with-
-logging.yaml
-# wait for the config change to make it to the Pod:
+# 部署更新后的 ConfigMap:
+kubectl apply -f todo-list/configMaps/todo-web-config-dev-with-logging.yaml
+# 等待配置变更生效到 Pod :
 sleep 120
-# check the new setting:
+# 检查新的设置:
 kubectl exec deploy/todo-web -- sh -c 'ls -l /app/config/*.json'
-# load a few pages from the site at your Service IP address
-# check the logs again:
+
+# 从您的 Service IP地址的站点加载几个页面，再次检查日志：
 kubectl logs -l app=todo-web
 ```
 
-You can see my output in figure 4.10. The sleep is there to give the Kubernetes API time to roll out the new configuration files to the Pod; after a couple of minutes, the new configuration is loaded, and the app is operating with enhanced logging.
+可以在图4.10中看到我的输出。sleep 是为了让Kubernetes API有时间将新的配置文件在Pod 重新加载;几分钟后，新配置被加载，应用程序在增强的日志记录下运行。
 
-![图4.10 ConfigMap data is cached, so it takes couple of minutes for updates to reach Pods.](./images/Figure4.10.png)
+![图4.10 ConfigMap数据是缓存的，所以更新需要几分钟才能到达Pods.](./images/Figure4.10.png)
 
-Volumes are a powerful option for loading config files, especially with apps like this, which react to changes and update settings on the fly. Bumping up the logging level without having to restart your app is a great help in tracking down issues. You need to be careful with your configuration, though, because volume mounts don’t necessarily work the way you expect. If the mount path for a volume already exists in the container image, then the ConfigMap directory overwrites it, replacing all the contents, which can cause your app to fail in exciting ways. Listing 4.9 shows an example.
+卷是加载配置文件的一个强大的选项，尤其是像这样的应用程序，它会对变化做出反应，并实时更新设置。在不重启应用程序的情况下提高日志级别对跟踪问题有很大帮助。但是，您需要小心您的配置，因为卷挂载不一定以您期望的方式工作。如果容器镜像中已经存在卷的挂载路径，那么ConfigMap目录将覆盖它，替换所有内容，这可能导致应用程序以令人兴奋的方式失败。清单4.9显示了一个示例。
 
-> Listing 4.9 todo-web-dev-broken.yaml, a Pod spec with a misconfigured mount
+> 清单 4.9 todo-web-dev-broken.yaml, 一个 Pod配置了错误的挂载
 
 ```
 spec:
@@ -326,33 +324,33 @@ spec:
     - name: web
       image: kiamol/ch04-todo-list
       volumeMounts:
-        - name: config                # Mounts the ConfigMap volume
-          mountPath: "/app"           # Overwrites the directory
+        - name: config                # 挂载 ConfigMap 卷
+          mountPath: "/app"           # 覆盖目录
 ```
 
-This is a broken Pod spec, where the ConfigMap is loaded into the /app directory rather than the /app/config directory. The author probably intended this to merge the directories, adding the JSON config files to the existing app directory. Instead, it’s going to wipe out the application binaries.
+这是一个坏的Pod spec 配置，其中ConfigMap被加载到/app目录而不是/app/config目录。作者可能是想合并目录，将JSON配置文件添加到现有的应用目录中。相反，它将清除应用程序二进制文件。
 
-TRY IT NOW
-The Pod spec from listing 4.9 removes all the app binaries, so the replacement Pod won’t start. See what happens next.
+<b>现在就试试</b> 清单4.9中的Pod 配置删除了所有应用程序二进制文件，因此替换的Pod将无法启动。看看接下来会发生什么。
 
 ```
-# deploy the badly configured Pod:
+# 部署错误配置的 Pod:
 kubectl apply -f todo-list/todo-web-dev-broken.yaml
-# browse back to the app and see how it looks
-# check the app logs:
+# 访问应用程序，看看它的样子
+# 检查应用日志:
 kubectl logs -l app=todo-web
-# and check the Pod status:
+# 检查 pod 状态:
 kubectl get pods -l app=todo-web
 ```
-The results here are interesting: the deployment breaks the app, and yet the app carries on working. That’s Kubernetes watching out for you. Applying the change creates a new Pod, and the container in that Pod immediately exits with an error, because the binary it tries to load no longer exists in the app directory. Kubernetes restarts the container a few times to give it a chance, but it keeps failing. After three tries, Kubernetes takes a rest, as you can see in figure 4.11.
 
-![图4.11 If an updated deployment fails, then the original Pod isn’t replaced.](./images/Figure4.11.png)
+这里的结果很有趣:部署破坏了应用程序，但应用程序继续工作。这是Kubernetes在保护你。应用更改会创建一个新的Pod，该Pod中的容器立即退出并报错，因为它试图加载的二进制文件不再存在于app目录中。Kubernetes重新启动容器几次，给它一个机会，但它一直失败。经过三次尝试后，Kubernetes开始休息，如图4.11所示。
 
-Now we have two Pods, but Kubernetes doesn’t remove the old Pod until the replacement is running successfully, which it never will in this case because we’ve broken the container setup. The old Pod isn’t removed and still happily serves requests; the new Pod is in a failed state, but Kubernetes periodically keeps restarting the container in the hope that it might have fixed itself. This is a situation to watch out for: the apply command seems to work, and the app carries on working, but it’s not using the manifest you’ve applied.
+![图4.11 如果更新的deployment 失败，则不会替换原来的Pod](./images/Figure4.11.png)
 
-We’ll fix that now and show one final option for surfacing ConfigMaps in the container filesystem. You can selectively load data items into the target directory, rather than loading every data item as its own file. Listing 4.10 shows the updated Pod spec.The mount path has been fixed, but the volume is set to deliver only one item.
+现在我们有了两个Pod，但Kubernetes不会删除旧的Pod，直到替换的Pod成功运行，在这种情况下它永远不会删除，因为我们破坏了容器设置。旧的Pod没有被移除，仍然愉快地服务于请求;新的Pod处于失败状态，但Kubernetes周期性地重新启动容器，希望它可能已经自我修复。这是一种需要注意的情况:apply命令似乎可以工作，应用程序继续工作，但它没有使用您所应用的清单。
 
-> Listing 4.10 todo-web-dev-no-logging.yaml, mounting a single ConfigMap item
+现在我们将修复这个问题，并展示在容器文件系统中显示ConfigMaps的最后一个选项。您可以有选择地将数据项加载到目标目录中，而不是将每个数据项作为其自己的文件加载。清单4.10显示了更新后的Pod规范。挂载路径已经固定，但是卷被设置为只交付一个项。
+
+> 清单 4.10 todo-web-dev-no-logging.yaml, 挂载 ConfigMap 单项
 
 ```
 spec:
@@ -360,41 +358,39 @@ spec:
     - name: web
       image: kiamol/ch04-todo-list
       volumeMounts:
-        - name: config               # Mounts the ConfigMap volume
-          mountPath: "/app/config"   # to the correct direcory
+        - name: config               # 挂载 ConfigMap 卷到正常的目录
+          mountPath: "/app/config"   
           readOnly: true
 volumes:
   - name: config
     configMap:
-      name: todo-web-config-dev      # Loads the ConfigMap volume
-      items:                         # Specifies the data items to load
-      - key: config.json             # Loads the config.json item
-        path: config.json            # Surfaces it as the file config.json
+      name: todo-web-config-dev      # 加载 ConfigMap 卷
+      items:                         # 指定数据项进行加载
+      - key: config.json             # 加载 config.json 项
+        path: config.json            # 作为 文件 config.json
 ```
 
-This specification uses the same ConfigMap, so it is just an update to the deployment.This will be a cascading update: it will create a new Pod, which will start correctly, and
-then Kubernetes will remove the two previous Pods.
+该规范使用相同的ConfigMap，因此它只是对部署的更新。这将是一个级联更新:它将创建一个新的Pod，它将正确启动，并且然后Kubernetes会移除之前的两个pod。
 
-TRY IT NOW
-Deploy the spec from listing 4.10, which rolls out the updated volume mount to fix the app but also ignores the logging JSON file in the ConfigMap.
+<b>现在就试试</b>  部署清单4.10中的 spec，该 spec 推出更新后的卷挂载以修复应用程序，但也忽略了ConfigMap中的日志JSON文件。
 
 ```
-# apply the change:
+# 应用变更:
 kubectl apply -f todo-list/todo-web-dev-no-logging.yaml
-# list the config folder contents:
+# 列出配置文件夹的内容:
 kubectl exec deploy/todo-web -- sh -c 'ls /app/config'
-# now browse to a few pages on the app
-# check the logs:
+# 现在浏览应用的几个页面，
+# 检查日志:
 kubectl logs -l app=todo-web
-# and check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=todo-web
 ```
 
-Figure 4.12 shows my output. The app is working again, but it sees only a single configuration file, so the enhanced logging settings don’t get applied.
+图4.12显示了我的输出。应用程序又开始工作了，但它只看到一个配置文件，所以没有应用增强的日志记录设置。
 
-![图4.12 Volumes can surface selected items from a ConfigMap into a mount directory.](./images/Figure4.12.png)
+![图4.12 卷可以将ConfigMap中选定的项显示到挂载目录中.](./images/Figure4.12.png)
 
-ConfigMaps support a wide range of configuration systems. Between environment variables and volume mounts you should be able to store app settings in ConfigMaps and apply them however your app expects. The separation between the configuration spec and the app spec also supports different release workflows, allowing different teams to own different parts of the process. One thing you shouldn’t use ConfigMaps for, however, is any sensitive data—they’re effectively wrappers for text files with no additional security semantics. For configuration data that you need to keep secure,Kubernetes provides Secrets.
+configmap支持广泛的配置系统。在环境变量和卷挂载之间，你应该能够在ConfigMaps中存储应用程序设置，并根据应用程序的需要应用它们。配置规范和应用规范之间的分离还支持不同的发布工作流，允许不同的团队拥有流程的不同部分。但是，有一件事不应该使用ConfigMaps，那就是任何敏感数据——它们实际上是文本文件的包装器，没有额外的安全语义。对于需要保护的配置数据，Kubernetes提供了Secrets。
 
  ## 4.4 使用 Secrets 配置敏感数据
  Secrets are a separate type of resource, but they have a similar API to ConfigMaps. You work with them in the same way, but because they’re meant to store sensitive information, Kubernetes manages them differently. The main differences are all around minimizing exposure. Secrets are sent only to nodes that need to use them and are stored in memory rather than on disk; Kubernetes also supports encryption both in transit and at rest for Secrets.
