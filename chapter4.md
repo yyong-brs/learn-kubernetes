@@ -99,44 +99,42 @@ kubectl exec deploy/sleep -- sh -c 'printenv | grep "^KIAMOL"'
 
  ## 4.2 在 ConfigMaps 中存储和使用配置文件
 
- Options for creating and using ConfigMaps have evolved over many Kubernetes releases, so they now support practically every configuration variant you can think of. These sleep Pod exercises are a good way to show the variations, but they’re getting a bit boring, so we’ll just have one more before we move on to something more interesting. Listing 4.3 shows an environment file—a text file with key-value pairs that can be loaded to create one ConfigMap with multiple data items.
+在许多 Kubernetes 版本中，创建和使用configmap的选项已经得到了发展，所以它们现在几乎支持您能想到的所有配置变体。这些 sleep Pod 练习是展示变化的好方法，但它们有点无聊，所以在我们进入更有趣的内容之前，我们再做一个。清单4.3显示了一个环境文件——一个具有键-值对的文本文件，可以加载它来创建一个带有多个数据项的ConfigMap。
 
-> Listing 4.3 ch04.env, a file of environment variables
+> 清单 4.3 ch04.env, 一个包含环境变量的文件
 
 ```
-# Environment files use a new line for each variable.
+# 环境变量文件，使用每个新行定义每个变量
 KIAMOL_CHAPTER=ch04
 KIAMOL_SECTION=ch04-4.1
 KIAMOL_EXERCISE=try it now
 ```
 
-Environment files are a useful way to group multiple settings, and Kubernetes has explicit support for loading them into ConfigMaps and surfacing all the settings as environment variables in a Pod container.
+环境文件是将多个设置分组的有效方法，Kubernetes明确支持将它们加载到ConfigMaps中，并将所有设置作为Pod容器中的环境变量呈现出来。
 
-TRY IT NOW
-Create a new ConfigMap populated from the environment file in listing 4.3, then deploy an update to the sleep app to use the new settings.
+<b>现在就试试</b> 创建一个从清单4.3中的环境文件填充的新的ConfigMap，然后将更新部署到 sleep 应用程序以使用新的设置。
 
 ```
-# load an environment variable into a new ConfigMap:
-kubectl create configmap sleep-config-env-file --from-env-
-file=sleep/ch04.env
-# check the details of the ConfigMap:
+# 加载环境变量到新的 ConfigMap:
+kubectl create configmap sleep-config-env-file --from-env-file=sleep/ch04.env
+# 检查 ConfigMap 明细信息:
 kubectl get cm sleep-config-env-file
-# update the Pod to use the new ConfigMap:
+# 更新 Pod 使用新的 ConfigMap:
 kubectl apply -f sleep/sleep-with-configMap-env-file.yaml
-# check the values in the container:
+# 在容器中检查值:
 kubectl exec deploy/sleep -- sh -c 'printenv | grep "^KIAMOL"'
 ```
 
-My output, in figure 4.5, shows the printenv command reading all the environment variables and showing the ones with Kiamol names, but it might not be the result you expect.
+在图4.5中，我的输出显示 printenv 命令读取所有环境变量并显示具有Kiamol名称的变量，但这可能不是您所期望的结果。
 
-![图4.5 A ConfigMap can have multiple data items, and the Pod can load them all.](./images/Figure4.5.png)
+![图4.5 一个ConfigMap可以有多个数据项，Pod可以全部加载它们.](./images/Figure4.5.png)
 
-This exercise showed you how to create a ConfigMap from a file. It also showed you that Kubernetes has rules of precedence for applying environment variables. The Pod spec you just deployed, shown in listing 4.4, loads all environment variables from the ConfigMap, but it also specifies explicit environment values with some of the same keys.
+这个练习向您展示了如何从文件创建ConfigMap。它还向您展示了Kubernetes在应用环境变量时具有优先级规则。您刚刚部署的Pod规范(如清单4.4所示)从ConfigMap加载所有环境变量，但它也使用一些相同的键显式指定环境值。
 
-> Listing 4.4 sleep-with-configMap-env-file.yaml, multiple ConfigMaps in a Pod
+> 清单 4.4 sleep-with-configMap-env-file.yaml, 一个 Pod 关联多个 ConfigMaps
 
 ```
-env:                              # The existing environment section
+env:                              # 已经存在的环境配置部分
 - name: KIAMOL_CHAPTER
   value: "04"
 - name: KIAMOL_SECTION
@@ -144,16 +142,16 @@ env:                              # The existing environment section
     configMapKeyRef:
       name: sleep-config-literal
       key: kiamol.section
-envFrom:                          # envFrom loads multiple variables
-- configMapRef:                   # from a ConfigMap
+envFrom:                          # envFrom 加载多个变量
+- configMapRef:                   # 基于 ConfigMap
     name: sleep-config-env-file
 ```
 
-So the environment variables defined with env in the Pod spec override the values defined with envFrom if there are duplicate keys. It’s useful to remember that you can override any environment variables set in the container image or in ConfigMaps by explicitly setting them in the Pod spec—a quick way to change a configuration setting when you’re tracking down problems.
+因此，如果存在重复的键，Pod规范中用env定义的环境变量将覆盖用envFrom定义的值。记住一点很有用，您可以通过显式地在Pod规范中设置容器镜像或ConfigMaps中设置的任何环境变量来覆盖它们——这是在跟踪问题时更改配置设置的快速方法。
 
-Environment variables are well supported, but they only get you so far, and most application platforms prefer a more structured approach. In the rest of the exercises in this chapter, we’ll use a web application that supports a hierarchy of configuration sources. Default settings are packaged in a JSON file in the Docker image, and the app looks in other locations at run time for JSON files with settings that override the defaults—and all the JSON settings can be overridden with environment variables. Listing 4.5 shows the Pod spec for the first deployment we’ll use.
+环境变量得到了很好的支持，但它们只能提供到此为止，大多数应用程序平台更喜欢一种更结构化的方法。在本章的其余练习中，我们将使用一个支持配置源层次结构的web应用程序。默认设置被打包在Docker 镜像中的JSON文件中，应用程序在运行时在其他位置寻找具有覆盖默认设置的JSON文件——所有JSON设置都可以用环境变量覆盖。清单4.5显示了我们将使用的第一个部署的Pod规范。
 
-> Listing 4.5 todo-web.yaml, a web app with configuration settings
+> 清单 4.5 todo-web.yaml, 带有配置设置的web应用程序
 
 ```
 spec:
@@ -165,73 +163,70 @@ spec:
       value: Warning
 ```
 
-This run of the app will use all the default settings from the JSON configuration file in the image, except for the default logging level, which is set as an environment variable.
-TRY IT NOW
-Run the app without any additional configuration, and check its behavior.
+这个应用程序的运行将使用镜像中JSON配置文件中的所有默认设置，除了默认日志级别，它被设置为一个环境变量。
+
+<b>现在就试试</b> 在没有任何额外配置的情况下运行应用程序，并检查其行为。
 
 ```
-# deploy the app with a Service to access it:
+# 部署应用程序和 Service 来访问它:
 kubectl apply -f todo-list/todo-web.yaml
-# wait for the Pod to be ready:
+# 等待 Pod ready:
 kubectl wait --for=condition=Ready pod -l app=todo-web
-# get the address of the app:
-kubectl get svc todo-web -o
-jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080'
-# browse to the app and have a play around
-# then try browsing to /config
-# check the application logs:
+# 获取应用 地址:
+kubectl get svc todo-web -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080'
+
+# 浏览应用程序，玩一玩，然后尝试浏览/config 检查应用程序日志
 kubectl logs -l app=todo-web
 ```
 
-The demo app is a simple to-do list (which will be distressingly familiar to readers of Learn Docker in a Month of Lunches). In its current setup, it lets you add and view items,
-but there should also be a /config page we can use in nonproduction environments to view all the configuration settings. As you can see in figure 4.6, that page is empty,
-and the app logs a warning that someone tried to access it.
+演示应用程序是一个简单的待办事项列表(对于《在一个月的午餐中学习Docker》的读者来说，这将是令人痛苦的熟悉)。在当前的设置中，它允许您添加和查看项，但是还应该有一个/config页面，我们可以在非生产环境中使用它来查看所有的配置设置。如图4.6所示，该页面为空，应用程序记录了有人试图访问它的警告。
 
-![图4.6 The app mostly works, but we need to set additional configuration values.](./images/Figure4.6.png)
+![图4.6 应用程序大部分工作，但我们需要设置额外的配置值.](./images/Figure4.6.png)
 
-The configuration hierarchy in use here is a very common approach. If you’re not familiar with it, appendix C in the ebook is the chapter “Application Configuration Management in Containers” from Learn Docker in a Month of Lunches, which explains it in detail. This example is a .NET Core app that uses JSON, but you see similar configuration systems using a variety of file formats in Java Spring apps, Node.js, Go, Python, and more. In Kubernetes, you use the same app configuration approach with them all.
+这里使用的配置层次结构是一种非常常见的方法。如果你对它不熟悉，电子书的附录C是《Learn Docker in a Month of lunch》中的“容器中的应用程序配置管理”章节，其中详细解释了它。这个例子是一个使用JSON的. net Core应用程序，但是你可以在Java Spring应用程序、Node.js、Go、Python等中看到使用各种文件格式的类似配置系统。在Kubernetes中，你使用相同的应用配置方法。
 
-- Default app settings are baked into the container image. This could be just the settings which apply in every environment, or it could be a full set of configuration options, so without any extra setup, the app runs in development mode (that’s helpful for developers who can quickly start the app with a simple Docker run command).
-- The actual settings for each environment are stored in a ConfigMap and surfaced into the container filesystem. Kubernetes presents the configuration data as a file in a known location, which the app checks and merges with the content from the default file.
-- Any settings that need to be tweaked can be applied as environment variables in the Pod specification for the Deployment.
+- 这可能只是适用于每个环境的设置，也可能是一组完整的配置选项，所以不需要任何额外的设置，应用程序就可以在开发模式下运行(这对那些可以用简单的Docker run命令快速启动应用程序的开发人员很有帮助)。
+- 每个环境的实际设置存储在ConfigMap中，并呈现到容器文件系统中。Kubernetes将配置数据显示为一个位于已知位置的文件，应用程序检查并将其与默认文件中的内容合并。
+- 任何需要调整的设置都可以作为部署Pod规范中的环境变量应用。
 
-Listing 4.6 shows the YAML specification for the development configuration of the todo app. It contains the contents of a JSON file, which the app will merge with the default JSON configuration file in the container image, with a setting to make the config page visible.
+清单4.6显示了todo应用程序开发配置的YAML规范。它包含一个JSON文件的内容，应用程序将该JSON文件与容器镜像中的默认JSON配置文件合并，并设置使配置页面可见。
 
-> Listing 4.6 todo-web-config-dev.yaml, a ConfigMap specification
+> 清单 4.6 todo-web-config-dev.yaml, 一个 ConfigMap的配置信息
 
 ```
 apiVersion: v1
-kind: ConfigMap                # ConfigMap is the resource type.
+kind: ConfigMap                # ConfigMap 是一种资源类型
 metadata:
-  name: todo-web-config-dev    # Names the ConfigMap.
+  name: todo-web-config-dev    # ConfigMap 名字
 data:
-  config.json: |-              # The data key is the filename.
-    {                          # The file contents can be any format.
+  config.json: |-              # 数据 key 是文件名
+    {                          # 文件内容可以是任何格式
       "ConfigController": {
         "Enabled" : true
       }
     }
 ```
-You can embed any kind of text configuration file into a YAML spec, as long as you’re careful with the whitespace. I prefer this to loading ConfigMaps directly from configuration files because it means you can consistently use the kubectl apply command to deploy every part of your app. If I wanted to load the JSON file directly, I’d need to use the kubectl create command for configuration resources and apply for everything else.
 
-The ConfigMap definition in listing 4.6 contains just a single setting, but it’s stored in the native configuration format for the app. When we deploy an updated Pod spec,the setting will be applied and the config page will be visible.
+您可以将任何类型的文本配置文件嵌入到YAML规范中，只要小心处理空白即可。我更喜欢直接从配置文件加载ConfigMaps，因为这意味着你可以始终使用kubectl apply命令来部署应用程序的每个部分。如果我想直接加载JSON文件，我需要使用kubectl create命令来配置资源，并应用其他所有内容。
 
-TRY IT NOW
-The new Pod spec references the ConfigMap, so that needs to be created first by applying the YAML, then we update the to-do app Deployment.
+清单4.6中的ConfigMap定义只包含一个设置，但它以应用程序的本机配置格式存储。当我们部署更新的Pod规范时，该设置将被应用，配置页面将可见。
+
+
+<b>现在就试试</b> 新的Pod规范引用了ConfigMap，因此需要首先通过应用YAML来创建ConfigMap，然后我们更新待办事项应用部署。
 
 ```
-# create the JSON ConfigMap:
+# 创建 JSON ConfigMap:
 kubectl apply -f todo-list/configMaps/todo-web-config-dev.yaml
-# update the app to use the ConfigMap:
+# 更新应用使用ConfigMap:
 kubectl apply -f todo-list/todo-web-dev.yaml
-# refresh your web browser at the /config page for your Service
+# 刷新网页指向 /config 路由页面
 ```
 
-You can see my output in figure 4.7. The config page loads correctly now, so the new Deployment configuration is merging in the settings from the ConfigMap to override the default setting in the image, which blocked access to that page.
+可以在图4.7中看到我的输出。配置页面现在可以正确加载，因此新的部署配置正在合并ConfigMap中的设置，以覆盖镜像中的默认设置，该设置阻止了对该页的访问。
 
-![图4.7 Loading ConfigMap data into the container filesystem, where the app loads config files.](./images/Figure4.7.png)
+![图4.7 将ConfigMap数据加载到容器文件系统中，应用程序将在其中加载配置文件.](./images/Figure4.7.png)
 
-This approach needs two things: your application needs to be able to merge in the ConfigMap data, and your Pod specification needs to load the data from the ConfigMap into the expected file path in the container filesystem. We’ll see how that works in the next section.
+这种方法需要两个前提:应用程序需要能够合并ConfigMap数据，Pod规范需要将ConfigMap中的数据加载到容器文件系统中的预期文件路径中。我们将在下一节中看到它是如何工作的。
 
  ## 4.3 从 ConfigMaps 中查找配置数据
 
