@@ -393,177 +393,160 @@ kubectl get pods -l app=todo-web
 configmap支持广泛的配置系统。在环境变量和卷挂载之间，你应该能够在ConfigMaps中存储应用程序设置，并根据应用程序的需要应用它们。配置规范和应用规范之间的分离还支持不同的发布工作流，允许不同的团队拥有流程的不同部分。但是，有一件事不应该使用ConfigMaps，那就是任何敏感数据——它们实际上是文本文件的包装器，没有额外的安全语义。对于需要保护的配置数据，Kubernetes提供了Secrets。
 
  ## 4.4 使用 Secrets 配置敏感数据
- Secrets are a separate type of resource, but they have a similar API to ConfigMaps. You work with them in the same way, but because they’re meant to store sensitive information, Kubernetes manages them differently. The main differences are all around minimizing exposure. Secrets are sent only to nodes that need to use them and are stored in memory rather than on disk; Kubernetes also supports encryption both in transit and at rest for Secrets.
 
-Secrets are not encrypted 100% of the time, though. Anyone who has access to Secret objects in your cluster can read the unencrypted values. There is an obfuscation layer: Kubernetes can read and write Secret data with Base64 encoding, which isn’t really a security feature but does prevent accidental exposure of secrets to someone looking over your shoulder.
+Secrets 是一种单独的资源类型，但它们具有与ConfigMaps类似的API。你以同样的方式使用它们，但因为它们是用来存储敏感信息的，所以Kubernetes以不同的方式管理它们。主要的区别在于最大限度地减少接触。Secrets 只被发送到需要使用它们的节点，并且存储在内存中而不是磁盘上;Kubernetes还支持在传输和静止时对Secrets进行加密。
 
-TRY IT NOW
-You can create Secrets from a literal value, passing the key and data into the kubectl command. The retrieved data is Base64 encoded.
+然而，Secrets 并不是100%加密的。任何可以访问集群中的 Secret 对象的人都可以读取未加密的值。有一个混淆层:Kubernetes可以读写Base64编码的secret 数据，这并不是一个真正的安全功能，但确实可以防止 secrets 意外暴露给那些在你背后看着你的人。
+
+<b>现在就试试</b> 您可以从一个文字值创建Secrets，并将键和数据传递给kubectl命令。检索到的数据是Base64编码的。
+
 ```
-# FOR WINDOWS USERS—this script adds a Base64 command to your session:
+# 对于 WINDOWS 这个脚本将一个Base64命令添加到会话中:
 . .\base64.ps1
-# now create a secret from a plain text literal:
-kubectl create secret generic sleep-secret-literal --from-
-literal=secret=shh...
-# show the friendly details of the Secret:
+# 现在从纯文本文字创建一个 secret:
+kubectl create secret generic sleep-secret-literal --from-literal=secret=shh...
+# 友好展示 Secret 信息:
 kubectl describe secret sleep-secret-literal
-# retrieve the encoded Secret value:
+# 查看已编码的 Secret 值:
 kubectl get secret sleep-secret-literal -o jsonpath='{.data.secret}'
-# and decode the data:
-kubectl get secret sleep-secret-literal -o jsonpath='{.data.secret}' |
-  base64 -d
+# 然后解码数据:
+kubectl get secret sleep-secret-literal -o jsonpath='{.data.secret}' | base64 -d
 ```
 
-You can see from the output in figure 4.13 that Kubernetes treats Secrets differently from ConfigMaps. The data values aren’t shown in the kubectl describe command,only the names of the item keys, and when you do fetch the data, it’s shown encoded, so you need to pipe it into a decoder to read it.
+从图4.13的输出中可以看出，Kubernetes对Secrets的处理与ConfigMaps不同。kubectl describe命令中不显示数据值，只显示键值的名称，并且在获取数据时显示为编码，因此需要将其输送到解码器中进行读取。
 
-![图4.13 Secrets have a similar API to ConfigMaps, but Kubernetes tries to avoid accidental exposure.](./images/Figure4.13.png)
+![图4.13 Secrets有一个类似ConfigMaps的API，但是Kubernetes尽量避免意外暴露它.](./images/Figure4.13.png)
 
-That precaution doesn’t apply when Secrets are surfaced inside Pod containers. The container environment sees the original plain text data. Listing 4.11 shows a return to the sleep app, configured to load the new Secret as an environment variable.
+当 Secerts 在 Pod 容器内浮出水面时，这种预防措施并不适用。容器环境看到原始的纯文本数据。清单4.11显示了 sleep 应用程序的返回，配置为将新的Secret作为环境变量加载。
 
-> Listing 4.11 sleep-with-secret.yaml, a Pod spec loading a Secret
+> 清单 4.11 sleep-with-secret.yaml, 一个 Pod 配置加载了 Secret
 
 ```
 spec:
   containers:
     - name: sleep
       image: kiamol/ch03-sleep
-      env:                                   # Environment variables
-      - name: KIAMOL_SECRET                  # Variable name in the container
-        valueFrom:                           # loaded from an external source
-          secretKeyRef:                      # which is a Secret
-            name: sleep-secret-literal       # Names the Secret
-            key: secret                      # Key of the Secret data item
+      env:                                   # 环境变量
+      - name: KIAMOL_SECRET                  # 容器中的变量名
+        valueFrom:                           # 从外部源加载
+          secretKeyRef:                      # 来自 Secret
+            name: sleep-secret-literal       # Secret 名称
+            key: secret                      # secret 数据项的key
 ```
 
-The specification to consume Secrets is almost the same as for ConfigMaps—a named environment variable can be loaded from a named item in a Secret. This Pod spec delivers the Secret item in its original form to the container.
+使用 Secrets 的配置与使用configmaps的配置几乎相同——可以从Secret中的命名项加载命名环境变量。这个Pod 配置将 Secret 数据项以其原始形式交付到容器。
 
-
-TRY IT NOW
-Run a simple sleep Pod that uses the Secret as an environment variable.
+<b>现在就试试</b> 运行一个简单的sleep Pod，使用Secret作为环境变量。
 
 ```
-# update the sleep Deployment:
+# 更新 sleep Deployment:
 kubectl apply -f sleep/sleep-with-secret.yaml
-# check the environment variable in the Pod:
+# 检查 pod 中的环境变量:
 kubectl exec deploy/sleep -- printenv KIAMOL_SECRET
 ```
 
-Figure 4.14 shows the output. In this case the Pod is using only a Secret, but Secrets and ConfigMaps can be mixed in the same Pod spec, populating environment variables or files or both.
+图4.14显示了输出结果。在这种情况下，Pod只使用Secret，但是Secrets和ConfigMaps可以混合在同一个Pod 配置中，填充环境变量或文件或两者。
 
-![图4.14 Secrets loaded into Pods are not Base64 encoded.](./images/Figure4.14.png)
+![图4.14 加载到Pods中的 Secret 不是Base64编码的.](./images/Figure4.14.png)
 
+您应该警惕将Secrets加载到环境变量中。保护敏感数据的关键在于最大限度地减少其暴露。可以从任何进程读取环境变量,在Pod容器中，一些应用程序平台在遇到严重错误时记录所有环境变量的值。另一种方法是将Secrets显示为文件(如果应用程序支持的话)，这让您可以选择使用文件权限来保护访问。
 
-You should be wary of loading Secrets into environment variables. Securing sensitive data is all about minimizing its exposure. Environment variables can be read from any process
-in the Pod container, and some application platforms log all environment variable values if they hit a critical error. The alternative is to surface Secrets as files, if the application supports it, which gives you the option of securing access with file permissions.
+为了圆满完成本章，我们将在不同的配置中运行待办事项应用程序，其中它使用单独的数据库来存储项目，运行在自己的Pod中。数据库服务器是使用Docker Hub上的官方镜像的 Postgres，它从环境中的配置值读取登录凭据。清单4.12显示了用于将数据库密码创建为Secret的YAML规范。
 
-To round off this chapter, we’ll run the to-do app in a different configuration where it uses a separate database to store items, running in its own Pod. The database
-server is Postgres using the official image on Docker Hub, which reads logon credentials from configuration values in the environment. Listing 4.12 shows a YAML spec
-for creating the database password as a Secret.
-
-> Listing 4.12 -todo-db-secret-test.yaml, a Secret for the database user
-
+> 清单 4.12 -todo-db-secret-test.yaml, 数据库用户的 Secret
 ```
 apiVersion: v1
-kind: Secret                         # Secret is the resource type.
+kind: Secret                         # Secret 是资源类型
 metadata:
-  name: todo-db-secret-test          # Names the Secret
-type: Opaque                         # Opaque secrets are for text data.
-stringData:                          # stringData is for plain text.
-  POSTGRES_PASSWORD: "kiamol-2*2*"   # The secret key and value.
+  name: todo-db-secret-test          # 命名 Secret
+type: Opaque                         # Opaque 类型 secrets 用于文本数据.
+stringData:                          # stringData用于纯文本.
+  POSTGRES_PASSWORD: "kiamol-2*2*"   # secret key 以及 value.
 ```
 
-This approach states the password in plain text in the stringData field, which gets encoded to Base64 when you create the Secret. Using YAML files for Secrets poses a
-tricky problem: it gives you a nice consistent deployment approach, at the cost of having all your sensitive data visible in source control.
+这种方法在stringData字段中以纯文本形式声明密码，在创建Secret时将其编码为Base64。为Secrets使用YAML文件带来了一个棘手的问题:它为您提供了一种良好的一致部署方法，代价是在源代码控制中可见所有敏感数据。
 
-In a production scenario, you would keep the real data out of the YAML file, using placeholders instead, and do some additional processing as part of your deployment—something like injecting the data into the placeholder from a GitHub Secret. Whichever approach you take, remember that once the Secret exists in Kubernetes, it’s easy for anyone who has access to read the value.
+在生产场景中，您会将真实数据排除在YAML文件之外，而是使用占位符，并在部署过程中执行一些额外的处理——比如从GitHub Secret中将数据注入占位符。无论您采用哪种方法，请记住，一旦Secret存在于Kubernetes中，任何人都可以轻松读取该值。
 
-TRY IT NOW
-Create a Secret from the manifest in listing 4.12, and check the data.
+<b>现在就试试</b>从清单4.12中的清单创建一个Secret，并检查数据
 
 ```
-# deploy the Secret:
+# 部署 Secret:
 kubectl apply -f todo-list/secrets/todo-db-secret-test.yaml
-# check the data is encoded:
-kubectl get secret todo-db-secret-test -o
-  jsonpath='{.data.POSTGRES_PASSWORD}'
-# see what annotations are stored:
-kubectl get secret todo-db-secret-test -o
-  jsonpath='{.metadata.annotations}'
+# 检查数据是否已编码:
+kubectl get secret todo-db-secret-test -o jsonpath='{.data.POSTGRES_PASSWORD}'
+# 查看存储了哪些 annotations:
+kubectl get secret todo-db-secret-test -o jsonpath='{.metadata.annotations}'
 ```
 
-You can see in figure 4.15 that the string is encoded to Base64. The outcome is the same as it would be if the specification used the normal data field and set the password value in Base64 directly in the YAML.
+在图4.15中可以看到字符串被编码为Base64。其结果与规范使用普通数据字段并直接在YAML中设置Base64中的密码值相同。
 
-![图4.15 Secrets created from string data are encoded, but the original data is also stored in the object.](./images/Figure4.15.png)
+![图4.15 从字符串数据创建的 Secret 被编码，但原始数据也存储在对象中.](./images/Figure4.15.png)
 
-To use that Secret as the Postgres password, the image gives us a couple of options.We can load the value into an environment variable called POSTGRES_PASSWORD—not ideal—or we can load it into a file and tell Postgres where to load the file, by setting the POSTGRES_PASSWORD_FILE environment variable. Using a file means we can control access permissions at the volume level, which is how the database is configured in code listing 4.13.
+要使用Secret作为Postgres密码，镜像为我们提供了两个选项。我们可以将这个值加载到一个名为POSTGRES_PASSWORD的环境变量中——这并不理想——或者我们可以将它加载到一个文件中，并通过设置POSTGRES_PASSWORD_FILE环境变量告诉Postgres加载文件的位置。使用文件意味着我们可以在卷级别上控制访问权限，这就是清单4.13代码中配置数据库的方式。
 
-> Listing 4.13 todo-db-test.yaml, a Pod spec mounting a volume from a secret
+> 清单 4.13 todo-db-test.yaml, 一个 Pod spec mount 了来自于 secret 的卷
 ```
 spec:
   containers:
     - name: db
     image: postgres:11.6-alpine
     env:
-    - name: POSTGRES_PASSWORD_FILE            # Sets the path to the file
+    - name: POSTGRES_PASSWORD_FILE            # 设置环境变量文件
       value: /secrets/postgres_password
-    volumeMounts:                             # Mounts a Secret volume
-      - name: secret                          # Names the volume
+    volumeMounts:                             # 挂载 Secret 卷
+      - name: secret                          # volume name
         mountPath: "/secrets"
   volumes:
     - name: secret
-    secret:                                   # Volume loaded from a Secret
-    secretName: todo-db-secret-test           # Secret name
-    defaultMode: 0400                         # Permissions to set for files
-    items:                                    # Optionally names the data items
-    - key: POSTGRES_PASSWORD
-    path: postgres_password
+      secret:                                     # 从 Secret加载的 volume
+        secretName: todo-db-secret-test           # Secret name
+        defaultMode: 0400                         # 文件权限
+        items:                                    # 可选 命名数据项
+        - key: POSTGRES_PASSWORD
+          path: postgres_password
 ```
 
-When this Pod is deployed, Kubernetes loads the value of the Secret item into a file at the path /secrets/postgres_password. That file will be set with 0400 permissions, which means it can be read by the container user but not by any other users. The environment variable is set for Postgres to load the password from that file, which the Postgres user has access to, so the database will start with credentials set from the Secret.
+当部署这个Pod时，Kubernetes将Secret项的值加载到路径为/secrets/postgres_password的文件中。该文件将设置为0400权限，这意味着容器用户可以读取它，但任何其他用户都不能读取。环境变量被设置为让Postgres从Postgres用户有权访问的文件中加载密码，因此数据库将从Secret中设置的凭据开始。
 
-TRY IT NOW
-Deploy the database Pod, and verify the database starts correctly.
+<b>现在就试试</b> 部署数据库Pod，并验证数据库是否正确启动。
 
 ```
-# deploy the YAML from listing 4.13
+# 部署清单 4.13 的 YAML
 kubectl apply -f todo-list/todo-db-test.yaml
-# check the database logs:
+# 检查数据库日志:
 kubectl logs -l app=todo-db --tail 1
-# verify the password file permissions:
-kubectl exec deploy/todo-db -- sh -c 'ls -l $(readlink -f
-  /secrets/postgres_password)'
+# 检查密码文件权限:
+kubectl exec deploy/todo-db -- sh -c 'ls -l $(readlink -f /secrets/postgres_password)'
 ```
 
-Figure 4.16 shows the database starting up and waiting for connections—indicating it has been configured correctly—and the final output verifies that the file permissions are set as expected.
+图4.16显示了数据库启动和等待连接的过程——这表明数据库已正确配置——最终输出验证文件权限是否按预期设置。
 
-![图4.16 If the app supports it, configuration settings can be read by files populated from Secrets.](./images/Figure4.16.png)
+![图4.16 如果应用程序支持，配置设置可以从Secrets中填充的文件读取.](./images/Figure4.16.png)
 
-All that’s left is to run the app itself in the test configuration, so it connects to the Postgres database rather than using a local database file for storage. There’s lots more
-YAML for that, to create a ConfigMap, Secret, Deployment, and Service, but it’s all using features we’ve covered already, so we’ll just go ahead and deploy.
+剩下的就是在测试配置中运行应用程序本身，这样它就可以连接到Postgres数据库，而不是使用本地数据库文件进行存储。还有很多YAML可以用来创建ConfigMap、Secret、Deployment和Service，但是这些都是使用我们已经介绍过的特性，所以我们只需要继续部署即可。
 
-TRY IT NOW
-Run the to-do app so it uses the Postgres database for storage.
+<b>现在就试试</b>运行 to-do 应用程序，使其使用Postgres数据库进行存储。
 
 ```
-# the ConfigMap configures the app to use Postgres:
+# ConfigMap配置应用使用Postgres:
 kubectl apply -f todo-list/configMaps/todo-web-config-test.yaml
 
-# the Secret contains the credentials to connect to Postgres:
+# Secret包含连接到Postgres的凭据:
 kubectl apply -f todo-list/secrets/todo-web-secret-test.yaml
-# the Deployment Pod spec uses the ConfigMap and Secret:
+# 部署Pod规范使用ConfigMap和Secret:
 kubectl apply -f todo-list/todo-web-test.yaml
-# check the database credentials are set in the app:
+# 检查应用程序中是否设置了数据库凭据:
 kubectl exec deploy/todo-web-test -- cat /app/secrets/secrets.json
-# browse to the app and add some items
+# 浏览应用程序并添加一些项目
 ```
-My output is shown in figure 4.17, where the plain text contents of the Secret JSON
-file are shown inside the web Pod container.
+我的输出如图4.17所示，其中Secret JSON文件的纯文本内容显示在web Pod容器中。
 
-![图4.17 Loading app configuration into Pods and surfacing ConfigMaps and Secrets as JSON files](./images/Figure4.17.png)
+![图4.17 加载应用程序配置到Pods和将ConfigMaps和Secrets 作为JSON文件](./images/Figure4.17.png)
 
-Now when you add to-do items in the app, they are stored in the Postgres database, so storage is separated from the application runtime. You can delete the web Pod; its controller will start a replacement with the same configuration, which connects to the same database Pod, so all the data from the original web Pod is still available.
+现在，当你在应用程序中添加待办事项时，它们被存储在Postgres数据库中，因此存储与应用程序运行时分离。你可以删除web Pod;它的控制器将启动一个具有相同配置的替换，它连接到相同的数据库Pod，因此所有来自原始web Pod的数据仍然可用。
 
-This has been a pretty exhaustive look at configuration options in Kubernetes. The principles are quite simple—loading ConfigMaps or Secrets into environment variables or files—but there are a lot of variations. You need a good understanding of the nuances so you can manage app configuration in a consistent way, even if your apps all have different configuration models.
+这是Kubernetes中配置选项的一个非常详尽的介绍。原理非常简单—将configmap或secret加载到环境变量或文件中—但是有很多变化。你需要很好地理解这些细微差别，以便以一致的方式管理应用程序配置，即使你的应用程序都有不同的配置模型。
 
  ## 4.5 管理 Kubernetes 中的应用程序配置
 
