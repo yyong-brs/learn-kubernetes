@@ -550,27 +550,26 @@ kubectl exec deploy/todo-web-test -- cat /app/secrets/secrets.json
 
  ## 4.5 管理 Kubernetes 中的应用程序配置
 
- Kubernetes gives you the tools to manage app configuration using whatever workflow fits for your organization. The core requirement is for your applications to read configuration settings from the environment, ideally with a hierarchy of files and environment variables. Then you have the flexibility to use ConfigMaps and Secrets to support your deployment process. You have two factors to consider in your design: do you need your apps to respond to live configuration updates, and how will you manage Secrets?
+Kubernetes 为您提供了管理应用程序配置的工具，使用任何适合您的组织的工作流。核心需求是让应用程序从环境中读取配置设置，理想情况下是使用文件和环境变量的层次结构。然后您就可以灵活地使用configmap和Secrets来支持您的部署过程。在你的设计中有两个因素需要考虑:你是否需要你的应用程序响应实时配置更新，以及你将如何管理Secrets?
 
-If live updates without a Pod replacement are important to you, then your options are limited. You can’t use environment variables for settings, because any changes to those result in a Pod replacement. You can use a volume mount and load configuration changes from files, but you need to deploy changes by updating the existing ConfigMap or Secret objects. You can’t change the volume to point to a new config object, because that’s a Pod replacement too.
+如果对您而言，不替换 Pod 的实时更新很重要，那么您的选项就很有限了。您无法使用环境变量设置，因为对这些变量的任何更改都会导致 Pod 替换。您可以使用卷挂载并从文件加载配置更改，但是您需要通过更新现有的 ConfigMap 或 Secret 对象来部署更改。您不能将卷更改为指向新的配置对象，因为这也是 Pod 替换。
 
-The alternative to updating the same config object is to deploy a new object every time with some versioning scheme in the object name and updating the app Deployment to reference the new object. You lose live updates but gain an audit trail of configuration changes and have an easy option to revert back to previous settings. Figure 4.18 shows those options.
+更新相同配置对象的替代方法是每次部署新对象，在对象名称中使用某种版本方案，并更新 app 部署以引用新对象。您会失去实时更新，但可以轻松地获得配置更改的审计记录，并有一个方便的选项来返回到先前的设置。图 4.18 显示了这些选项。
 
-![图4.18 You can choose your own approach to configuration management,supported by Kubernetes](./images/Figure4.18.png)
+![图4.18 您可以选择自己的配置管理方法，由Kubernetes支持](./images/Figure4.18.png)
 
-The other question is how you manage sensitive data. Large organizations might have dedicated configuration management teams who own the process of deploying configuration files. That fits nicely with a versioned approach to ConfigMaps and Secrets,where the configuration management team deploys new objects from literals or controlled files in advance of the deployment.
+另一个问题是如何管理敏感数据。大型组织可能有专门的配置管理团队，他们拥有部署配置文件的过程。这非常适合ConfigMaps和Secrets的版本化方法，在这种方法中，配置管理团队在部署之前从文字或受控文件部署新对象。
 
-An alternative is a fully automated deployment, where ConfigMaps and Secrets are created from YAML templates in source control. The YAML files contain placeholders instead of sensitive data, and the deployment process replaces them with real values from a secure store, like Azure KeyVault, before applying them. Figure 4.19 compares those options.
+另一种选择是完全自动化的部署，其中configmap和secret是从源代码控制中的YAML模板创建的。YAML文件包含占位符而不是敏感数据，在应用它们之前，部署过程会使用来自安全存储(如Azure KeyVault)的真实值替换它们。图4.19比较了这些选项。
 
-![图4.19 Secret management can be automated in deployment or strictly controlled by a separate team.](./images/Figure4.19.png)
+![图4.19 Secrets 管理可以在部署时自动化，也可以由单独的团队严格控制.](./images/Figure4.19.png)
 
-You can use any approach that works for your teams and your application stacks,remembering that the goal is for all configuration settings to be loaded from the platform, so the same container image is deployed in every environment.It’s time to clean up your cluster. If you’ve followed along with all the exercises (and of course you have!), you’ll have a couple of dozen resources to remove. I’ll introduce some useful features of kubectl to help clear everything out.
+您可以使用任何适用于您的团队和应用程序堆栈的方法，记住目标是从平台加载所有配置设置，以便在每个环境中部署相同的容器镜像。现在是清理集群的时候了。如果您已经完成了所有的练习(当然您已经完成了!)，那么您将有几十个资源需要删除。我将介绍kubectl的一些有用特性，以帮助理清所有问题。
 
-TRY IT NOW
-The kubectl delete command can read a YAML file and delete the resources defined in the file. And if you have multiple YAML files in a directory, you can use the directory name as the argument to delete (or apply),and it will run over all the files.
+<b>现在就试试</b>kubectl delete命令可以读取YAML文件并删除文件中定义的资源。如果在一个目录中有多个YAML文件，可以使用目录名作为删除(或应用)的参数，它将遍历所有文件。
 
 ```
-# delete all the resources in all the files in all the directories:
+# 删除所有目录下所有文件中的所有资源:
 kubectl delete -f sleep/
 kubectl delete -f todo-list/
 kubectl delete -f todo-list/configMaps/
@@ -579,8 +578,7 @@ kubectl delete -f todo-list/secrets/
 
  ## 4.6 实验室
 
- If you’re reeling from all the options Kubernetes gives you to configure apps, this lab is going to help. In practice, your apps will have their own ideas about configuration
-management, and you’ll need to model your Kubernetes Deployments to suit the way your apps expect to be configured. That’s what you need to do in this lab with a simple app called Adminer. Here we go:
+如果你对Kubernetes提供的所有配置应用程序的选项感到困惑，这个实验室将会有所帮助。实际上，您的应用程序将有自己的配置管理想法，您需要对Kubernetes部署进行建模，以适应应用程序预期的配置方式。这就是你在这个实验室里需要用一个叫做Adminer的简单应用程序来做的。开始吧:
 - Adminer, a web UI for administering SQL databases, can be a handy tool to run in Kubernetes when you’re troubleshooting database issues.
 - Start by deploying the YAML files in the ch04/lab/postgres folder, then deploy the ch04/lab/adminer.yaml file to run Adminer in its basic state.
 - Find the external IP for your Adminer Service, and browse to port 8082. Note that you need to specify a database server and that the UI design is stuck in the 1990s. You can confirm the connection to Postgres by using postgres as the database name, username, and password.
