@@ -579,12 +579,11 @@ kubectl delete -f todo-list/secrets/
  ## 4.6 实验室
 
 如果你对Kubernetes提供的所有配置应用程序的选项感到困惑，这个实验室将会有所帮助。实际上，您的应用程序将有自己的配置管理想法，您需要对Kubernetes部署进行建模，以适应应用程序预期的配置方式。这就是你在这个实验室里需要用一个叫做Adminer的简单应用程序来做的。开始吧:
-- Adminer, a web UI for administering SQL databases, can be a handy tool to run in Kubernetes when you’re troubleshooting database issues.
-- Start by deploying the YAML files in the ch04/lab/postgres folder, then deploy the ch04/lab/adminer.yaml file to run Adminer in its basic state.
-- Find the external IP for your Adminer Service, and browse to port 8082. Note that you need to specify a database server and that the UI design is stuck in the 1990s. You can confirm the connection to Postgres by using postgres as the database name, username, and password.
-- Your job is to create and use some config objects in the Adminer Deployment so that the database server name defaults to the lab’s Postgres Service, and the UI uses the much nicer design called price.
-- You can set the default database server in an environment variable called ADMINER_DEFAULT_SERVER. Let’s call this sensitive data, so it should use a Secret.
-- The UI design is set in the environment variable ADMINER_DESIGN; that’s not sensitive, so a ConfigMap will do nicely.
+- Adminer 是一个用于管理SQL数据库的web UI，在解决数据库问题时可以在Kubernetes中运行.
+- 首先在 ch04/lab/postgres 文件夹中部署YAML文件，然后部署 ch04/lab/adminer.yaml 在基本状态下运行Adminer.
+- 找到Adminer Service的 external IP，并浏览到端口8082。请注意，您需要指定一个数据库服务器，并且UI设计停留在20世纪90年代。可以使用Postgres作为数据库名、用户名和密码来确认与Postgres的连接.
+- 您的工作是在Adminer Deployment中创建和使用一些配置对象，以便数据库服务器名称默认为实验室的Postgres Service，并且UI使用称为price的更好的设计.
+- 可以在名为ADMINER_DEFAULT_SERVER的环境变量中设置默认数据库服务器。让我们称其为敏感数据，因此它应该使用Secret.
+- UI设计设置在环境变量ADMINER_DESIGN中;这是不敏感的，所以ConfigMap会做得很好.
 
-This will take a little bit of investigation and some thought on how to surface the configuration settings, so it’s good practice for real application configuration. My solution
-is posted on GitHub for you to check your approach: https://github.com/sixeyed/kiamol/blob/master/ch04/lab/README.md.
+这将花费一些研究和思考如何显示配置设置，因此对于实际应用程序配置来说，这是一个很好的实践。我的解决方案发布在GitHub上，供你检查方法:https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch04/lab/README.md。
