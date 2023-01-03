@@ -390,7 +390,7 @@ kubectl get endpoints sleep-2
 
 您的集群中已经有多个命名空间，到目前为止我们部署的所有资源都是在默认名称空间中创建的（称为 default；这就是为什么我们不需要在YAML文件中指定命名空间）。内部Kubernetes组件（如DNS服务器和KubernetesAPI）也在kube-system 命名空间的Pods中运行。
 
-<b>现在就试试</b> Kurectl支持命名空间，您可以使用命名空间标志处理默认命名空间之外的资源。
+<b>现在就试试</b> Kubectl支持命名空间，您可以使用命名空间标志处理默认命名空间之外的资源。
 ```
 # 在 default 命名空间检查 Service:
 kubectl get svc --namespace default
