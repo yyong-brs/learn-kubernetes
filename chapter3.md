@@ -28,6 +28,7 @@ kubectl exec deploy/sleep-1 -- ping -c 2 $(kubectl get pod -l app=sleep-2
 我的输出如图 3.1 所示. 容器中的 Ping 工作的很好, 第一个 Pod 成功 ping 通第二个 Pod, 前提是我必须使用 kubectl 获取ip地址，并作为 ping命令的入参。
 
 ![图3.1  使用 IP 地址实现 Pod 网络通信—你可以使用 kubernetes API 获取 ip 地址.](./images/Figure3.1.png)
+<center>图3.1  使用 IP 地址实现 Pod 网络通信—你可以使用 kubernetes API 获取 ip 地址.</center>
 
 Kubernetes 中的虚拟网络覆盖整个集群，因此 Pods 即使在不同的节点上运行，也可以通过IP地址进行通信。此示例在单节点 K3s 集群和 100 节点AKS集群上的工作方式相同。这是一个有用的练习，可以帮助您了解Kubernetes没有任何特殊的网络魔力；它只是使用你的应用程序已经使用的标准协议。但是您通常不会这样做，因为IP地址是特定于一个Pod的，并且当Pod被替换时，替换将具有新的IP地址。
 
@@ -47,10 +48,12 @@ kubectl get pod -l app=sleep-2 --output
 在图 3.2, 我的输出显示了新的 POD 拥有了新的 IP 地址，如果你 ping 旧的地址，将会失败。
 
 ![图3.2 Pod IP 地址并不是其配置的一部分; 替换的 Pod 拥有新的地址.](./images/Figure3.2.png)
+<center>图3.2 Pod IP 地址并不是其配置的一部分; 替换的 Pod 拥有新的地址.</center>
 
 需要一个可以更改的资源的永久地址的问题是一个老问题，互联网使用DNS（域名系统）解决了这个问题，将友好名称映射到IP地址，Kubernetes使用相同的系统。Kubernetes集群内置了DNS服务器，它将服务名称映射到IP地址。图3.3显示了域名查找如何用于Pod-to-Pod通信。
 
 ![图3.3  Services 允许 Pods 使用固定的域名通信.](./images/Figure3.3.png)
+<center>图3.3  Services 允许 Pods 使用固定的域名通信.</center>
 
 这种类型的 Service 是对Pod及其网络地址的抽象，就像 Deployment 是对Pod及其容器的抽象一样。Service 有自己的IP地址，它是静态的。当消费者向该地址发出网络请求时，Kubernetes将其路由到Pod的实际IP地址。Service 和它的Pod之间的链接是用标签选择器设置的，就像Deployments和Pods之间的链接一样。
 
@@ -85,6 +88,7 @@ kubectl exec deploy/sleep-1 -- ping -c 1 sleep-2
 我的输出如图 3.4 所示, 你可以看到名称查找正常, ping命令没有按预期工作，因为ping使用的是Kubernetes Services不支持的网络协议。
 
 ![图3.4 部署一个 Service 以创建一个 DNS 入口, 为 Service 名称提供固定的IP地址.](./images/Figure3.4.png)
+<center>图3.4 部署一个 Service 以创建一个 DNS 入口, 为 Service 名称提供固定的IP地址.</center>
 
 这是Kubernetes中服务发现背后的基本概念：部署Service 资源，并使用 Service 名称作为组件通信的域名。
 
@@ -112,6 +116,7 @@ ctrl-c
 您可以从图3.5所示的输出中看到，应用程序失败，并显示一条消息，说明API不可用。
 
 ![图3.5 web应用程序无法正常运行，因为对API的网络调用失败.](./images/Figure3.5.png)
+<center>图3.5 web应用程序无法正常运行，因为对API的网络调用失败.</center>
 
 错误页面还显示了站点希望在其中查找API http://numbers-api 的域名。这不是一个完全限定的域名（比如blog.sixeed.com）；这是一个应该由本地网络解析的地址，但Kubernetes中的DNS服务器无法解析它，因为没有名称为numbersapi的Service。清单3.2中的配置显示了一个名称正确的Service，以及一个与API Pod匹配的标签选择器。
 
@@ -147,6 +152,7 @@ ctrl-c
 我的输出如图3.6所示，显示了应用程序正常工作，网站显示了API生成的随机数。
 
 ![图3.6 部署 Service 可修复web应用程序和API之间的断开链接.](./images/Figure3.6.png)
+<center>图3.6 部署 Service 可修复web应用程序和API之间的断开链接.</center>
 
 除了 Services、Deployments 和Pods之外，这里的重要教训是，YAML 规范描述了Kubernetes中的整个应用程序，包括所有组件和它们之间的网络。Kubernetes不会对应用程序架构进行假设；您需要在YAML中指定它。这个简单的web应用程序需要定义三个Kubernetes资源，以便在当前状态下工作—两个Deployments和一个Service—但拥有所有这些移动部件的优势是增加了弹性。
 
@@ -169,6 +175,7 @@ ctrl-c
 图3.7显示了 Deployment 控制器创建的替换Pod。它是相同的API Pod规范，但在具有新IP地址的新Pod中运行。不过，API Service的IP地址没有改变，web Pod可以在相同的网络地址到达新的API Pod。
 
 ![图3.7  该 Service 将web Pod与API Pod隔离，因此API Pod是否更改无关紧要.](./images/Figure3.7.png)
+<center>图3.7  该 Service 将web Pod与API Pod隔离，因此API Pod是否更改无关紧要.</center>
 
 我们在这些练习中手动删除Pod，以触发控制器创建替换，但在Kubernetes应用程序的正常生命周期中，Pod替换总是发生。每当您更新应用程序的组件以添加功能、修复错误或发布对依赖项的更新时，您都将替换Pods。每当一个节点宕机时，它的Pod就会在其他节点上被替换。Service 抽象以通过这些替换保持应用程序的通信。
 
@@ -179,6 +186,7 @@ ctrl-c
 您有几个选项来配置 Kubernetes 以监听进入集群的流量并将其转发到Pod。我们将从一种简单而灵活的方法开始。这是一种叫做LoadBalancer 类型的 Service，它解决了将流量发送到Pod的问题，Pod可能运行在与接收流量的节点不同的节点上；图3.8显示了它的工作方式。
 
 ![图3.8 LoadBalancer 类型 Service 将外部流量从任何节点路由到匹配的Pod.](./images/Figure3.8.png)
+<center>图3.8 LoadBalancer 类型 Service 将外部流量从任何节点路由到匹配的Pod.</center>
 
 这看起来是一个棘手的问题，特别是因为您可能有许多Pod与 Service 的标签选择器匹配，所以集群需要选择一个节点来发送流量，然后在该节点上选择一个Pod。Kubernetes为您提供了世界级的编排，因此您需要做的就是部署LoadBalancer Service。清单3.3显示了web应用程序的 Service 配置。
 
@@ -213,10 +221,12 @@ kubectl get svc numbers-web -o
 图3.9显示了我在Docker Desktop Kubernetes集群上运行该练习的结果，在这里我可以浏览到地址为 http://localhost:8080.
 
 ![图3.9 Kubernetes从其运行的平台请求LoadBalancer Services的IP地址](./images/Figure3.9.png)
+<center>图3.9 Kubernetes从其运行的平台请求LoadBalancer Services的IP地址.</center>
 
 使用K3s或云中的托管Kubernetes集群，输出是不同的，其中Service部署为负载平衡器创建了一个专用的外部IP地址。图3.10显示了在我的LinuxVM上使用K3s集群的相同练习（使用相同的YAML规范）的输出，网站位于http://172.28.132.127:8080.
 
 ![图3.10 Different Kubernetes platforms use different addresses for LoadBalancer Services](./images/Figure3.10.png)
+<center>图3.10 不同的Kubernetes平台为LoadBalancer服务使用不同的地址.</center>
 
 对于相同的应用程序清单，结果如何不同？我在第1章中说过，您可以以不同的方式部署Kubernetes，这都是相同的Kubernete（我的重点），但这并不是绝对正确的。Kubernetes包含许多扩展点，发行版在如何实现某些特性方面具有灵活性。LoadBalancer Services是一个很好的例子，说明了实现的不同之处，适合于发行版的目标。
 
@@ -229,6 +239,7 @@ kubectl get svc numbers-web -o
 回到标准Kubernetes的世界，您可以使用另一种 NodePort Service 类型来监听进入集群的网络流量，并将其引导到 Pod。NodePort 类型 Service 不需要外部负载均衡器，集群中的每个节点都侦听 Service 中指定的端口，并将流量发送到Pod上的目标端口。图3.11显示了它的工作原理。
 
 ![图3.11 NodePort 类型 Service 还将外部流量路由到Pod，但它们不需要负载均衡器.](./images/Figure3.11.png)
+<center>图3.11 NodePort 类型 Service 还将外部流量路由到Pod，但它们不需要负载均衡器.</center>
 
 NodePort Services 没有 LoadBalancer Services 的灵活性，因为您需要为每个 Service 提供不同的端口，您的节点需要可公开访问，并且无法跨多节点集群实现负载均衡。NodePort Services在发行版中也有不同级别的支持，因此它们在K3s和Docker Desktop中的工作效果与预期一致，但在Kind中却不太好。清单3.4显示了一个NodePort规范以供参考。
 
@@ -259,6 +270,7 @@ spec:
 第一个选项是使用 ExternalName 类型 Service，它就像一个域到另一个域的别名。ExternalName Services允许您在应用程序Pod中使用本地名称，当Pod发出查找请求时，Kubernetes中的DNS服务器将本地名称解析为完全限定的外部名称。图3.12显示了如何工作，Pod使用解析为外部系统地址的本地名称。
 
 ![图3.12 使用ExternalName Service 可以为远程组件使用本地群集地址.](./images/Figure3.12.png)
+<center>图3.12 使用ExternalName Service 可以为远程组件使用本地群集地址.</center>
 
 本章的演示应用程序希望使用本地 API 生成随机数，但只需部署ExternalName服务，即可切换为从GitHub上的文本文件读取静态数。
 
@@ -277,6 +289,7 @@ kubectl get svc numbers-api
 我的输出如图3.13所示。您可以看到该应用程序以相同的方式工作，并且它使用相同的API URL。然而，如果您刷新页面，您会发现它总是返回相同的数字，因为它不再使用随机数API。
 
 ![图3.13 ExternalName Services可以用作重定向，以在集群外部发送请求.](./images/Figure3.13.png)
+<center>图3.13 ExternalName Services可以用作重定向，以在集群外部发送请求.</center>
 
 ExternalName Services是处理应用程序配置中无法解决的环境之间差异的有用方法。也许您有一个应用程序组件，它使用硬编码字符串作为数据库服务器的名称。在开发环境中，您可以使用预期的域名创建ClusterIP服务，该域名解析为在Pod中运行的测试数据库；在生产环境中，可以使用解析为数据库服务器的真实域名的ExternalName Service。清单3.5显示了API外部名称的YAML规范。
 
@@ -302,6 +315,7 @@ kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | tail -n 5’
 当你尝试这样做时，你可能会得到看起来像错误的混乱结果，因为Nslokup工具会返回很多信息，而且每次运行它的顺序都不一样。不过你想要的数据就在那里。我重复了该命令几次，以获得如图3.14所示的适合打印输出的效果。
 
 ![图3.14 在Kubernetes中，应用程序默认不会被隔离，因此任何Pod都可以查找任何 Service.](./images/Figure3.14.png)
+<center>图3.14 在Kubernetes中，应用程序默认不会被隔离，因此任何Pod都可以查找任何 Service.</center>
 
 关于ExternalName Services，有一件重要的事情需要了解，您可以从本练习中看到：它们最终只是为应用程序提供一个使用地址，但实际上并不会改变应用程序发出的请求。这对于通过TCP通信的数据库等组件来说很好，但对于HTTP服务来说就不那么简单了。HTTP请求在头字段中包含目标主机名，这与ExternalName响应中的实际域不匹配，因此客户端调用可能会失败。本章中的随机数应用程序有一些黑客代码来解决这个问题，手动设置主机标头，但这种方法最适合非HTTP服务。
 
@@ -351,6 +365,7 @@ kubectl exec deploy/sleep-1 -- sh -c ’nslookup numbers-api | grep
 
 我的输出（如图3.15所示）证实了Kubernetes将很乐意让您部署一个破坏应用程序的服务变更。域名解析内部群集IP地址，但对该地址的任何网络调用都会失败，因为它们被路由到端点中不存在的实际IP地址。
 ![图3.15 Service 中的错误配置可能会破坏您的应用程序，即使不部署应用程序更改.](./images/Figure3.15.png)
+<center>图3.15 Service 中的错误配置可能会破坏您的应用程序，即使不部署应用程序更改.</center>
 
 该练习的输出提出了几个有趣的问题：DNS查找如何返回集群IP地址而不是端点地址？为什么域名以.default.svc.cluster.local结尾？使用Kubernetes服务不需要网络工程背景，但如果您了解服务解决方案的实际工作方式，这将有助于您跟踪问题，这就是我们将如何完成本章的内容。
 
@@ -361,6 +376,7 @@ Kubernetes支持您的应用程序可能需要的所有网络配置，这些配�
 在本章中，我们已经介绍了所有 Service 类型及其典型用例，因此现在您已经很好地了解了可以使用的模式。如果您觉得这里有太多的细节，请放心，大多数时候您都会部署 ClusterIP 类型服务，这几乎不需要配置。它们大部分都是无缝工作的，但深入一层来理解堆栈是很有用的。图3.16显示了下一层次的细节。
 
 ![图3.16 Kubernetes运行DNS服务器和代理，并将它们与标准网络工具一起使用。](./images/Figure3.16.png)
+<center>图3.16 Kubernetes运行DNS服务器和代理，并将它们与标准网络工具一起使用.</center>
 
 关键是 ClusterIP 是网络上不存在的虚拟IP地址。Pods通过运行在节点上的 kube-proxy 访问网络，并使用数据包过滤将虚拟IP发送到真实端点。Kubernetes services  只要它们存在，就保留它们的IP地址，并且 Service 可以独立于应用程序的任何其他部分而存在。Service 有一个控制器，每当Pods发生更改时，该控制器会更新端点列表，因此客户端始终使用静态虚拟IP地址，kube-proxy 始终拥有最新的端点列表。
 
@@ -381,12 +397,14 @@ kubectl get endpoints sleep-2
 您可以在图3.17中看到我的输出，这是第一个问题的答案Kubernetes DNS返回Cluster IP地址，而不是端点，因为端点地址发生了变化。
 
 ![图3.17 Service 的Cluster IP地址不会更改，但端点列表始终在更新。.](./images/Figure3.17.png)
+<center>图3.17 Service 的Cluster IP地址不会更改，但端点列表始终在更新.</center>
 
 使用静态虚拟IP意味着客户端可以无限期地缓存DNS查找响应（许多应用程序这样做是错误的性能节省），并且无论一段时间内发生多少Pod替换，IP地址都将继续工作。关于域名后缀的第二个问题需要通过横向步骤来回答，以查看Kubernetes命名空间。
 
 每个Kubernetes资源都位于一个命名空间中，这是一个可以用来对其他资源进行分组的资源。命名空间是对Kubernetes集群进行逻辑分区的一种方式，您可以为每个产品、每个团队或单个共享命名空间。我们暂时还不会使用名称空间，但我在这里介绍它们，因为它们在DNS解析中发挥作用。图3.18显示了命名空间在服务名称中的位置。
 
 ![图3.18 命名空间对集群进行逻辑分区，但 Service 可以跨命名空间访问.](./images/Figure3.18.png)
+<center>图3.18 命名空间对集群进行逻辑分区，但 Service 可以跨命名空间访问.</center>
 
 您的集群中已经有多个命名空间，到目前为止我们部署的所有资源都是在默认名称空间中创建的（称为 default；这就是为什么我们不需要在YAML文件中指定命名空间）。内部Kubernetes组件（如DNS服务器和KubernetesAPI）也在kube-system 命名空间的Pods中运行。
 
@@ -407,6 +425,7 @@ kubectl exec deploy/sleep-1 -- sh -c 'nslookup kube-dns.kube-
 我的输出如图3.19所示，回答了第二个问题：Service 的本地域名只是服务名称，但这是包含Kubernetes命名空间的完全限定域名的别名。
 
 ![图3.19 可以使用相同的kubectl命令查看不同命名空间中的资源.](./images/Figure3.19.png)
+<center>图3.19 可以使用相同的kubectl命令查看不同命名空间中的资源.</center>
 
 在Kubernetes之旅的早期了解命名空间很重要，因为它可以帮助您看到Kubernete的核心功能也可以作为Kubernets应用程序运行，但除非您明确设置了命名空间，否则在kubectl中看不到它们。命名空间是细分集群以提高利用率而不损害安全性的一种强大方式，我们将在第11章中再次讨论它们。
 
@@ -425,6 +444,7 @@ kubectl get all
 现在集群又干净了，尽管如图3.20所示，您需要小心使用其中一些kubectl命令。
 
 ![图3.20 您需要显式删除创建的任何服务，但要注意all参数.](./images/Figure3.20.png)
+<center>图3.20 您需要显式删除创建的任何服务，但要注意all参数.</center>
 
 ## 3.6 实验室
 
