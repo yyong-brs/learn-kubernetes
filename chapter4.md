@@ -24,6 +24,7 @@ kubectl exec deploy/sleep -- printenv HOSTNAME KIAMOL_CHAPTER
 从图4.1所示的输出中可以看到，容器中存在hostname变量，并由Kubernetes填充，但自定义Kiamol变量不存在。
 
 ![图4.1 所有Pod容器都有Kubernetes和容器操作系统设置的一些环境变量.](./images/Figure4.1.png)
+<center>图4.1 所有Pod容器都有Kubernetes和容器操作系统设置的一些环境变量.</center>
 
 在本练习中，应用程序只是Linux printenv工具，但原理对任何应用程序都是相同的。许多技术栈使用环境变量作为基本配置系统。在Kubernetes中提供这些设置的最简单方法是在Pod Spec 中添加环境变量。清单4.1显示了 sleep Deployment 的更新后的 Pod Spec，其中添加了Kiamol环境变量。
 
@@ -53,12 +54,14 @@ kubectl exec deploy/sleep -- printenv HOSTNAME KIAMOL_CHAPTER
 我的输出(如图4.2所示)显示了结果——一个设置了Kiamol环境变量的新容器，在一个新的Pod中运行。
 
 ![图4.2 将环境变量添加到Pod Spec 中可以在Pod容器中使用这些值.](./images/Figure4.2.png)
+<center>图4.2 将环境变量添加到Pod Spec 中可以在Pod容器中使用这些值.</center>
 
 关于前面的练习，重要的是新应用程序使用相同的Docker 镜像;这是一个具有相同二进制文件的相同应用程序——只是配置设置在部署之间发生了更改。在Pod Spec 中内联设置环境值对于简单设置很好，但实际应用程序通常有更复杂的配置需求，这就是使用ConfigMaps时的情况。
 
 ConfigMap只是一个资源，它存储了一些可以加载到Pod中的数据。数据可以是一组键-值对、文本简介，甚至是二进制文件。您可以使用键-值对加载带有环境变量的Pods，使用文本加载任何类型的配置文件—json、XML、YAML、TOML、ini—以及二进制文件加载许可密钥。一个Pod可以使用多个ConfigMap，每个ConfigMap可以被多个Pod使用。图4.3显示了其中的一些选项。
 
 ![图4.3 configmap是单独的资源，可以附加到0个或多个pod.](./images/Figure4.3.png)
+<center>图4.3 configmap是单独的资源，可以附加到0个或多个pod.</center>
 
 我们将继续使用简单的 sleep Deployment，以展示创建和使用configmap的基础知识。清单4.2显示了更新后Pod Spec的环境部分，其中使用了一个在YAML中定义的环境变量和一个从ConfigMap中加载的环境变量。
 
@@ -94,6 +97,7 @@ kubectl exec deploy/sleep -- sh -c 'printenv | grep "^KIAMOL"'
 在本书中，我们不会经常使用kubectl describe 命令，因为输出通常很冗长，会占用大部分屏幕，但它绝对是值得尝试的东西。描述Services和Pods以可读的格式为您提供了许多有用的信息。您可以在图4.4中看到我的输出，其中包括描述ConfigMap时显示的键值数据。
 
 ![图4.4 Pods可以从ConfigMaps加载单独的数据项并重命名键.](./images/Figure4.4.png)
+<center>图4.4 Pods可以从ConfigMaps加载单独的数据项并重命名键.</center>
 
 从文字值创建 ConfigMap 对于单独的设置来说很好，但是如果您有很多配置数据，它会变得非常麻烦。除了在命令行上指定文本值外，Kubernetes还允许你从文件中加载configmap。
 
@@ -128,6 +132,7 @@ kubectl exec deploy/sleep -- sh -c 'printenv | grep "^KIAMOL"'
 在图4.5中，我的输出显示 printenv 命令读取所有环境变量并显示具有Kiamol名称的变量，但这可能不是您所期望的结果。
 
 ![图4.5 一个ConfigMap可以有多个数据项，Pod可以全部加载它们.](./images/Figure4.5.png)
+<center>图4.5 一个ConfigMap可以有多个数据项，Pod可以全部加载它们.</center>
 
 这个练习向您展示了如何从文件创建ConfigMap。它还向您展示了Kubernetes在应用环境变量时具有优先级规则。您刚刚部署的Pod规范(如清单4.4所示)从ConfigMap加载所有环境变量，但它也使用一些相同的键显式指定环境值。
 
@@ -182,6 +187,7 @@ kubectl logs -l app=todo-web
 演示应用程序是一个简单的待办事项列表(对于《在一个月的午餐中学习Docker》的读者来说，这将是令人痛苦的熟悉)。在当前的设置中，它允许您添加和查看项，但是还应该有一个/config页面，我们可以在非生产环境中使用它来查看所有的配置设置。如图4.6所示，该页面为空，应用程序记录了有人试图访问它的警告。
 
 ![图4.6 应用程序大部分工作，但我们需要设置额外的配置值.](./images/Figure4.6.png)
+<center>图4.6 应用程序大部分工作，但我们需要设置额外的配置值.</center>
 
 这里使用的配置层次结构是一种非常常见的方法。如果你对它不熟悉，电子书的附录C是《Learn Docker in a Month of lunch》中的“容器中的应用程序配置管理”章节，其中详细解释了它。这个例子是一个使用JSON的. net Core应用程序，但是你可以在Java Spring应用程序、Node.js、Go、Python等中看到使用各种文件格式的类似配置系统。在Kubernetes中，你使用相同的应用配置方法。
 
@@ -225,6 +231,7 @@ kubectl apply -f todo-list/todo-web-dev.yaml
 可以在图4.7中看到我的输出。配置页面现在可以正确加载，因此新的部署配置正在合并ConfigMap中的设置，以覆盖镜像中的默认设置，该设置阻止了对该页的访问。
 
 ![图4.7 将ConfigMap数据加载到容器文件系统中，应用程序将在其中加载配置文件.](./images/Figure4.7.png)
+<center>图4.7 将ConfigMap数据加载到容器文件系统中，应用程序将在其中加载配置文件.</center>
 
 这种方法需要两个前提:应用程序需要能够合并ConfigMap数据，Pod规范需要将ConfigMap中的数据加载到容器文件系统中的预期文件路径中。我们将在下一节中看到它是如何工作的。
 
@@ -233,6 +240,7 @@ kubectl apply -f todo-list/todo-web-dev.yaml
  将配置项加载到环境变量中的替代方法是将它们作为容器目录中的文件表示。容器文件系统是一个虚拟构造，由容器镜像和其他源构建。Kubernetes可以使用ConfigMaps作为文件系统源——它们作为一个目录挂载，每个数据项都有一个文件。图4.8显示了您刚刚部署的设置，其中ConfigMap中的数据项显示为一个文件。
 
 ![图4.8 configmap可以作为容器文件系统中的目录加载.](./images/Figure4.8.png)
+<center>图4.8 configmap可以作为容器文件系统中的目录加载.</center>
 
 Kubernetes通过Pod 配置 Spec 的两个特性来管理这个奇怪的魔法:卷，它使ConfigMap的内容对Pod可用，卷挂载，它将ConfigMap卷的内容加载到Pod容器的指定路径中。清单4.7显示了在前面的练习中部署的卷和挂载。
 
@@ -269,6 +277,7 @@ kubectl exec deploy/todo-web -- sh -c 'echo ch04 >> /app/config/config.json'
 如图4.9所示，我的输出显示JSON配置文件存在于应用程序的预期位置，但ConfigMap文件由Kubernetes管理，并作为只读文件交付。
 
 ![图4.9 容器文件系统由Kubernetes从镜像和ConfigMap构建。.](./images/Figure4.9.png)
+<center>图4.9 容器文件系统由Kubernetes从镜像和ConfigMap构建.</center>
 
 将ConfigMaps加载为目录是很灵活的，你可以使用它来支持不同的应用配置方法。如果您的配置被拆分到多个文件中，您可以将其全部存储在一个ConfigMap中，并将其全部加载到容器中。清单4.8显示了使用两个JSON文件更新to-do ConfigMap的数据项，这些JSON文件分离了应用程序行为和日志记录的设置。
 
@@ -313,6 +322,7 @@ kubectl logs -l app=todo-web
 可以在图4.10中看到我的输出。sleep 是为了让Kubernetes API有时间将新的配置文件在Pod 重新加载;几分钟后，新配置被加载，应用程序在增强的日志记录下运行。
 
 ![图4.10 ConfigMap数据是缓存的，所以更新需要几分钟才能到达Pods.](./images/Figure4.10.png)
+<center>图4.10 ConfigMap数据是缓存的，所以更新需要几分钟才能到达Pods.</center>
 
 卷是加载配置文件的一个强大的选项，尤其是像这样的应用程序，它会对变化做出反应，并实时更新设置。在不重启应用程序的情况下提高日志级别对跟踪问题有很大帮助。但是，您需要小心您的配置，因为卷挂载不一定以您期望的方式工作。如果容器镜像中已经存在卷的挂载路径，那么ConfigMap目录将覆盖它，替换所有内容，这可能导致应用程序以令人兴奋的方式失败。清单4.9显示了一个示例。
 
@@ -345,6 +355,7 @@ kubectl get pods -l app=todo-web
 这里的结果很有趣:部署破坏了应用程序，但应用程序继续工作。这是Kubernetes在保护你。应用更改会创建一个新的Pod，该Pod中的容器立即退出并报错，因为它试图加载的二进制文件不再存在于app目录中。Kubernetes重新启动容器几次，给它一个机会，但它一直失败。经过三次尝试后，Kubernetes开始休息，如图4.11所示。
 
 ![图4.11 如果更新的deployment 失败，则不会替换原来的Pod](./images/Figure4.11.png)
+<center>图4.11 如果更新的deployment 失败，则不会替换原来的Pod.</center>
 
 现在我们有了两个Pod，但Kubernetes不会删除旧的Pod，直到替换的Pod成功运行，在这种情况下它永远不会删除，因为我们破坏了容器设置。旧的Pod没有被移除，仍然愉快地服务于请求;新的Pod处于失败状态，但Kubernetes周期性地重新启动容器，希望它可能已经自我修复。这是一种需要注意的情况:apply命令似乎可以工作，应用程序继续工作，但它没有使用您所应用的清单。
 
@@ -389,6 +400,7 @@ kubectl get pods -l app=todo-web
 图4.12显示了我的输出。应用程序又开始工作了，但它只看到一个配置文件，所以没有应用增强的日志记录设置。
 
 ![图4.12 卷可以将ConfigMap中选定的项显示到挂载目录中.](./images/Figure4.12.png)
+<center>图4.12 卷可以将ConfigMap中选定的项显示到挂载目录中.</center>
 
 configmap支持广泛的配置系统。在环境变量和卷挂载之间，你应该能够在ConfigMaps中存储应用程序设置，并根据应用程序的需要应用它们。配置规范和应用规范之间的分离还支持不同的发布工作流，允许不同的团队拥有流程的不同部分。但是，有一件事不应该使用ConfigMaps，那就是任何敏感数据——它们实际上是文本文件的包装器，没有额外的安全语义。对于需要保护的配置数据，Kubernetes提供了Secrets。
 
@@ -416,6 +428,7 @@ kubectl get secret sleep-secret-literal -o jsonpath='{.data.secret}' | base64 -d
 从图4.13的输出中可以看出，Kubernetes对Secrets的处理与ConfigMaps不同。kubectl describe命令中不显示数据值，只显示键值的名称，并且在获取数据时显示为编码，因此需要将其输送到解码器中进行读取。
 
 ![图4.13 Secrets有一个类似ConfigMaps的API，但是Kubernetes尽量避免意外暴露它.](./images/Figure4.13.png)
+<center>图4.13 Secrets有一个类似ConfigMaps的API，但是Kubernetes尽量避免意外暴露它.</center>
 
 当 Secerts 在 Pod 容器内浮出水面时，这种预防措施并不适用。容器环境看到原始的纯文本数据。清单4.11显示了 sleep 应用程序的返回，配置为将新的Secret作为环境变量加载。
 
@@ -448,6 +461,7 @@ kubectl exec deploy/sleep -- printenv KIAMOL_SECRET
 图4.14显示了输出结果。在这种情况下，Pod只使用Secret，但是Secrets和ConfigMaps可以混合在同一个Pod 配置中，填充环境变量或文件或两者。
 
 ![图4.14 加载到Pods中的 Secret 不是Base64编码的.](./images/Figure4.14.png)
+<center>图4.14 加载到Pods中的 Secret 不是Base64编码的.</center>
 
 您应该警惕将Secrets加载到环境变量中。保护敏感数据的关键在于最大限度地减少其暴露。可以从任何进程读取环境变量,在Pod容器中，一些应用程序平台在遇到严重错误时记录所有环境变量的值。另一种方法是将Secrets显示为文件(如果应用程序支持的话)，这让您可以选择使用文件权限来保护访问。
 
@@ -482,6 +496,7 @@ kubectl get secret todo-db-secret-test -o jsonpath='{.metadata.annotations}'
 在图4.15中可以看到字符串被编码为Base64。其结果与规范使用普通数据字段并直接在YAML中设置Base64中的密码值相同。
 
 ![图4.15 从字符串数据创建的 Secret 被编码，但原始数据也存储在对象中.](./images/Figure4.15.png)
+<center>图4.15 从字符串数据创建的 Secret 被编码，但原始数据也存储在对象中.</center>
 
 要使用Secret作为Postgres密码，镜像为我们提供了两个选项。我们可以将这个值加载到一个名为POSTGRES_PASSWORD的环境变量中——这并不理想——或者我们可以将它加载到一个文件中，并通过设置POSTGRES_PASSWORD_FILE环境变量告诉Postgres加载文件的位置。使用文件意味着我们可以在卷级别上控制访问权限，这就是清单4.13代码中配置数据库的方式。
 
@@ -523,6 +538,7 @@ kubectl exec deploy/todo-db -- sh -c 'ls -l $(readlink -f /secrets/postgres_pass
 图4.16显示了数据库启动和等待连接的过程——这表明数据库已正确配置——最终输出验证文件权限是否按预期设置。
 
 ![图4.16 如果应用程序支持，配置设置可以从Secrets中填充的文件读取.](./images/Figure4.16.png)
+<center>图4.16 如果应用程序支持，配置设置可以从Secrets中填充的文件读取.</center>
 
 剩下的就是在测试配置中运行应用程序本身，这样它就可以连接到Postgres数据库，而不是使用本地数据库文件进行存储。还有很多YAML可以用来创建ConfigMap、Secret、Deployment和Service，但是这些都是使用我们已经介绍过的特性，所以我们只需要继续部署即可。
 
@@ -543,6 +559,7 @@ kubectl exec deploy/todo-web-test -- cat /app/secrets/secrets.json
 我的输出如图4.17所示，其中Secret JSON文件的纯文本内容显示在web Pod容器中。
 
 ![图4.17 加载应用程序配置到Pods和将ConfigMaps和Secrets 作为JSON文件](./images/Figure4.17.png)
+<center>图4.17 加载应用程序配置到Pods和将ConfigMaps和Secrets 作为JSON文件.</center>
 
 现在，当你在应用程序中添加待办事项时，它们被存储在Postgres数据库中，因此存储与应用程序运行时分离。你可以删除web Pod;它的控制器将启动一个具有相同配置的替换，它连接到相同的数据库Pod，因此所有来自原始web Pod的数据仍然可用。
 
@@ -557,12 +574,14 @@ Kubernetes 为您提供了管理应用程序配置的工具，使用任何适合
 更新相同配置对象的替代方法是每次部署新对象，在对象名称中使用某种版本方案，并更新 app 部署以引用新对象。您会失去实时更新，但可以轻松地获得配置更改的审计记录，并有一个方便的选项来返回到先前的设置。图 4.18 显示了这些选项。
 
 ![图4.18 您可以选择自己的配置管理方法，由Kubernetes支持](./images/Figure4.18.png)
+<center>图4.18 您可以选择自己的配置管理方法，由Kubernetes支持.</center>
 
 另一个问题是如何管理敏感数据。大型组织可能有专门的配置管理团队，他们拥有部署配置文件的过程。这非常适合ConfigMaps和Secrets的版本化方法，在这种方法中，配置管理团队在部署之前从文字或受控文件部署新对象。
 
 另一种选择是完全自动化的部署，其中configmap和secret是从源代码控制中的YAML模板创建的。YAML文件包含占位符而不是敏感数据，在应用它们之前，部署过程会使用来自安全存储(如Azure KeyVault)的真实值替换它们。图4.19比较了这些选项。
 
 ![图4.19 Secrets 管理可以在部署时自动化，也可以由单独的团队严格控制.](./images/Figure4.19.png)
+<center>图4.19 Secrets 管理可以在部署时自动化，也可以由单独的团队严格控制.</center>
 
 您可以使用任何适用于您的团队和应用程序堆栈的方法，记住目标是从平台加载所有配置设置，以便在每个环境中部署相同的容器镜像。现在是清理集群的时候了。如果您已经完成了所有的练习(当然您已经完成了!)，那么您将有几十个资源需要删除。我将介绍kubectl的一些有用特性，以帮助理清所有问题。
 
