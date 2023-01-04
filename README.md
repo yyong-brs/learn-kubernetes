@@ -66,4 +66,18 @@
 
     - 4.5 [管理 Kubernetes 中的应用程序配置](./chapter4.md#45-管理-kubernetes-中的应用程序配置)
 
-    - 4.6 [实验室](./chapter4.md#46-实验室)
+    - 4.6 [实验室](./chapter4.md#46-实验室) 
+
+  - 第五章 [通过 volumes,mounts,claims 存储数据](./chapter5.md)
+
+    - 5.1 [Kubernetes 如何构建容器文件系统](./chapter5.md#51-kubernetes-如何构建容器文件系统)
+
+    - 5.2 [在节点使用 volumes 及 mounts 存储数据](./chapter5.md#52-在节点使用-volumes-及-mounts-存储数据)
+
+    - 5.3 [使用 persistent volumes 及 claims 存储集群范围数据](./chapter5.md#53-使用-persistent-volumes-及-claims-存储集群范围数据)
+
+    - 5.4 [动态 volume provisioning 及 storage classes](./chapter5.md#54-动态-volume-provisioning-及-storage-classes)
+
+    - 5.5 [理解 Kubernetes 中存储的选择](./chapter5.md#55-理解-kubernetes-中存储的选择)
+
+    - 5.6 [实验室](./chapter5.md#56-实验室)
