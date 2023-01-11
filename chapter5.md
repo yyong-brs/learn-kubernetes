@@ -13,80 +13,80 @@ Pod 中的容器的文件系统由Kubernetes使用多个源构建。容器镜像
 
 在容器中运行的应用程序只看到一个它具有读写访问权限的文件系统，所有这些层的细节都是隐藏的。这对于将应用程序迁移到Kubernetes来说是很好的，因为它们不需要更改就可以在Pod中运行。但如果你的应用确实需要写入数据，你需要了解它们如何使用存储并设计Pods来支持它们的需求。否则，你的应用程序看起来运行正常，但当任何意外发生时(如使用新容器重新启动Pod)，你将面临数据丢失的风险。
 
-**TRY IT NOW** If the app inside a container crashes and the container exits, the Pod will start a replacement. The new container will start with the filesystem from the container image and a new writable layer, and any data written by the previous container in its writable layer is gone.
-<b>现在就试试</b>
+<b>现在就试试</b> 如果容器内的应用程序崩溃并且容器退出，Pod将开始替换。新容器将从容器镜像和新的可写层开始从文件系统开始，前一个容器在其可写层中写入的任何数据都将消失。
 
 ```
-# switch to this chapter’s exercise directory:
+# 进入本章练习目录:
 cd ch05
-# deploy a sleep Pod:
+# 部署一个 sleep Pod:
 kubectl apply -f sleep/sleep.yaml
-# write a file inside the container:
+# 在容器内写入一个文件:
 kubectl exec deploy/sleep -- sh -c 'echo ch05 > /file.txt; ls /*.txt'
-# check the container ID:
+# 检查容器 id:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[0].containerID}'
-# kill all processes in the container, causing a Pod restart:
+# kill 容器中所有的进程, 触发 Pod 重启:
 kubectl exec -it deploy/sleep -- killall5
-# check the replacment container ID:
+# 检查替换的容器 id:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[0].containerID}'
-# look for the file you wrote it won’t be there:
+# 查看你之前写入的文件，已经不存在:
 kubectl exec deploy/sleep -- ls /*.txt
 ```
-Remember two important things from this exercise: the filesystem of a Pod container has the life cycle of the container rather than the Pod, and when Kubernetes talks about a Pod restart, it’s actually referring to a replacement container. If your apps are merrily writing data inside containers, that data doesn’t get stored at the Pod level if the Pod restarts with a new container, all the data is gone. My output in figure 5.2 shows that.
+
+在这个练习中记住两件重要的事情:Pod容器的文件系统具有容器的生命周期而不是Pod，并且当Kubernetes谈论Pod重启时，它实际上指的是一个替换容器。如果您的应用程序愉快地在容器中写入数据，这些数据不会存储在Pod级别，如果Pod使用新容器重新启动，所有数据都将消失。输出如图5.2所示。
 
 ![图5.2](./images/Figure5.2.png)
 <center>图5.2 可写层具有容器的生命周期，而不是Pod.</center>
 
-We already know that Kubernetes can build the container filesystem from other sources we surfaced ConfigMaps and Secrets into filesystem directories in chapter 4. The mechanism for that is to define a volume at the Pod level that makes another storage source available and then to mount it into the container filesystem at a specified path. ConfigMaps and Secrets are read-only storage units, but Kubernetes supports many other types of volume that are writable. Figure 5.3 shows how you can design a Pod that uses a volume to store data that persists between restarts and could even be accessible clusterwide.
+我们已经知道 Kubernetes 可以从其他来源构建容器文件系统，我们在第 4 章中提到过ConfigMaps和Secrets文件系统目录。其机制是在Pod级别定义一个卷，使另一个存储源可用，然后将其挂载到容器文件系统的指定路径上。ConfigMaps和Secrets 是只读存储单元，但Kubernetes支持许多其他类型的可写卷。图5.3展示了如何设计一个Pod，使用卷来存储重启之间的数据，甚至可以在整个集群范围内访问。
 
 ![图5.3](./images/Figure5.3.png)
 <center>图5.3 虚拟文件系统可以从引用外部存储块的卷构建.</center>
 
-We’ll come to clusterwide volumes later in the chapter, but for now, we’ll start with a much simpler volume type, which is still useful for many scenarios. Listing 5.1 shows a Pod spec using a type of volume called EmptyDir, which is just an empty directory, but it’s stored at the Pod level rather than at the container level. It is mounted as a volume into the container, so it’s visible as a directory, but it’s not one of the image or container layers.
+我们将在本章的后面讨论集群范围的卷，但现在，我们将从一个更简单的卷类型开始，这对许多场景仍然有用。清单5.1显示了一个Pod 配置，它使用了一种名为 EmptyDir 的卷类型，这只是一个空目录，但是它存储在Pod级别而不是容器级别。它作为一个卷被挂载到容器中，因此它作为一个目录可见，但它不是镜像层或容器层之一。
 
-**Listing 5.1 sleep-with-emptyDir.yaml, a simple volume spec**
+> 清单 5.1 sleep-with-emptyDir.yaml, 一个简单的 volume 配置
+
 ```
 spec:
-    containers:
-        - name: sleep
-          image: kiamol/ch03-sleep
-          volumeMounts:
-          - name: data # Mounts a volume called data
-            mountPath: /data # into the /data directory
-    volumes:
-        - name: data # This is the data volume spec,
-          emptyDir: {} # which is the EmptyDir type.
+  containers:
+    - name: sleep
+      image: kiamol/ch03-sleep
+      volumeMounts:
+      - name: data # 挂载一个名为 data 的卷
+        mountPath: /data # 挂载到 /data 目录
+  volumes:
+    - name: data # 这个就是 data 卷配置,
+      emptyDir: {} # 指定 EmptyDir 类型.
 ```
 
-An empty directory sounds like the least useful piece of storage you can imagine, but actually it has a lot of uses because it has the same life cycle as the Pod. Any data stored in an EmptyDir volume remains in the Pod between restarts, so replacement containers can access data written by their predecessors.
+空目录听起来是你能想到的最没用的存储空间，但实际上它有很多用途，因为它与Pod具有相同的生命周期。任何存储在EmptyDir卷中的数据都会在重启之间保留在Pod中，这样替换容器就可以访问前一个容器写入的数据。
 
-**TRY IT NOW** Update the sleep deployment using the spec from listing 5.1,adding an EmptyDir volume. Now you can write data and kill the container and the replacement can read the data.
-<b>现在就试试</b>
+<b>现在就试试</b> 使用代码清单 5.1 中的配置更新 sleep 部署，添加一个EmptyDir卷。现在可以写入数据并杀死容器，替换容器可以读取数据。
 
 ```
-# update the sleep Pod to use an EmptyDir volume:
+# 更新 sleep Pod 使用一个 EmptyDir volume:
 kubectl apply -f sleep/sleep-with-emptyDir.yaml
-# list the contents of the volume mount:
+# 查看 volume mount 的内容:
 kubectl exec deploy/sleep -- ls /data
-# create a file in the empty directory:
+# 在空目录下创建一个文件:
 kubectl exec deploy/sleep -- sh -c 'echo ch05 > /data/file.txt; ls /data'
-# check the container ID:
+# 检查容器 ID:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[0].containerID}'
-# kill the container processes:
+# kill 容器进程:
 kubectl exec deploy/sleep -- killall5
-# check replacement container ID:
+# 检查替换的容器 ID:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[0].containerID}'
-# read the file in the volume:
+# 查看 volume 挂载的文件:
 kubectl exec deploy/sleep -- cat /data/file.txt
 ```
-You can see my output in figure 5.4. The containers just see a directory in the filesystem, but it points to a storage unit which is part of the Pod.
+输出如图 5.4 所示。容器只是在文件系统中看到一个目录，但它指向一个存储单元，它是Pod的一部分。
 
 ![图5.4](./images/Figure5.4.png)
 <center>图5.4 像空目录这样的基本目录仍然是有用的，因为它可以由容器共享.</center>
 
-You can use EmptyDir volumes for any applications that use the filesystem for temporary storage—maybe your app calls an API, which takes a few seconds to respond, and the response is valid for a long time. The app might save the API response in a local file because reading from disk is faster than repeating the API call. An EmptyDir volume is a reasonable source for a local cache because if the app crashes, then the replacement container will still have the cached files and still benefit from the speed boost.
+任何使用文件系统作为临时存储的应用程序都可以使用 EmptyDir 卷——也许你的应用程序会调用一个API，这个API需要几秒钟才能响应，而且响应需要很长一段时间。应用程序可能会将API响应保存在本地文件中，因为从磁盘读取比重复调用API更快。EmptyDir卷是本地缓存的一个合理来源，因为如果应用程序崩溃，那么替换容器仍然拥有缓存的文件，仍然可以从速度提升中受益。
 
-EmptyDir volumes only share the life cycle of the Pod, so if the Pod is replaced,then the new Pod starts with, well, an empty directory. If you want your data to persist between Pods, then you can mount other types of volume that have their own life cycles.
+EmptyDir 卷只共享Pod的生命周期，所以如果替换了Pod，那么新的Pod就从一个空目录开始。如果你希望数据在Pods之间持久化，那么你可以挂载其他类型的卷，它们有自己的生命周期。
 
 ## 5.2 在节点使用 volumes 及 mounts 存储数据
 
