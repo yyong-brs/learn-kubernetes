@@ -1,15 +1,15 @@
 # 第五章 通过 volumes,mounts,claims 存储数据
 
-Data access in a clustered environment is difficult. Moving compute around is the easy part the Kubernetes API is in constant contact with the nodes, and if a node stops responding, then Kubernetes can assume it’s offline and start replacements for all of its Pods on other nodes. But if an application in one of those Pods was storing data on the node, then the replacement won’t have access to that data when it starts on a different node, and it would be disappointing if that data contained a large order that a customer hadn’t completed. You really need clusterwide storage, so Pods can access the same data from any node.
+在集群环境中访问数据是困难的。计算的移动是简单的部分，Kubernetes API与节点保持着持续的联系，如果一个节点停止响应，Kubernetes就会认为它已离线，并在其他节点上为其所有Pod启动替代品。但如果其中一个Pod中的应用程序将数据存储在节点上，那么在其他节点上启动时，替代品将无法访问该数据，如果该数据包含客户尚未完成的大订单，那将是令人失望的。你真的需要全集群存储，这样Pod就可以从任何节点访问相同的数据。
 
-Kubernetes doesn’t have built-in clusterwide storage, because there isn’t a single solution that works for every scenario. Apps have different storage requirements, and the platforms that can run Kubernetes have different storage capabilities. Data is always a balance between speed of access and durability, and Kubernetes supports that by allowing you to define the different classes of storage that your cluster pro-vides and to request a specific storage class for your application. In this chapter you’ll learn how to work with different types of storage and how Kubernetes abstracts away storage implementation details.
+Kubernetes 没有内置集群范围的存储，因为没有一个解决方案适用于所有场景。应用程序有不同的存储需求，可以运行Kubernetes的平台有不同的存储能力。数据始终是访问速度和持久性之间的平衡，Kubernetes支持这一点，它允许您定义集群提供的不同存储类(storage class)，并为应用程序请求特定的存储类。在本章中，您将学习如何使用不同类型的存储，以及Kubernetes如何抽象出存储实现细节。
 
 ## 5.1 Kubernetes 如何构建容器文件系统
 
-Containers in Pods have their filesystem constructed by Kubernetes using multiple sources. The container image provides the initial contents of the filesystem, and every container has a writable storage layer, which it uses to write new files or to update any files from the image. (Docker images are read-only, so when a container updates a file from the image, it’s actually updating a copy of the file in its own writable layer.) Figure 5.1 shows how that looks inside the Pod.
+Pod 中的容器的文件系统由Kubernetes使用多个源构建。容器镜像提供文件系统的初始内容，并且每个容器都有一个可写存储层，用于从镜像写入新文件或更新任何文件。(Docker镜像是只读的，所以当容器从镜像中更新文件时，它实际上是在自己的可写层中更新文件的副本。)图5.1显示了Pod内部的情况。
 
-![Figure5.1](./images/Figure5.1.png)
-**Figure 5.1 Containers don’t know it, but their filesystem is a virtual construct, built by Kubernetes.**
+![图5.1](./images/Figure5.1.png)
+<center>图5.1 容器并不知道这一点，但它们的文件系统是由Kubernetes构建的虚拟结构。.</center>
 
 The application running in the container just sees a single filesystem to which it has read and write access, and all those layer details are hidden. That’s great for moving apps to Kubernetes because they don’t need to change to run in a Pod. But if your apps do write data, you will need to understand how they use storage and design your Pods to support their requirements. Otherwise, your apps will seem to be running fine, but you’re setting yourself up for data loss when anything unexpected happens like a Pod restarting with a new container.
 
@@ -33,13 +33,13 @@ kubectl exec deploy/sleep -- ls /*.txt
 ```
 Remember two important things from this exercise: the filesystem of a Pod container has the life cycle of the container rather than the Pod, and when Kubernetes talks about a Pod restart, it’s actually referring to a replacement container. If your apps are merrily writing data inside containers, that data doesn’t get stored at the Pod level if the Pod restarts with a new container, all the data is gone. My output in figure 5.2 shows that.
 
-![Figure5.2](./images/Figure5.2.png)
-**Figure 5.2 The writable layer has the life cycle of the container, not the Pod.**
+![图5.2](./images/Figure5.2.png)
+<center>图5.2 可写层具有容器的生命周期，而不是Pod.</center>
 
 We already know that Kubernetes can build the container filesystem from other sources we surfaced ConfigMaps and Secrets into filesystem directories in chapter 4. The mechanism for that is to define a volume at the Pod level that makes another storage source available and then to mount it into the container filesystem at a specified path. ConfigMaps and Secrets are read-only storage units, but Kubernetes supports many other types of volume that are writable. Figure 5.3 shows how you can design a Pod that uses a volume to store data that persists between restarts and could even be accessible clusterwide.
 
-![Figure5.3](./images/Figure5.3.png)
-**Figure 5.3 The virtual filesystem can be built from volumes that refer to external pieces of storage.**
+![图5.3](./images/Figure5.3.png)
+<center>图5.3 虚拟文件系统可以从引用外部存储块的卷构建.</center>
 
 We’ll come to clusterwide volumes later in the chapter, but for now, we’ll start with a much simpler volume type, which is still useful for many scenarios. Listing 5.1 shows a Pod spec using a type of volume called EmptyDir, which is just an empty directory, but it’s stored at the Pod level rather than at the container level. It is mounted as a volume into the container, so it’s visible as a directory, but it’s not one of the image or container layers.
 
@@ -79,8 +79,8 @@ kubectl exec deploy/sleep -- cat /data/file.txt
 ```
 You can see my output in figure 5.4. The containers just see a directory in the filesystem, but it points to a storage unit which is part of the Pod.
 
-![Figure5.4](./images/Figure5.4.png)
-**Figure 5.4 Something as basic as an empty directory is still useful because it can be shared by containers.**
+![图5.4](./images/Figure5.4.png)
+<center>图5.4 像空目录这样的基本目录仍然是有用的，因为它可以由容器共享.</center>
 
 You can use EmptyDir volumes for any applications that use the filesystem for temporary storage—maybe your app calls an API, which takes a few seconds to respond, and the response is valid for a long time. The app might save the API response in a local file because reading from disk is faster than repeating the API call. An EmptyDir volume is a reasonable source for a local cache because if the app crashes, then the replacement container will still have the cached files and still benefit from the speed boost.
 
@@ -108,8 +108,8 @@ kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
 
 This is a common setup for web applications, where the proxy boosts performance by serving responses directly from its local cache, and that also reduces load on the web app. You can see my output in figure 5.5. The first Pi calculation took more than one second to respond, and the refresh was practically immediate because it came from the proxy and did not need to be calculated.
 
-![Figure5.5](./images/Figure5.5.png)
-**Figure 5.5 Caching files in an EmptyDir volume means the cache survives Pod restarts.**
+![图5.5](./images/Figure5.5.png)
+<center>图5.5 在 EmptyDir 卷中缓存文件意味着Pod重启后缓存仍然存在.</center>
 
 An EmptyDir volume could be a reasonable approach for an app like this, because the data stored in the volume is not critical. If there’s a Pod restart, then the cache survives, and the new proxy container can serve responses cached by the previous container. If the Pod is replaced, then the cache is lost. The replacement Pod starts with an empty cache directory, but the cache isn’t required—the app still functions correctly; it just starts off slow until the cache gets filled again.
 
@@ -125,13 +125,13 @@ kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
 
 My output is shown in figure 5.6. The result is the same, but I had to wait another second for it to be calculated by the web app, because the replacement proxy Pod started without a cache.
 
-![Figure5.6](./images/Figure5.6.png)
-**Figure 5.6 A new Pod starts with a new empty directory.**
+![图5.6](./images/Figure5.6.png)
+<center>图5.6 一个新的Pod从一个新的空目录开始.</center>
 
 The next level of durability comes from using a volume that maps to a directory on the node’s disk, which Kubernetes calls a HostPath volume. HostPaths are specified as a volume in the Pod, which is mounted into the container filesystem in the usual way. When the container writes data into the mount directory, it actually is written to the disk on the node. Figure 5.7 shows the relationship among node, Pod, and volume.
 
-![Figure5.7](./images/Figure5.7.png)
-**Figure 5.7 HostPath volumes maintain data between Pod replacements, but only if Pods use the same node.**
+![图5.7](./images/Figure5.7.png)
+<center>图5.7 HostPath卷维护Pod替换之间的数据，但前提是Pod使用相同的节点.</center>
 
 HostPath volumes can be useful, but you need to be aware of their limitations. Data is physically stored on the node, and that’s that. Kubernetes doesn’t magically replicate that data to all the other nodes in the cluster. Listing 5.2 shows an updated Pod spec for the web proxy that uses a HostPath volume instead of an EmptyDir. When the proxy container writes cache files to /data/nginx/cache, they will actually be stored on the node at /volumes/nginx/cache.
 
@@ -172,8 +172,8 @@ kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
 
 My output appears in figure 5.8. The initial request took just under a second to respond, but the refresh was pretty much instananeous because the new Pod inherited the cached response from the old Pod, stored on the node.
 
-![Figure5.8](./images/Figure5.8.png)
-**Figure 5.8 On a single-node cluster, Pods always run on the same node, so they can all use the HostPath.**
+![图5.8](./images/Figure5.8.png)
+<center>图5.8 在单节点的集群中，Pods总是运行在同一个节点上，所以它们都可以使用HostPath.</center>
 
 The obvious problem with HostPath volumes is that they don’t make sense in a cluster with more than one node, which is pretty much every cluster outside of a simple lab environment. You can include a requirement in your Pod spec to say the Pod should always run on the same node, to make sure it goes where the data is, but doing so lim- its the resilience of your solution—if the node goes offline, then the Pod won’t run, and you lose your app.
 
@@ -211,8 +211,8 @@ kubectl exec deploy/sleep -- whoami
 
 As shown in figure 5.9, the Pod container can see the log files on the node, which in this case includes the Kubernetes logs. This is fairly harmless, but this container runs as the root user, which maps to the root user on the node, so the container has complete access to the filesystem.
 
-![Figure5.9](./images/Figure5.9.png)
-**Figure 5.9 Danger! Mounting a HostPath can give you complete access to the data on the node.**
+![图5.9](./images/Figure5.9.png)
+<center>图5.9 危险!挂载HostPath可以让你完全访问节点上的数据.</center>
 
 If this all seems like a terrible idea, remember that Kubernetes is a platform with a wide range of features to suit many applications. You could have an older app that needs to access specific file paths on the node where it is running, and the HostPath volume lets you do that. In that scenario, you can take a safer approach, using a volume that has access to one path on the node, which limits what the container can see by declaring subpaths for the volume mount. Listing 5.4 shows that.
 
@@ -251,15 +251,15 @@ kubectl exec deploy/sleep -- sh -c 'ls /container-logs | grep nginx'
 In this exercise, there’s no way to explore the node’s filesystem other than through the mounts to the log directories. As shown in figure 5.10, the container can access files only in the subpaths.
 HostPath volumes are a good way to start with stateful apps; they’re easy to use, and they work in the same way on any cluster. They are useful in real-world applications, too, but only when your apps are using state for temporary storage. For permanent storage, we need to move on to volumes which can be accessed by any node in the cluster.
 
-![Figure5.10](./images/Figure5.10.png)
-**Figure 5.10 Restricting access to volumes with subpaths limits what the container can do.**
+![图5.10](./images/Figure5.10.png)
+<center>图5.10 限制对带子路径的卷的访问限制了容器可以做的事情.</center>
 
 ## 5.3 使用 persistent volumes 及 claims 存储集群范围数据
 
 A Kubernetes cluster is like a pool of resources: it has a number of nodes, which each have some CPU and memory capacity they make available to the cluster, and Kubernetes uses that to run your apps. Storage is just another resource that Kubernetes makes available to your application, but it can only provide clusterwide storage if the nodes can plug into a distributed storage system. Figure 5.11 shows how Pods can access volumes from any node if the volume uses distributed storage.
 
-![Figure5.11](./images/Figure5.11.png)
-**Figure 5.11 Distributed storage gives your Pod access to data from any node, but it needs platform support.**
+![图5.11](./images/Figure5.11.png)
+<center>图5.11 分布式存储使 Pod 可以访问来自任何节点的数据，但它需要平台支持.</center>
 
 Kubernetes supports many volume types backed by distributed storage systems: AKS clusters can use Azure Files or Azure Disk, EKS clusters can use Elastic Block Store, and in the datacenter, you can use simple Network File System (NFS) shares, or a networked filesystem like GlusterFS. All of these systems have different configuration requirements, and you can specify them in the volume spec for your Pod. Doing so would make your application spec tightly coupled to one storage implementation, and Kubernetes provides a more flexible approach.
 
@@ -300,8 +300,8 @@ kubectl get pv
 
 My output is shown in figure 5.12. The node labeling is necessary only because I’m not using a distributed storage system; you would normally just specify the NFS or Azure Disk volume configuration, which is accessible from any node. A local volume exists on only one node, and the PV identifies that node using the label.
 
-![Figure5.12](./images/Figure5.12.png)
-**Figure 5.12 If you don’t have distributed storage, you can cheat by pinning a PV to a local volume.**
+![图5.12](./images/Figure5.12.png)
+<center>图5.12 如果没有分布式存储，可以通过将PV固定到本地卷来作弊.</center>
 
 Now the PV exists in the cluster as an available storage unit, with a known set of features, including the size and access mode. Pods can’t use that PV directly; instead, they need to claim it using a PersistentVolumeClaim (PVC). The PVC is the storage abstraction that Pods use, and it just requests some storage for an application. The PVC gets matched to a PV by Kubernetes, and it leaves the underlying volume details to the PV. Listing 5.6 shows a claim for some storage that will be matched to the PV we created.
 
@@ -336,8 +336,9 @@ kubectl get pv
 
 My output appears in figure 5.13, where you can see the one-to-one binding: the PVC is bound to the volume, and the PV is bound by the claim.
 
-![Figure5.13](./images/Figure5.13.png)
+![图5.13](./images/Figure5.13.png)
 **Figure 5.13 PVs are just units of storage in the cluster; you claim them for your app with a PVC.**
+<center>图5.13 PV 只是集群中的存储单元;你可以用 PVC 来为你的应用认领它.</center>
 
 This is a static provisioning approach, where the PV needs to be explicitly created so Kubernetes can bind to it. If there is no matching PV when you create a PVC, the claim is still created, but it’s not usable. It will stay in the system waiting for a PV to be created that meets its requirements.
 
@@ -352,8 +353,8 @@ kubectl get pvc
 
 You can see in figure 5.14 that the new PVC is in the Pending status. It will remain that way until a PV appears in the cluster with at least 100 MB capacity, which is the storage request in this claim.
 
-![Figure5.14](./images/Figure5.14.png)
-**Figure 5.14 With static provisioning, a PVC will be unusable until there is a PV it can bind to.**
+![图5.14](./images/Figure5.14.png)
+<center>图5.14 对于静态配置（static provisioning），PVC将不可用，直到有一个PV可以绑定到它.</center>
 
 A PVC needs to be bound before a Pod can use it. If you deploy a Pod that references an unbound PVC, the Pod will stay in the Pending state until the PVC is bound, and so your app will never run until it has the storage it needs. The first PVC we created has been bound, so it can be used, but by only one Pod. The access mode of the claim is ReadWriteOnce, which means the volume is writable but can be mounted by only one Pod. Listing 5.7 shows an abbreviated Pod spec for a Postgres database, using the PVC for storage.
 
@@ -387,13 +388,13 @@ kubectl exec deploy/sleep -- mkdir -p /node-root/volumes/pv01
 
 Figure 5.15 shows the sleep Pod running with root permissions, so it can create the directory on the node, even though I don’t have access to the node directly.
 
-![Figure5.15](./images/Figure5.15.png)
-**Figure 5.15 In this example, the HostPath is an alternative way to access the PV source on the node.**
+![图5.15](./images/Figure5.15.png)
+<center>图5.15 在本例中，HostPath是访问节点PV源的另一种方式.</center>
 
 Everything is in place now to run the to-do list app with persistent storage. Normally, you won’t need to go through as many steps as this, because you’ll know the capabilities your cluster provides. I don’t know what your cluster can do, however, so these exercises work on any cluster, and they’ve been a useful introduction to all the storage resources. Figure 5.16 shows what we’ve deployed so far, along with the database we’re about to deploy.
 
-![Figure5.16](./images/Figure5.16.png)
-**Figure 5.16 Just a little bit complicated—mapping a PV and a HostPath to the same storage location**
+![图5.16](./images/Figure5.16.png)
+<center>图5.16 只是有点复杂——将PV和HostPath映射到相同的存储位置.</center>
 
 Let’s run the database. When the Postgres container is created, it mounts the volume in the Pod, which is backed by the PVC. This new database container connects to an empty volume, so when it starts up, it will initialize the database, creating the writeahead log (WAL), which is the main data file. The Postgres Pod doesn’t know it, but the PVC is backed by a local volume on the node, where we also have a sleep Pod running, which we can use to look at the Postgres files.
 
@@ -412,8 +413,8 @@ kubectl exec deploy/sleep -- sh -c 'ls -l /node-root/volumes/pv01 | grep wal'
 
 My output in figure 5.17 shows he database server starting correctly and waiting for connections, having written all its data files to the volume.
 
-![Figure5.17](./images/Figure5.17.png)
-**Figure 5.17 The database container writes to the local data path, but that’s actually a mount for the PVC.**
+![图5.17](./images/Figure5.17.png)
+<center>图5.17 数据库容器写入本地数据路径，但这实际上是PVC的挂载.</center>
 
 The last thing to do is run the app, test it, and confirm the data still exists if the data-
 base Pod is replaced.
@@ -437,8 +438,8 @@ kubectl exec deploy/sleep -- ls -l /node-root/volumes/pv01/pg_wal
 
 You can see in figure 5.18 that my to-do app is showing some data, and you’ll just have to take my word for it that the data was added into the first database Pod and reloaded from the second database Pod.
 
-![Figure5.18](./images/Figure5.18.png)
-**Figure 5.18 The storage abstractions mean the database gets persistent storage just by mounting a PVC.**
+![图5.18](./images/Figure5.18.png)
+<center>图5.18 存储抽象意味着数据库只需挂载PVC就可以获得持久存储.</center>
 
 We now have a nicely decoupled app, with a web Pod that can be updated and scaled independently of the database, and a database Pod, which uses persistent storage outside of the Pod life cycle. This exercise used a local volume as the backing store for the persistent data, but the only change you’d need to make for a production deployment is to replace the volume spec in the PV with a distributed volume supported by your cluster.
 
@@ -484,8 +485,8 @@ kubectl get pv
 
 What happens when you run the exercise? Docker Desktop uses a HostPath volume in the default storage class for dynamically provisioned PVs; AKS uses Azure Files; K3s uses HostPath but with a different configuration from Docker Desktop, which means you won’t see the PV because it is created only when a Pod that uses the PVC is cre- ated. Figure 5.19 shows my output from Docker Desktop. The PV is created and bound to the PVC, and when the PVC is deleted, the PV is removed, too.
 
-![Figure5.19](./images/Figure5.19.png)
-**Figure 5.19 Docker Desktop has one set of behaviors for the default storage class; other platforms differ.**
+![图5.19](./images/Figure5.19.png)
+<center>图5.19 Docker Desktop 有一组默认 storage class 的行为;其他平台有所不同.</center>
 
 Storage classes provide a lot of flexibility. You create them as standard Kubernetes resources, and in the spec, you define exactly how the storage class works with the following three fields:
 - provisioner—the component that creates PVs on demand. Different platforms have different provisioners, for example, the provisioner in the default AKS storage class integrates with Azure Files to create new file shares.
@@ -510,8 +511,8 @@ kubectl get sc
 
 The output you see from listing the storage classes shows what your cluster has configured. After running the script, you should have a new class called kiamol, which has the same setup as the default storage class. My output from Docker Desktop is shown in figure 5.20.
 
-![Figure5.20](./images/Figure5.20.png)
-**Figure 5.20 Cloning the default storage class to create a custom class you can use in PVC specs**
+![图5.20](./images/Figure5.20.png)
+<center>图5.20 克隆 default storage class 以创建可在PVC spec 中使用的自定义类型.</center>
 
 Now you have a custom storage class that your apps can request in a PVC. This is a much more intuitive and flexible way to manage storage, especially in a cloud platform where dynamic provisioning is simple and fast. Listing 5.9 shows a PVC spec requesting the new storage class.
 
@@ -546,8 +547,8 @@ kubectl get pods -l app=todo-db
 
 This exercise switches the database Pod to use the new dynamically provisioned PVC, as shown in my output in figure 5.21. The new PVC is backed by a new volume, so it will start empty and you’ll lose your previous data. The previous volume still exists, so you could deploy another update to your database Pod, revert it back to the old PVC, and see your items.
 
-![Figure5.21](./images/Figure5.21.png)
-**Figure 5.21 Using storage classes greatly simplifies your app spec; you just name the class in your PVC.**
+![图5.21](./images/Figure5.21.png)
+<center>图5.21 使用 storage classes 极大地简化了你的应用配置;你只需在你的PVC中命名这个类别.</center>
 
 ## 5.5 理解 Kubernetes 中存储的选择
 
