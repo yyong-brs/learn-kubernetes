@@ -90,149 +90,148 @@ EmptyDir 卷只共享Pod的生命周期，所以如果替换了Pod，那么新�
 
 ## 5.2 在节点使用 volumes 及 mounts 存储数据
 
-This is where working with data gets trickier than working with compute, because we need to think about whether data will be tied to a particular node—meaning any replacement Pods will need to run on that node to see the data—or whether the data has clusterwide access and the Pod can run on any node. Kubernetes supports many variations, but you need to know what you want and what your cluster supports and specify that for the Pod.
+这是数据处理比计算处理更为复杂的地方，因为我们需要考虑数据是否与特定节点相关联 - 这意味着任何替换 Pod 都需要在该节点上运行以查看数据 - 或数据是否具有集群范围的访问权限，并且 Pod 可以在任何节点上运行。Kubernetes 支持许多变体，但您需要知道您想要什么以及集群支持什么，并为 Pod 指定。
 
-The simplest storage option is to use a volume that maps to a directory on the node, so when the container writes to the volume mount, the data is actually stored in a known directory on the node’s disk. We’ll demonstrate that by running a real app that uses an EmptyDir volume for cache data, understanding the limitations, and then upgrading it to use node-level storage.
+最简单的存储选项是使用映射到节点上目录的卷，这样当容器写入卷挂载时，数据实际上存储在节点磁盘上的一个已知目录中。我们将通过运行一个使用EmptyDir卷缓存数据的实际应用程序来演示这一点，了解其限制，然后将其升级为使用节点级存储。
 
-**TRY IT NOW** Run a web application that uses a proxy component to improve performance. The web app runs in a Pod with an internal Service, and the proxy runs in another Pod, which is publicly available on a LoadBalancer Service.
-<b>现在就试试</b>
+<b>现在就试试</b> 运行一个使用代理组件来提高性能的web应用程序。web应用程序运行在一个带有内部服务的Pod中，代理运行在另一个Pod中，该Pod通过LoadBalancer服务公开可用。
 
 ```
-# deploy the Pi application:
+# 部署 Pi 应用:
 kubectl apply -f pi/v1/
-# wait for the web Pod to be ready:
+# 等待 web Pod ready:
 kubectl wait --for=condition=Ready pod -l app=pi-web
-# find the app URL from your LoadBalancer:
+# 从 LoadBalancer 获取应用 URL:
 kubectl get svc pi-proxy -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080/?dp=30000'
-# browse to the URL, wait for the response then refresh the page
-# check the cache in the proxy
+# 访问 URL, 等待响应然后刷新页面
+# 检查 proxy 中的缓存
 kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
 ```
 
-This is a common setup for web applications, where the proxy boosts performance by serving responses directly from its local cache, and that also reduces load on the web app. You can see my output in figure 5.5. The first Pi calculation took more than one second to respond, and the refresh was practically immediate because it came from the proxy and did not need to be calculated.
+这是 web 应用程序的常见设置，其中代理通过直接从本地缓存中提供响应来提高性能，这也减少了web应用程序的负载。你可以在图5.5中看到我的输出。第一个Pi计算花费了1秒多的时间来响应，并且刷新实际上是即时的，因为它来自代理，不需要计算。
 
 ![图5.5](./images/Figure5.5.png)
 <center>图5.5 在 EmptyDir 卷中缓存文件意味着Pod重启后缓存仍然存在.</center>
 
-An EmptyDir volume could be a reasonable approach for an app like this, because the data stored in the volume is not critical. If there’s a Pod restart, then the cache survives, and the new proxy container can serve responses cached by the previous container. If the Pod is replaced, then the cache is lost. The replacement Pod starts with an empty cache directory, but the cache isn’t required—the app still functions correctly; it just starts off slow until the cache gets filled again.
+对于这样的应用程序来说，EmptyDir卷可能是一种合理的方法，因为存储在卷中的数据不是关键数据。如果Pod重启，缓存会存活下来，新的代理容器可以为前一个容器缓存的响应提供服务。如果Pod被替换，那么缓存就会丢失。替换的Pod从一个空的缓存目录开始，但缓存不是必需的——应用程序仍然可以正常运行;它只是缓慢地开始，直到缓存再次被填充。
 
-**TRY IT NOW** Remove the proxy Pod. It will be replaced because it’s managed by a deployment controller. The replacement starts with a new EmptyDir volume, which for this app means an empty proxy cache so requests are sent on to the web Pod.
-<b>现在就试试</b>
+<b>现在就试试</b> 移除 proxy Pod。它将被替换，因为它由部署控制器管理。替换从一个新的EmptyDir卷开始，对于这个应用程序来说，这意味着一个空的代理缓存，因此请求被发送到web Pod。
 
 ```
-# delete the proxy Pod:
+# 删除 proxy Pod:
 kubectl delete pod -l app=pi-proxy
-# check the cache directory of the replacement Pod:
+# 检查替换的 Pod 缓存目录:
 kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
-# refresh your browser at the Pi app URL
+# 刷新界面
 ```
 
-My output is shown in figure 5.6. The result is the same, but I had to wait another second for it to be calculated by the web app, because the replacement proxy Pod started without a cache.
+输出如图 5.6 所示。结果是相同的，但我不得不等待另一秒，以等待web应用程序计算，因为替换代理Pod启动时没有缓存。
 
 ![图5.6](./images/Figure5.6.png)
 <center>图5.6 一个新的Pod从一个新的空目录开始.</center>
 
-The next level of durability comes from using a volume that maps to a directory on the node’s disk, which Kubernetes calls a HostPath volume. HostPaths are specified as a volume in the Pod, which is mounted into the container filesystem in the usual way. When the container writes data into the mount directory, it actually is written to the disk on the node. Figure 5.7 shows the relationship among node, Pod, and volume.
+下一个级别的持久性来自于使用映射到节点磁盘上目录的卷，Kubernetes将其称为HostPath卷。hostpath被指定为Pod中的一个卷，它以通常的方式装载到容器文件系统中。容器将数据写入挂载目录时，实际上是将数据写入节点上的磁盘。图5.7展示了node、Pod和volume之间的关系。
 
 ![图5.7](./images/Figure5.7.png)
 <center>图5.7 HostPath卷维护Pod替换之间的数据，但前提是Pod使用相同的节点.</center>
 
-HostPath volumes can be useful, but you need to be aware of their limitations. Data is physically stored on the node, and that’s that. Kubernetes doesn’t magically replicate that data to all the other nodes in the cluster. Listing 5.2 shows an updated Pod spec for the web proxy that uses a HostPath volume instead of an EmptyDir. When the proxy container writes cache files to /data/nginx/cache, they will actually be stored on the node at /volumes/nginx/cache.
+HostPath 卷可能很有用，但您需要了解它们的局限性。数据物理存储在节点上，仅此而已。Kubernetes不会神奇地将数据复制到集群中的所有其他节点。代码清单5.2是更新后的Pod 配置，它使用HostPath卷代替了EmptyDir。当代理容器将缓存文件写入/data/nginx/cache时，它们实际上会存储在节点上的目录 /volumes/nginx/cache。
 
-**Listing 5.2 nginx-with-hostPath.yaml, mounting a HostPath volume**
-
-```
-spec: # This is an abridged Pod spec;
-    containers: # the full spec also contains a configMap volume mount.
-    - image: nginx:1.17-alpine
-      name: nginx
-      ports:
-        - containerPort: 80
-      volumeMounts:
-        - name: cache-volume
-          mountPath: /data/nginx/cache # The proxy cache path
-    volumes:
-    - name: cache-volume
-      hostPath: # Using a directory on the node
-        path: /volumes/nginx/cache # The volume path on the node
-        type: DirectoryOrCreate # creates a path if it doesn’t exist
-```
-This method extends the durability of the data beyond the life cycle of the Pod to the life cycle of the node’s disk, provided replacement Pods always run on the same node. That will be the case in a single-node lab cluster because there’s only one node. Replacement Pods will load the HostPath volume when they start, and if it is populated with cache data from a previous Pod, then the new proxy can start serving cached data straight away.
-
-**TRY IT NOW** Update the proxy deployment to use the Pod spec from listing 5.2, then use the app and delete the Pod. The replacement responds using the existing cache.
-<b>现在就试试</b>
+> 清单 5.2 nginx-with-hostPath.yaml, 挂载 HostPath volume
 
 ```
-# update the proxy Pod to use a HostPath volume:
+spec: 
+  containers: # 完整的配置 还包含一个configMap卷挂载
+  - image: nginx:1.17-alpine
+    name: nginx
+    ports:
+      - containerPort: 80
+    volumeMounts:
+      - name: cache-volume
+        mountPath: /data/nginx/cache # proxy 缓存路径
+  volumes:
+  - name: cache-volume
+    hostPath: # 使用节点上的目录
+      path: /volumes/nginx/cache # 节点路径
+      type: DirectoryOrCreate # 不存在则创建路径
+```
+
+这种方法将数据的持久性从Pod的生命周期扩展到节点磁盘的生命周期，前提是替换Pod总是在同一个节点上运行。在单节点的实验室集群中会出现这种情况，因为只有一个节点。替换Pod将在启动时加载HostPath卷，如果它使用前一个Pod的缓存数据填充，那么新的代理可以立即开始提供缓存数据。
+
+<b>现在就试试</b> 更新 proxy 部署以使用清单5.2中的Pod 配置，然后使用应用程序并删除Pod。替换将使用现有缓存进行响应。
+
+```
+# 更新 proxy Pod 使用 HostPath volume:
 kubectl apply -f pi/nginx-with-hostPath.yaml
-# list the contents of the cache directory:
+# 列出缓存目录内容:
 kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
-# browse to the app URL
-# delete the proxy Pod:
+# 访问 app URL
+# 删除 proxy Pod:
 kubectl delete pod -l app=pi-proxy
-# check the cache directory in the replacement Pod:
+# 检查替换 Pod 下的缓存目录:
 kubectl exec deploy/pi-proxy -- ls -l /data/nginx/cache
-# refresh your browser
+# 刷新浏览器
 ```
 
-My output appears in figure 5.8. The initial request took just under a second to respond, but the refresh was pretty much instananeous because the new Pod inherited the cached response from the old Pod, stored on the node.
+输出如图5.8所示。最初的请求只花了不到一秒的时间来响应，但刷新几乎是即时的，因为新的Pod继承了旧Pod缓存的响应，并存储在节点上。
 
 ![图5.8](./images/Figure5.8.png)
 <center>图5.8 在单节点的集群中，Pods总是运行在同一个节点上，所以它们都可以使用HostPath.</center>
 
-The obvious problem with HostPath volumes is that they don’t make sense in a cluster with more than one node, which is pretty much every cluster outside of a simple lab environment. You can include a requirement in your Pod spec to say the Pod should always run on the same node, to make sure it goes where the data is, but doing so lim- its the resilience of your solution—if the node goes offline, then the Pod won’t run, and you lose your app.
+HostPath卷的一个明显的问题是，它们在有多个节点的集群中没有意义，几乎每个集群都有一个简单的实验室环境。你可以在Pod 配置中包含一个要求，要求Pod应该始终运行在同一个节点上，以确保它与数据在一起，但这样做限制了你的解决方案的弹性——如果节点离线，Pod将无法运行，你的应用程序将丢失。
 
-A less obvious problem is that method presents a nice security exploit. Kubernetes doesn’t restrict which directories on the node are available to use for HostPath volumes. The Pod spec shown in listing 5.3 is perfectly valid, and it makes the entire filesystem on the node available for the Pod container to access.
+一个不太明显的问题是，该方法提供了一个很好的安全漏洞。Kubernetes没有限制节点上的哪些目录可用于HostPath卷。代码清单5.3中的Pod配置是完全有效的，它使得Pod容器可以访问该节点上的整个文件系统。
 
-**Listing 5.3 sleep-with-hostPath.yaml, a Pod with full access to the node’s disk**
-```
-spec:
-    containers:
-      - name: sleep
-        image: kiamol/ch03-sleep
-        volumeMounts:
-          - name: node-root
-            mountPath: /node-root
-    volumes:
-      - name: node-root
-        hostPath:
-          path: / # The root of the node’s filesystem
-          type: Directory # path needs to exist.
-```
+> 清单 5.3 sleep-with-hostPath.yaml, 一个可以完全访问节点磁盘的 Pod 
 
-Anyone who has access to create a Pod from that specification now has access to the whole filesystem of the node where the Pod is running. You might be tempted to use a volume mount like this as a quick way to read multiple paths on the host, but if your app is compromised and an attacker can execute commands in the container, then they also have access to the node’s disk.
-
-**TRY IT NOW** Run a Pod from the YAML shown in listing 5.3, and then run some commands in the Pod container to explore the node’s filesystem.
-<b>现在就试试</b>
-
-```
-# run a Pod with a volume mount to the host:
-kubectl apply -f sleep/sleep-with-hostPath.yaml
-# check the log files inside the container:
-kubectl exec deploy/sleep -- ls -l /var/log
-# check the logs on the node using the volume:
-kubectl exec deploy/sleep -- ls -l /node-root/var/log
-# check the container user:
-kubectl exec deploy/sleep -- whoami
-```
-
-As shown in figure 5.9, the Pod container can see the log files on the node, which in this case includes the Kubernetes logs. This is fairly harmless, but this container runs as the root user, which maps to the root user on the node, so the container has complete access to the filesystem.
-
-![图5.9](./images/Figure5.9.png)
-<center>图5.9 危险!挂载HostPath可以让你完全访问节点上的数据.</center>
-
-If this all seems like a terrible idea, remember that Kubernetes is a platform with a wide range of features to suit many applications. You could have an older app that needs to access specific file paths on the node where it is running, and the HostPath volume lets you do that. In that scenario, you can take a safer approach, using a volume that has access to one path on the node, which limits what the container can see by declaring subpaths for the volume mount. Listing 5.4 shows that.
-
-**Listing 5.4 sleep-with-hostPath-subPath.yaml, restricting mounts with subpaths**
 ```
 spec:
   containers:
     - name: sleep
       image: kiamol/ch03-sleep
       volumeMounts:
-        - name: node-root # Name of the volume to mount
-          mountPath: /pod-logs # Target path for the container
-          subPath: var/log/pods # Source path within the volume
+        - name: node-root
+          mountPath: /node-root
+  volumes:
+    - name: node-root
+      hostPath:
+        path: / # 节点文件系统的根目录
+        type: Directory # 目录必须存在.
+```
+
+任何有权限根据该配置创建Pod的人现在都可以访问Pod运行所在节点的整个文件系统。你可能想使用这样的卷挂载来快速读取主机上的多个路径，但如果你的应用程序受到攻击，攻击者可以在容器中执行命令，那么他们也可以访问节点的磁盘。
+
+<b>现在就试试</b> 运行代码清单 5.3 中的YAML文件中的Pod，然后在 Pod 容器中运行一些命令来浏览node的文件系统。
+
+```
+# 运行一个带卷挂载到主机的Pod:
+kubectl apply -f sleep/sleep-with-hostPath.yaml
+# 检查容器内的日志文件:
+kubectl exec deploy/sleep -- ls -l /var/log
+# 检查卷所在节点的日志:
+kubectl exec deploy/sleep -- ls -l /node-root/var/log
+# 检查容器用户:
+kubectl exec deploy/sleep -- whoami
+```
+
+如图 5.9 所示，Pod容器可以看到节点上的日志文件，在本例中包括Kubernetes日志。这是相当无害的，但是这个容器以root用户的身份运行，该用户映射到节点上的root用户，因此容器可以完全访问文件系统。
+
+![图5.9](./images/Figure5.9.png)
+<center>图5.9 危险!挂载HostPath可以让你完全访问节点上的数据.</center>
+
+如果这一切看起来像是一个糟糕的想法，请记住Kubernetes是一个具有广泛功能的平台，可以适应许多应用程序。您可能有一个旧的应用程序，需要访问其运行节点上的特定文件路径，而HostPath卷允许您这样做。在这种情况下，您可以采用一种更安全的方法，使用可以访问节点上一条路径的卷，通过声明卷挂载的子路径来限制容器可以看到的内容。清单5.4显示了这一点。
+
+> 清单 5.4 sleep-with-hostPath-subPath.yaml, 用子路径限制挂载
+
+```
+spec:
+  containers:
+    - name: sleep
+      image: kiamol/ch03-sleep
+      volumeMounts:
+        - name: node-root # 挂载的卷名称
+          mountPath: /pod-logs # 容器的路径
+          subPath: var/log/pods # 卷内的路径
         - name: node-root
           mountPath: /container-logs
           subPath: var/log/containers
@@ -242,134 +241,130 @@ spec:
         path: /
         type: Directory
 ```
-Here, the volume is still defined at the root path on the node, but the only way to access it is through the volume mounts in the container, which are restricted to defined subpaths. Between the volume specification and the mount specification, you have a lot of flexibility in building and mapping your container filesystem.
 
-**TRY IT NOW** Update the sleep Pod so the container’s volume mount is restricted to the subpaths defined in listing 5.4, and check the file contents.
-<b>现在就试试</b>
+在这里，卷仍然定义在节点的根路径上，但访问它的唯一方式是通过容器中的卷挂载，这些挂载仅限于定义的子路径。在volume 配置和mount 配置之间，在构建和映射容器文件系统方面有很大的灵活性。
+
+<b>现在就试试</b> 更新sleep Pod，使容器的卷挂载限制在清单5.4中定义的子路径中，并检查文件内容。
 
 ```
-# update the Pod spec:
+# 更新 Pod spec:
 kubectl apply -f sleep/sleep-with-hostPath-subPath.yaml
-# check the Pod logs on the node:
+# 检查 node 上 Pod 日志:
 kubectl exec deploy/sleep -- sh -c 'ls /pod-logs | grep _pi-'
-# check the container logs:
+# 检查容器日志 logs:
 kubectl exec deploy/sleep -- sh -c 'ls /container-logs | grep nginx'
 ```
 
-In this exercise, there’s no way to explore the node’s filesystem other than through the mounts to the log directories. As shown in figure 5.10, the container can access files only in the subpaths.
-HostPath volumes are a good way to start with stateful apps; they’re easy to use, and they work in the same way on any cluster. They are useful in real-world applications, too, but only when your apps are using state for temporary storage. For permanent storage, we need to move on to volumes which can be accessed by any node in the cluster.
+在这个练习中，除了通过挂载到日志目录之外，没有其他方法可以查看节点的文件系统。如图 5.10 所示，容器只能访问子路径中的文件。
+HostPath卷是创建有状态应用程序的好方法;它们易于使用，并且在任何集群上都以相同的方式工作。它们在现实世界的应用程序中也很有用，但只有当你的应用程序使用状态作为临时存储时才有用。对于永久存储，我们需要迁移到集群中任何节点都可以访问的卷。
 
 ![图5.10](./images/Figure5.10.png)
 <center>图5.10 限制对带子路径的卷的访问限制了容器可以做的事情.</center>
 
 ## 5.3 使用 persistent volumes 及 claims 存储集群范围数据
 
-A Kubernetes cluster is like a pool of resources: it has a number of nodes, which each have some CPU and memory capacity they make available to the cluster, and Kubernetes uses that to run your apps. Storage is just another resource that Kubernetes makes available to your application, but it can only provide clusterwide storage if the nodes can plug into a distributed storage system. Figure 5.11 shows how Pods can access volumes from any node if the volume uses distributed storage.
+Kubernetes 集群就像一个资源池:它有许多节点，每个节点都有一些 CPU 和内存容量供集群使用，Kubernetes使用它们来运行你的应用程序。存储只是Kubernetes提供给你的应用程序的另一种资源，但只有当节点可以插入分布式存储系统时，它才能提供集群范围的存储。图 5.11 展示了如果卷使用分布式存储，Pods 如何从任何节点访问卷。
 
 ![图5.11](./images/Figure5.11.png)
 <center>图5.11 分布式存储使 Pod 可以访问来自任何节点的数据，但它需要平台支持.</center>
 
-Kubernetes supports many volume types backed by distributed storage systems: AKS clusters can use Azure Files or Azure Disk, EKS clusters can use Elastic Block Store, and in the datacenter, you can use simple Network File System (NFS) shares, or a networked filesystem like GlusterFS. All of these systems have different configuration requirements, and you can specify them in the volume spec for your Pod. Doing so would make your application spec tightly coupled to one storage implementation, and Kubernetes provides a more flexible approach.
+Kubernetes 支持由分布式存储系统支持的许多卷类型: AKS集群可以使用 Azure 文件或 Azure 磁盘，EKS集群可以使用弹性块存储，并且在数据中心，您可以使用简单的网络文件系统(NFS)共享，或像 GlusterFS 这样的网络文件系统。所有这些系统都有不同的配置要求，您可以在 Pod 的卷配置中指定它们。这样做将使您的应用程序配置与一种存储实现紧密耦合，Kubernetes提供了一种更灵活的方法。
 
-Pods are an abstraction over the compute layer, and Services are an abstraction over the network layer. In the storage layer, the abstractions are PersistentVolumes (PV) and PersistentVolumeClaims. A PersistentVolume is a Kubernetes object that defines an available piece of storage. A cluster administrator may create a set of PersistentVolumes, which each contain the volume spec for the underlying storage system. Listing 5.5 shows a PersistentVolume spec that uses NFS storage.
+Pods 是位于计算层之上的抽象，而Services是位于网络层之上的抽象。在存储层中，抽象是PersistentVolumes (PV)和PersistentVolumeClaims。PersistentVolume是一个Kubernetes对象，它定义了一个可用的存储空间。集群管理员可以创建一组持久化卷，其中每个卷包含底层存储系统的卷规格。代码清单5.5展示了使用NFS存储的 PersistentVolume 配置。
 
-
-**Listing 5.5 persistentVolume-nfs.yaml, a volume backed by an NFS mount**
+> 清单 5.5 persistentVolume-nfs.yaml, 由NFS挂载支持的卷
 
 ```
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv01 # A generic storage unit with a generic name
+  name: pv01 # 具有通用名称的通用存储单元
 spec:
   capacity:
-    storage: 50Mi # The amount of storage the PV offers
-  accessModes: # How the volume can be accessed by Pods
-    - ReadWriteOnce # It can only be used by one Pod. 
-  nfs: # This PV is backed by NFS.
-    server: nfs.my.network # Domain name of the NFS server
-    path: "/kubernetes-volumes" # Path to the NFS share
+    storage: 50Mi # PV 提供的存储空间
+  accessModes: # 如何通过Pods访问卷
+    - ReadWriteOnce # 它只能被一个Pod使用。
+  nfs: # 该PV由NFS支持.
+    server: nfs.my.network # NFS 服务的域名
+    path: "/kubernetes-volumes" # NFS 共享的路径
 ```
 
-You won’t be able to deploy that spec in your lab environment, unless you happen to have an NFS server in your network with the domain name nfs.my.network and a share called kubernetes-volumes. You could be running Kubernetes on any platform, so for the exercises that follow, we’ll use a local volume that will work anywhere. (If I used Azure Files in the exercises, they would work only on an AKS cluster, because EKS and Docker Desktop and the other Kubernetes distributions aren’t configured for Azure volume types.)
+您无法在实验室环境中部署该配置，除非您的网络中恰好有一个NFS服务器，其域名为 nfs.my.network，共享名为 kubernetes-volumes。您可以在任何平台上运行Kubernetes，因此在接下来的练习中，我们将使用可以在任何地方工作的本地卷。(如果我在练习中使用Azure文件，它们只能在AKS集群上工作，因为EKS和Docker Desktop以及其他Kubernetes发行版没有为Azure卷类型配置。)
 
-**TRY IT NOW** Create a PV that uses local storage. The PV is clusterwide, but the volume is local to one node, so we need to make sure the PV is linked to the node where the volume lives. We’ll do that with labels.
-<b>现在就试试</b>
+<b>现在就试试</b> 创建一个使用本地存储的 PV。PV是集群范围内的，但卷是本地的一个节点，因此我们需要确保PV连接到卷所在的节点。我们用标签来做。
 
 ```
-# apply a custom label to the first node in your cluster:
+# 将自定义标签应用到集群中的第一个节点:
 kubectl label node $(kubectl get nodes -o jsonpath='{.items[0].metadata.name}') kiamol=ch05
-# check the nodes with a label selector:
+# 使用标签选择器检查节点:
 kubectl get nodes -l kiamol=ch05
-# deploy a PV that uses a local volume on the labeled node:
+# 在标记的节点上部署一个使用本地卷的PV:
 kubectl apply -f todo-list/persistentVolume.yaml
-# check the PV:
+# 检查 PV:
 kubectl get pv
 ```
 
-My output is shown in figure 5.12. The node labeling is necessary only because I’m not using a distributed storage system; you would normally just specify the NFS or Azure Disk volume configuration, which is accessible from any node. A local volume exists on only one node, and the PV identifies that node using the label.
+输出如图5.12所示。节点标记是必要的，因为我没有使用分布式存储系统;您通常只需要指定NFS或Azure磁盘卷配置，这些配置可以从任何节点访问。本地卷仅存在于一个节点上，PV使用标签标识该节点。
 
 ![图5.12](./images/Figure5.12.png)
 <center>图5.12 如果没有分布式存储，可以通过将PV固定到本地卷来作弊.</center>
 
-Now the PV exists in the cluster as an available storage unit, with a known set of features, including the size and access mode. Pods can’t use that PV directly; instead, they need to claim it using a PersistentVolumeClaim (PVC). The PVC is the storage abstraction that Pods use, and it just requests some storage for an application. The PVC gets matched to a PV by Kubernetes, and it leaves the underlying volume details to the PV. Listing 5.6 shows a claim for some storage that will be matched to the PV we created.
+现在 PV 作为一个可用的存储单元存在于集群中，具有一组已知的特性，包括大小和访问模式。pod不能直接使用PV;相反，他们需要使用PersistentVolumeClaim (PVC)来声明它。PVC是Pods使用的存储抽象，它只是为应用程序请求一些存储空间。Kubernetes将PVC与PV匹配，并将底层的存储细节留给PV。代码清单5.6展示了一个与我们创建的PV相匹配的存储空间声明。
 
-**Listing 5.6 postgres-persistentVolumeClaim.yaml, a PVC matching the PV**
+> 清单 5.6 postgres-persistentVolumeClaim.yaml, PVC 匹配 PV
 
 ```
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc # The claim will be used by a specific app.
+  name: postgres-pvc # 该声明将由特定的应用程序使用。
 spec:
-  accessModes: # The required access mode
+  accessModes: # 必要的 access mode
     - ReadWriteOnce
 resources:
   requests:
-    storage: 40Mi # The amount of storage requested
-storageClassName: "" # A blank class means a PV needs to exist.
+    storage: 40Mi # 请求的存储大小
+storageClassName: "" # 一个空白类意味着PV需要存在.
 ```
 
-The PVC spec includes an access mode, storage amount, and storage class. If no storage class is specified, Kubernetes tries to find an existing PV that matches the requirements in the claim. If there is a match, then the PVC is bound to the PV—there is a one-to-one link, so once a PV is claimed, it is not available for any other PVCs to use.
+PVC 配置包括访问模式、存储量和存储类。如果没有指定存储类，Kubernetes会尝试找到与声明中要求匹配的现有PV。如果有匹配，则PVC绑定到PV—有一对一的链接，一旦PV 被声明使用，就不能供任何其他PVC使用。
 
-**TRY IT NOW** Deploy the PVC from listing 5.6. Its requirements are met by the PV we created in the previous exercise, so the claim will be bound to that volume.
-<b>现在就试试</b>
+<b>现在就试试</b> 部署代码清单 5.6 中的PVC。它的要求由我们在前一个练习中创建的 PV 满足，因此 claim 将绑定到该 volume。
 
 ```
-# create a PVC that will bind to the PV:
+# 创建一个绑定到 pv 的pvc:
 kubectl apply -f todo-list/postgres-persistentVolumeClaim.yaml
-# check PVCs:
+# 检查 PVCs:
 kubectl get pvc
-# check PVs:
+# 检查 PVs:
 kubectl get pv
 ```
 
-My output appears in figure 5.13, where you can see the one-to-one binding: the PVC is bound to the volume, and the PV is bound by the claim.
+我的输出出现在图 5.13 中，在这里可以看到一对一的绑定:PVC 绑定到卷，PV 绑定到 claim。
 
 ![图5.13](./images/Figure5.13.png)
-**Figure 5.13 PVs are just units of storage in the cluster; you claim them for your app with a PVC.**
 <center>图5.13 PV 只是集群中的存储单元;你可以用 PVC 来为你的应用认领它.</center>
 
-This is a static provisioning approach, where the PV needs to be explicitly created so Kubernetes can bind to it. If there is no matching PV when you create a PVC, the claim is still created, but it’s not usable. It will stay in the system waiting for a PV to be created that meets its requirements.
+这是一种静态配置方法，PV 需要显式创建，以便Kubernetes可以绑定到它。如果在创建PVC时没有匹配的PV，则仍然创建了声明，但它是不可用的。它将停留在系统中，等待满足其要求的PV被创建。
 
-**TRY IT NOW** The PV in your cluster is already bound to a claim, so it can’t be used again. Create another PVC that will remain unbound.
-<b>现在就试试</b>
+<b>现在就试试</b> 集群中的 PV 已经绑定到某个 claim ，因此不能再次使用。创建另一个PVC，将保持未绑定
 
 ```
-# create a PVC that doesn’t match any available PVs:
+# 创建一个不匹配任何可用 PV 的 PVC:
 kubectl apply -f todo-list/postgres-persistentVolumeClaim-too-big.yaml
-# check claims:
+# 检查 claims:
 kubectl get pvc
 ```
 
-You can see in figure 5.14 that the new PVC is in the Pending status. It will remain that way until a PV appears in the cluster with at least 100 MB capacity, which is the storage request in this claim.
+在图 5.14 中可以看到新的 PVC 处于挂起状态。这种情况会一直持续下去，直到集群中出现一个容量至少为100 MB的PV(即本声明中的存储需求)。
 
 ![图5.14](./images/Figure5.14.png)
 <center>图5.14 对于静态配置（static provisioning），PVC将不可用，直到有一个PV可以绑定到它.</center>
 
-A PVC needs to be bound before a Pod can use it. If you deploy a Pod that references an unbound PVC, the Pod will stay in the Pending state until the PVC is bound, and so your app will never run until it has the storage it needs. The first PVC we created has been bound, so it can be used, but by only one Pod. The access mode of the claim is ReadWriteOnce, which means the volume is writable but can be mounted by only one Pod. Listing 5.7 shows an abbreviated Pod spec for a Postgres database, using the PVC for storage.
+在 Pod 使用PVC之前，需要先把它绑起来。如果你部署了一个引用未绑定PVC的Pod，在PVC绑定之前Pod将保持挂起状态，因此你的应用程序将永远无法运行，直到它拥有所需的存储空间。我们创造的第一个PVC已经绑定，所以它可以使用，但只能绑定到一个 Pod。声明的访问模式是ReadWriteOnce，这意味着卷是可写的，但只能由一个Pod挂载。代码清单5.7是Postgres数据库的简短Pod 配置，使用PVC存储。
 
-**Listing 5.7 todo-db.yaml, a Pod spec consuming a PVC**
+> 清单 5.7 todo-db.yaml, 一个 Pod 配置消费 PVC**
+
 ```
 spec:
   containers:
@@ -380,85 +375,80 @@ spec:
           mountPath: /var/lib/postgresql/data
   volumes:
     - name: data
-      persistentVolumeClaim: # Volume uses a PVC
-        claimName: postgres-pvc # PVC to use
+      persistentVolumeClaim: # 卷使用某 PVC
+        claimName: postgres-pvc # 使用的 pvc 
 ```
 
-Now we have all the pieces in place to deploy a Postgres database Pod using a volume, which may or may not be backed by distributed storage. The application designer owns the Pod spec and the PVC and isn’t concerned about the PV—that’s dependent on the infrastructure of the Kubernetes cluster and could be managed by a different team. In our lab environment, we own it all. We need to take one more step: create the directory path on the node that the volume expects to use.
+现在我们已经准备好了使用卷部署Postgres数据库Pod的所有部件，卷可能支持也可能不支持分布式存储。应用程序设计人员拥有Pod 配置和PVC，并不关心pv——pv依赖于Kubernetes集群的基础设施，可以由不同的团队管理。在我们的实验室环境中，我们拥有一切。我们还需要采取另一个步骤:在卷预期使用的节点上创建目录路径。
 
-**TRY IT NOW** You probably won’t have access to log on to the nodes in a real Kubernetes cluster, so we’ll cheat here by running a sleep Pod, which has a HostPath mount to the node’s root, and create the directory using the mount.
-<b>现在就试试</b>
+<b>现在就试试</b> 你可能无法登录到真正的Kubernetes集群中的节点，所以我们在这里通过运行sleep Pod来作弊，它将HostPath挂载到节点的根目录，并使用挂载创建目录。
 
 ```
-# run the sleep Pod, which has access to the node’s disk:
+# 运行 sleep Pod, 它可以访问节点磁盘:
 kubectl apply -f sleep/sleep-with-hostPath.yaml
-# wait for the Pod to be ready:
+# 等待 Pod ready:
 kubectl wait --for=condition=Ready pod -l app=sleep
-# create the directory path on the node, which the PV expects:
+# 创建节点的目录, 来自 PV 指定的值:
 kubectl exec deploy/sleep -- mkdir -p /node-root/volumes/pv01
 ```
 
-Figure 5.15 shows the sleep Pod running with root permissions, so it can create the directory on the node, even though I don’t have access to the node directly.
+图 5.15 展示了以 root 权限运行的 sleep Pod，因此它可以在节点上创建目录，即使我没有直接访问该节点的权限。
 
 ![图5.15](./images/Figure5.15.png)
 <center>图5.15 在本例中，HostPath是访问节点PV源的另一种方式.</center>
 
-Everything is in place now to run the to-do list app with persistent storage. Normally, you won’t need to go through as many steps as this, because you’ll know the capabilities your cluster provides. I don’t know what your cluster can do, however, so these exercises work on any cluster, and they’ve been a useful introduction to all the storage resources. Figure 5.16 shows what we’ve deployed so far, along with the database we’re about to deploy.
+现在一切都准备好了，可以使用持久存储运行待办事项列表应用程序。通常情况下，你不需要经历这么多步骤，因为你知道集群提供的功能。不过，我不知道你的集群能做什么，所以这些练习可以在任何集群上运行，它们是对所有存储资源的有用介绍。图5.16展示了到目前为止部署的内容，以及即将部署的数据库。
 
 ![图5.16](./images/Figure5.16.png)
 <center>图5.16 只是有点复杂——将PV和HostPath映射到相同的存储位置.</center>
 
-Let’s run the database. When the Postgres container is created, it mounts the volume in the Pod, which is backed by the PVC. This new database container connects to an empty volume, so when it starts up, it will initialize the database, creating the writeahead log (WAL), which is the main data file. The Postgres Pod doesn’t know it, but the PVC is backed by a local volume on the node, where we also have a sleep Pod running, which we can use to look at the Postgres files.
+让我们运行数据库。当创建 Postgres 容器时，它将卷挂载到由PVC支持的Pod中。这个新的数据库容器连接到一个空卷，因此当它启动时，它将初始化数据库，创建预写日志(writeahead log, WAL)，这是主数据文件。Postgres Pod并不知道，但是PVC是由节点上的本地卷支持的，在这里我们也有一个sleep Pod在运行，我们可以使用它来查看Postgres文件。
 
-**TRY IT NOW** Deploy the database, and give it time to initialize the data files, and then check what’s been written in the volume using the sleep Pod.
-<b>现在就试试</b>
+<b>现在就试试</b> 部署数据库，并给它时间来初始化数据文件，然后使用sleep Pod检查卷中写入了什么。
 
 ```
-# deploy the database:
+# 部署 database:
 kubectl apply -f todo-list/postgres/
-# wait for Postgres to initialize:
+# 等待 Postgres 初始化:
 sleep 30
-# check the database logs:
+# 检查 database 日志:
 kubectl logs -l app=todo-db --tail 1
-# check the data files in the volume:
+# 检查卷中的数据文件:
 kubectl exec deploy/sleep -- sh -c 'ls -l /node-root/volumes/pv01 | grep wal'
 ```
 
-My output in figure 5.17 shows he database server starting correctly and waiting for connections, having written all its data files to the volume.
+图 5.17 中的输出显示数据库服务器已经正确启动并等待连接，已经将所有数据文件写入卷中。
 
 ![图5.17](./images/Figure5.17.png)
 <center>图5.17 数据库容器写入本地数据路径，但这实际上是PVC的挂载.</center>
 
-The last thing to do is run the app, test it, and confirm the data still exists if the data-
-base Pod is replaced.
+最后要做的是运行应用程序，测试它，并确认如果替换了数据库Pod，数据仍然存在。
 
-**TRY IT NOW** Run the web Pod for the to-do app, which connects to the Postgres database.
-<b>现在就试试</b>
+<b>现在就试试</b> 运行待办事项应用程序的web Pod，它连接到Postgres数据库。
 
 ```
-# deploy the web app components:
+# 部署 web app 组件:
 kubectl apply -f todo-list/web/
-# wait for the web Pod:
+# 等待 web Pod:
 kubectl wait --for=condition=Ready pod -l app=todo-web
-# get the app URL from the Service:
+# 从 Service 获取访问 url:
 kubectl get svc todo-web -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8081/new'
-# browse to the app, and add a new item
-# delete the database Pod:
+# 访问 app, 添加新的条目
+# 删除 database Pod:
 kubectl delete pod -l app=todo-db
-# check the contents of the volume on the node:
+# 检查 node 上的 卷的内容:
 kubectl exec deploy/sleep -- ls -l /node-root/volumes/pv01/pg_wal
-# check that your item is still in the to-do list
+# 检查新增加的条目是不是还在 to-do list
 ```
 
-You can see in figure 5.18 that my to-do app is showing some data, and you’ll just have to take my word for it that the data was added into the first database Pod and reloaded from the second database Pod.
+在图5.18中，您可以看到我的待办事项应用程序显示了一些数据，您只需相信我的话，这些数据被添加到第一个数据库Pod中，并从第二个数据库Pod中重新加载。
 
 ![图5.18](./images/Figure5.18.png)
 <center>图5.18 存储抽象意味着数据库只需挂载PVC就可以获得持久存储.</center>
 
-We now have a nicely decoupled app, with a web Pod that can be updated and scaled independently of the database, and a database Pod, which uses persistent storage outside of the Pod life cycle. This exercise used a local volume as the backing store for the persistent data, but the only change you’d need to make for a production deployment is to replace the volume spec in the PV with a distributed volume supported by your cluster.
+我们现在有了一个很好的解耦应用程序，它有一个web Pod，可以独立于数据库进行更新和扩展，还有一个数据库Pod，它在Pod生命周期之外使用持久存储。本练习使用本地卷作为持久数据的备份存储，但是对于生产部署，惟一需要做的更改是将PV中的卷配置替换为集群支持的分布式卷。
 
-Whether you should run a relational database in Kubernetes is a question we’ll address at the end of the chapter, but before we do that, we’ll look at the real deal with storage: having the cluster dynamically provision volumes based on an abstracted storage class.
-
+是否应该在 Kubernetes 中运行关系型数据库是我们将在本章末尾解决的问题，但在此之前，我们先来看看真正的存储:让集群根据抽象的存储类动态配置卷。
 
 ## 5.4 动态 volume provisioning 及 storage classes
 
