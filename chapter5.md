@@ -452,10 +452,11 @@ kubectl exec deploy/sleep -- ls -l /node-root/volumes/pv01/pg_wal
 
 ## 5.4 动态 volume provisioning 及 storage classes
 
-So far we’ve used a static provisioning workflow. We explicitly created the PV and then created the PVC, which Kubernetes bound to the PV. That works for all Kubernetes clusters and might be the preferred workflow in organizations where access to storage is strictly controlled, but most Kubernetes platforms support a simpler alternative with dynamic provisioning.
-In the dynamic provisioning workflow, you just create the PVC, and the PV that backs it is created on demand by the cluster. Clusters can be configured with multiple storage classes that reflect the different volume capabilities on offer as well as a default storage class. PVCs can specify the name of the storage class they want, or if they want to use the default class, then they omit the storage class field in the claim spec, as shown in listing 5.8.
+到目前为止，我们使用的是静态配置过程。我们明确地创建了PV，然后创建了PVC, Kubernetes将其绑定到PV。这适用于所有Kubernetes集群，并且可能是对存储访问受到严格控制的组织的首选工作方式，但大多数Kubernetes平台支持一个更简单的动态配置（dynamic provisioning）替代方案。
 
-**Listing 5.8 postgres-persistentVolumeClaim-dynamic.yaml, dynamic PVC**
+在动态配置工作流中，您只需创建PVC，而支持PVC的PV则由集群按需创建。集群可以配置多个存储类，这些存储类反映所提供的不同卷功能，也可以配置一个默认存储类。pvc可以指定他们想要的存储类的名称，或者如果他们想使用默认类，那么他们在声明配置中省略存储类字段，如清单5.8所示。
+
+> 清单 5.8 postgres-persistentVolumeClaim-dynamic.yaml, 动态 PVC
 
 ```
 apiVersion: v1
@@ -468,123 +469,117 @@ spec:
   resources:
     requests:
       storage: 100Mi
-      # There is no storageClassName field, so this uses the default class.
+      # 没有指定 storageClassName 字段, 所以此处使用 default class.
 ```
 
-You can deploy this PVC to your cluster without creating a PV—but I can’t tell you what will happen, because that depends on the setup of your cluster. If your Kubernetes platform supports dynamic provisioning with a default storage class, then you’ll see a PV is created and bound to the claim, and that PV will use whatever volume type your cluster has set for the default.
+您可以在不创建 PV 的情况下将这个 PVC 部署到您的集群中—但是我不能告诉您将会发生什么，因为这取决于您的集群的设置。如果您的 Kubernetes 平台支持使用默认存储类的动态配置，那么您将看到一个 PV 被创建并绑定到 PVC，并且该PV将使用集群中配置的默认类型。
 
-**TRY IT NOW** Deploy a PVC, and see if it is dynamically provisioned.
-<b>现在就试试</b>
+<b>现在就试试</b> 部署一个 PVC，并查看它是否是动态供应的。
 
 ```
-# deploy the PVC from listing 5.8:
+# 从清单 5.8 部署 PVC:
 kubectl apply -f todo-list/postgres-persistentVolumeClaim-dynamic.yaml
-# check claims and volumes:
+# 检查 claims 和 volumes:
 kubectl get pvc
 kubectl get pv
-# delete the claim:
+# 删除 claim:
 kubectl delete pvc postgres-pvc-dynamic
-# check volumes again:
+# 再次检查卷:
 kubectl get pv
 ```
 
-What happens when you run the exercise? Docker Desktop uses a HostPath volume in the default storage class for dynamically provisioned PVs; AKS uses Azure Files; K3s uses HostPath but with a different configuration from Docker Desktop, which means you won’t see the PV because it is created only when a Pod that uses the PVC is cre- ated. Figure 5.19 shows my output from Docker Desktop. The PV is created and bound to the PVC, and when the PVC is deleted, the PV is removed, too.
+当你运行这个练习时会发生什么?Docker Desktop使用默认存储类中的HostPath卷来动态分配 PV;AKS使用Azure文件;K3s使用HostPath，但配置与Docker Desktop不同，这意味着您将看不到 PV，因为它仅在创建使用 PVC 的 Pod 时创建。图5.19显示了Docker Desktop的输出。PV被创建并绑定到PVC，当PVC被删除时，PV也被删除。
 
 ![图5.19](./images/Figure5.19.png)
 <center>图5.19 Docker Desktop 有一组默认 storage class 的行为;其他平台有所不同.</center>
 
-Storage classes provide a lot of flexibility. You create them as standard Kubernetes resources, and in the spec, you define exactly how the storage class works with the following three fields:
-- provisioner—the component that creates PVs on demand. Different platforms have different provisioners, for example, the provisioner in the default AKS storage class integrates with Azure Files to create new file shares.
-- reclaimPolicy—defines what to do with dynamically created volumes when the claim is deleted. The underlying volume can be deleted, too, or it can be retained.
-- volumeBindingMode—determines whether the PV is created as soon as the PVC is created or not until a Pod that uses the PVC is created.
+Storage class 提供了很大的灵活性。您将它们创建为标准的 Kubernetes 资源，并且在 spec 中，您准确地定义了存储类如何使用以下三个字段
+- provisioner—按需创建 PV 的组件。不同的平台有不同的供应器，例如，默认AKS存储类中的供应器与Azure文件集成以创建新的文件共享。
+- reclaimPolicy—定义删除 claims 时如何处理动态创建的卷。底层卷也可以被删除，也可以被保留。
+- volumeBindingMode—决定是否在 PVC 创建时立即创建PV，或者直到使用PVC的Pod创建时才创建PV。
 
-Combining those properties lets you put together a choice of storage classes in your cluster, so applications can request the properties they need—everything from fast local storage to highly available clustered storage—without ever specifying the exact details of a volume or volume type. I can’t give you a storage class YAML that I can be sure will work on your cluster, because clusters don’t all have the same provisioners available. Instead we’ll create a new storage class by cloning your default class.
+通过组合这些属性，可以在集群中选择存储类，因此应用程序可以请求所需的属性(从快速本地存储到高可用集群存储)，而无需指定卷或卷类型的确切细节。我无法为您提供一个可以在您的集群上工作的存储类YAML，因为集群并不是所有的集群都有相同的可用供应程序。相反，我们将通过克隆默认类来创建一个新的存储类。
 
-**TRY IT NOW** Fetching the default storage class and cloning it contains some nasty details, so I’ve wrapped those steps in a script. You can check the script contents if you’re curious, but you may need to have a lie-down afterward.
-<b>现在就试试</b>
+<b>现在就试试</b> 获取默认 storage class 并克隆它包含一些令人讨厌的细节，因此我将这些步骤封装在一个脚本中。如果你好奇，你可以检查脚本内容，但之后你可能需要躺下休息一下。
 
 ```
-# list the storage classes in the cluster:
+# 查询集群 storage classes :
 kubectl get storageclass
-# clone the default on Windows:
+# 在 Windows 上 clone 默认的类型:
 Set-ExecutionPolicy Bypass -Scope Process -Force;
 ./cloneDefaultStorageClass.ps1
-# OR on Mac/Linux:
+# 或者在 Mac/Linux:
 chmod +x cloneDefaultStorageClass.sh && ./cloneDefaultStorageClass.sh
-# list storage classes:
+# 查询 storage classes:
 kubectl get sc
 ```
-
-The output you see from listing the storage classes shows what your cluster has configured. After running the script, you should have a new class called kiamol, which has the same setup as the default storage class. My output from Docker Desktop is shown in figure 5.20.
+从列出存储类中看到的输出显示了集群已配置的内容。运行脚本后，您应该有一个名为 kiamol 的新类型，它具有与默认存储类相同的设置。Docker Desktop的输出如图 5.20 所示。
 
 ![图5.20](./images/Figure5.20.png)
 <center>图5.20 克隆 default storage class 以创建可在PVC spec 中使用的自定义类型.</center>
 
-Now you have a custom storage class that your apps can request in a PVC. This is a much more intuitive and flexible way to manage storage, especially in a cloud platform where dynamic provisioning is simple and fast. Listing 5.9 shows a PVC spec requesting the new storage class.
+现在你有了一个自定义存储类，你的应用程序可以在PVC中请求它。这是一种更加直观和灵活的存储管理方式，特别是在动态供应简单快速的云平台中。清单5.9显示了请求新存储类的PVC规范。
 
-**Listing 5.9 postgres-persistentVolumeClaim-storageClass.yaml**
+> 清单 5.9 postgres-persistentVolumeClaim-storageClass.yaml
 ```
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: kiamol # The storage class is the abstraction.
+  storageClassName: kiamol # 这个存储类型是抽象的
   resources:
     requests:
       storage: 100Mi
 ```
 
-The storage classes in a production cluster will have more meaningful names, but we all now have a storage class with the same name in our clusters, so we can update the Postgres database to use that explicit class.
+生产集群中的存储类将有更有意义的名称，但我们现在在集群中都有一个具有相同名称的存储类，因此我们可以更新Postgres数据库以使用该显式类。
 
-**TRY IT NOW** Create the new PVC, and update the database Pod spec to use it.
-<b>现在就试试</b>
+<b>现在就试试</b> 创建新的PVC，并更新数据库Pod Spec 以使用它。
 
 ```
-# create a new PVC using the custom storage class:
-kubectl apply -f storageClass/postgres-persistentVolumeClaim-
-storageClass.yaml
-# update the database to use the new PVC:
+# 使用自定义存储类创建一个新的PVC:
+kubectl apply -f storageClass/postgres-persistentVolumeClaim-storageClass.yaml
+# 更新数据库以使用新的 PVC:
 kubectl apply -f storageClass/todo-db.yaml
-# check the storage:
+# 检查 storage:
 kubectl get pvc
 kubectl get pv
-# check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=todo-db
-# refresh the list in your to-do app
+# 刷新 to-do 应用清单
 ```
 
-This exercise switches the database Pod to use the new dynamically provisioned PVC, as shown in my output in figure 5.21. The new PVC is backed by a new volume, so it will start empty and you’ll lose your previous data. The previous volume still exists, so you could deploy another update to your database Pod, revert it back to the old PVC, and see your items.
+这个练习将数据库 Pod 切换为使用新的动态配置的PVC，如图5.21中的输出所示。新的PVC由一个新的卷支持，因此它将开始为空，您将丢失以前的数据。以前的卷仍然存在，因此您可以将另一个更新部署到数据库Pod，将其恢复到旧的PVC，并查看您的条目。
 
 ![图5.21](./images/Figure5.21.png)
 <center>图5.21 使用 storage classes 极大地简化了你的应用配置;你只需在你的PVC中命名这个类别.</center>
 
 ## 5.5 理解 Kubernetes 中存储的选择
 
-So that’s storage in Kubernetes. In your usual work, you’ll define PersistentVolumeClaims for your Pods and specify the size and storage class you need, which could be a custom value like FastLocal or Replicated. We took a long journey to get there in this chapter, because it’s important to understand what actually happens when you claim storage, what other resources are involved, and how you can configure them.
+这就是Kubernetes的存储。在您的日常工作中，您将为 pod 定义PersistentVolumeClaims，并指定所需的大小和存储类，这可以是一个自定义值，如FastLocal或Replicated。在本章中，我们花了很长时间才了解到这一点，因为了解在声明存储时实际发生了什么、涉及到哪些其他资源以及如何配置它们非常重要。
 
-We also covered volume types, and that’s an area you’ll need to research more to understand what options are available on your Kubernetes platform and what capabilities they provide. If you’re in a cloud environment, you should have the luxury of multiple clusterwide storage options, but remember that storage costs, and fast storage costs a lot. You need to understand that you can create a PVC using a fast storage class that could be configured to retain the underlying volume, and that means you’ll still be paying for storage when you’ve deleted your deployment.
+我们还介绍了卷类型，这是您需要深入研究的一个领域，以便了解您的Kubernetes平台上有哪些可用选项以及它们提供哪些功能。如果您处于云环境中，您应该拥有多个集群范围内的存储选项，但请记住存储成本，以及快速存储的成本很高。您需要理解，您可以使用快速存储类创建PVC，这些存储类可以配置为保留底层卷，这意味着您在删除部署时仍然需要支付存储费用。
 
-Which brings us to the big question: should you even use Kubernetes to run stateful apps like databases? The functionality is all there to give you highly available, replicated storage (if your platform provides it), but that doesn’t mean you should rush to decommission your Oracle estate and replace it with MySQL running in Kubernetes. Managing data adds a lot of complexity to your Kubernetes applications, and running stateful apps is only part of the problem. There are data backups, snapshots, and rollbacks to think about, and if you’re running in the cloud, a managed database service will probably give you that out of the box. But having your whole stack defined in Kubernetes manifests is pretty tempting, and some modern database servers are designed to run in a container platform; TiDB and CockroachDB are options worth looking at.
+这给我们带来了一个大问题:你是否应该使用 Kubernetes 来运行像数据库这样的有状态应用程序?这些功能都是为了给你提供高可用性的复制存储(如果你的平台提供的话)，但这并不意味着你应该急于退役你的Oracle资产，用运行在Kubernetes中的MySQL来代替它。管理数据给Kubernetes应用程序增加了很多复杂性，而运行有状态应用程序只是问题的一部分。需要考虑数据备份、快照和回滚，如果您在云中运行，托管数据库服务可能会为您提供开箱即用的服务。但是在Kubernetes清单中定义整个堆栈是非常诱人的，而且一些现代数据库服务器被设计为在容器平台中运行;TiDB和CockroachDB是值得一看的选项。
 
-All that’s left now is to tidy up your lab cluster before we move on to the lab.
+现在剩下的就是在我们进入实验室之前整理您的实验室集群。
 
-**TRY IT NOW** Delete all the objects from the manifests used in this chapter. You can ignore any errors you get, because not all the objects will exist when you run this.
-<b>现在就试试</b>
+<b>现在就试试</b> 从本章使用的清单中删除所有对象。您可以忽略所得到的任何错误，因为在运行此操作时，并非所有对象都将存在。
 
 ```
-# delete deployments, PVCs, PVs, and Services:
+# 删除 deployments, PVCs, PVs, and Services:
 kubectl delete -f pi/v1 -f sleep/ -f storageClass/ -f todo-list/web -f todo-list/postgres -f todo-list/
-# delete the custom storage class:
+# 删除自定义 storage class:
 kubectl delete sc kiamol
 ```
 
 ## 5.6 实验室
 
-These labs are meant to give you some experience in real-world Kubernetes problems, so I’m not going to ask you to replicate the exercise to clone the default storage class. Instead we have a new deployment of the to-do app, which has a couple of issues. We’re using a proxy in front of the web Pod to improve performance and a local database file inside the web Pod because this is just a development deployment. We need some persistent storage configured at the proxy layer and the web layer, so you can remove Pods and deployments, and the data still persists.
+这些实验旨在为您提供一些实际Kubernetes问题的经验，因此我不会要求您复制这个练习来克隆默认存储类。相反，我们有一个新的待办事项应用程序部署，它有几个问题。我们在web Pod前使用 Proxy 来提高性能，并在web Pod内使用本地数据库文件，因为这只是一个开发部署。我们需要在代理层和web层配置一些持久存储，这样你可以删除Pods和部署，而数据仍然可以保存。
 
-- Start by deploying the app manifests in the ch05/lab/todo-list folder; that creates the Services and Deployments for the proxy and web components.
-- Find the URL for the LoadBalancer, and try using the app. You’ll find it doesn’t respond, and you’ll need to dig into the logs to find out what’s wrong.
-- Your task is to configure persistent storage for the proxy cache files and for the database file in the web Pod. You should be able to find the mount targets from the log entries and the Pod spec.
-- When you have the app running, you should be able to add some data, delete all your Pods, refresh the browser, and see that your data is still there.
-- You can use any volume type or storage class that you like. This is a good opportunity to explore what your platform provides.
+- 首先在 ch05/lab/todo-list 文件夹中部署应用清单;它为代理和web组件创建 Service 和 Deployment。
+- 找到 LoadBalancer 的URL，并尝试使用该应用程序。你会发现它没有响应，你需要深入日志以找出问题所在.
+- 您的任务是为 Proxy 缓存文件和web Pod中的数据库文件配置持久存储。您应该能够从日志条目和Pod Spec 中找到挂载目标。
+- 当应用程序运行时，你应该能够添加一些数据，删除所有Pods，刷新浏览器，并看到你的数据仍然在那里。
+- 您可以使用任何您喜欢的卷类型或存储类。这是一个探索你的平台提供什么的好机会。
 
-My solution is on GitHub as usual for you to check if you need to: https://github.com/sixeyed/kiamol/blob/master/ch05/lab/README.md.
+我的解决方案像往常一样在GitHub上供你检查，如果你需要: https://github.com/yyong-brs/learn-kubernetes/blob/master/kiamol/ch05/lab/README.md.
