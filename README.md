@@ -81,3 +81,15 @@
     - 5.5 [理解 Kubernetes 中存储的选择](./chapter5.md#55-理解-kubernetes-中存储的选择)
 
     - 5.6 [实验室](./chapter5.md#56-实验室)
+
+  - 第六章 [通过 controllers 在多个 Pod 之间扩展应用](./chapter6.md)
+
+    - 6.1 [Kubernetes 如何大规模运行应用程序](./chapter6.md#61-kubernetes-如何大规模运行应用程序)
+
+    - 6.2 [使用 Deployments 和 ReplicaSets 来扩展负载](./chapter6.md#62-使用-deployments-和-replicasets-来扩展负载)
+
+    - 6.3 [使用 DaemonSets 实现高可用性](./chapter6.md#63-使用-daemonsets-实现高可用性)
+
+    - 6.4 [理解 Kubernetes 中的对象所有权](./chapter6.md#64-理解-kubernetes-中的对象所有权)
+
+    - 6.5 [实验室](./chapter6.md#65-实验室)
