@@ -386,45 +386,47 @@ statfulsets, DaemonSets, ReplicaSets和deployment是你用来建模应用的工�
 
 ## 6.4 理解 Kubernetes 中的对象所有权
 
-Controllers use a label selector to find objects that they manage, and the objects themselves keep a record of their owner in a metadata field. When you delete a controller, its managed objects still exist but not for long. Kubernetes runs a garbage collector process that looks for objects whose owner has been deleted, and it deletes them, too. Object ownership can model a hierarchy: Pods are owned by ReplicaSets, and ReplicaSets are owned by Deployments.
+控制器使用标签选择器来查找它们管理的对象，对象本身在 metadata 字段中保存其所有者的记录。删除控制器后，其管理对象仍然存在，但时间不会太长。Kubernetes运行一个垃圾收集器进程，该进程查找已删除所有者的对象，并删除它们。对象所有权可以建模层次结构:Pods由replicaset拥有，replicaset由deployment拥有。
 
-**TRY IT NOW** Look at the owner reference in the metadata fields for all Pods and ReplicaSets.
+<b>现在就试试</b> 查看所有 Pods 和 ReplicaSets 的 metadata 字段中的所有者引用。
 
 ```
-# check which objects own the Pods:
+# 检查哪些对象拥有Pods:
 kubectl get po -o custom-columns=NAME:'{.metadata.name}', OWNER:'{.metadata.ownerReferences[0].name}',OWNER_KIND:'{.metadata.ownerReferences[0].kind}'
-# check which objects own the ReplicaSets:
+# 检查哪些对象拥有 ReplicaSets:
 kubectl get rs -o custom-columns=NAME:'{.metadata.name}', OWNER:'{.metadata.ownerReferences[0].name}',OWNER_KIND:'{.metadata.ownerReferences[0].kind}'
 ```
 
-Figure 6.17 shows my output, where all of my Pods are owned by some other object, and all but one of my ReplicaSets are owned by a Deployment.
+图6.17显示了我的输出，其中我的所有pod都由其他对象拥有，而我的ReplicaSets中只有一个是由Deployment拥有的。
 
 ![图6.17](./images/Figure6.17.png)
-<center>图 6.17 Objects know who their owners are—you can find this in the object metadata.</center>
+<center>图 6.17 对象知道它们的所有者是谁——您可以在对象 metadata 中找到这一点。</center>
 
-Kubernetes does a good job of managing relationships, but you need to remember that controllers track their dependents using the label selector alone, so if you fiddle with labels, you could break that relationship. The default delete behavior is what you want most of the time, but you can stop cascading deletes using kubectl and delete only the controller—that removes the owner reference in the metadata for the dependents, so they don’t get picked up by the garbage collector.
+Kubernetes 在管理关系方面做得很好，但您需要记住，控制器仅使用标签选择器跟踪它们的依赖项，因此如果您更改了标签，可能会破坏这种关系。大多数情况下，默认的删除行为是您想要的，但是您可以使用kubectl停止级联删除，只删除控制器—这将删除依赖项元数据中的所有者引用，因此它们不会被垃圾收集器拾取。
 
-We’re going to finish up with a look at the architecture for the latest version of the Pi app, which we’ve deployed in this chapter. Figure 6.18 shows it in all its glory.
+我们将以我们在本章中部署的Pi应用程序的最新版本的架构来结束。图6.18显示了它的所有信息。
 
 ![图6.18](./images/Figure6.18.png)
-<center>图 6.18 The Pi application: no annotations necessary—the diagram should be crystal clear.</center>
+<center>图 6.18 Pi应用程序:不需要注释——图应该非常清晰。</center>
 
-Quite a lot is going on in this diagram: it’s a simple app, but the deployment is complex because it uses lots of Kubernetes features to get high availability, scale, and flexibility. By now you should be comfortable with all those Kubernetes resources, and you should understand how they fit together and when to use them. Around 150 lines of YAML define the application, but those YAML files are all you need to run this app on your laptop or on a 50-node cluster in the cloud. When someone new joins the project, if they have solid Kubernetes experience—or if they’ve read the first six chapters of this book—they can be productive straight away.
-That’s all for the first section. My apologies if you had to take a few extended lunchtimes this week, but now you have all the fundamentals of Kubernetes, with best practices built in. All we need to do is tidy up before you attempt the lab.
+这个图中包含了很多内容:它是一个简单的应用程序，但部署起来很复杂，因为它使用了大量 Kubernetes 特性来获得高可用性、伸缩性和灵活性。到目前为止，您应该已经熟悉了所有这些Kubernetes资源，并且应该了解它们是如何组合在一起的以及何时使用它们。大约有150行YAML定义了这个应用程序，但是这些YAML文件是在您的笔记本电脑或云中的50个节点集群上运行这个应用程序所需要的。当有人新加入这个项目时，如果他们有扎实的Kubernetes经验，或者如果他们已经阅读了本书的前六章，他们就可以立即高效地工作。
 
-**TRY IT NOW** All the top-level objects in this chapter had a kiamol label applied. Now that you understand cascading deletes, you’ll know that when you delete all those objects, all their dependents get deleted, too.
+以上就是第一部分的全部内容。如果你这周的午餐时间延长了，我很抱歉，但现在你已经掌握了Kubernetes的所有基础知识，并内置了最佳实践。我们要做的就是在你进入实验室之前清理一下。
+
+<b>现在就试试</b> 本章中所有顶级对象都应用了kiamol标签。现在您已经理解了级联删除，您将知道当您删除所有这些对象时，它们的所有依赖项也将被删除。
 
 ```
-# remove all the controllers and Services:
+# 删除所有的 controllers and Services:
 kubectl delete all -l kiamol=ch06
 ```
 
-## 6.5 Lab
-Kubernetes has changed a lot over the last few years. The controllers we’ve used in this chapter are the recommended ones, but there have been alternatives in the past. Your job in this lab is to take an app spec that uses some older approaches and update it to use the controllers you’ve learned about.
+## 6.5 实验室
 
-- Start by deploying the app in ch06/lab/numbers—it’s the random-number app from chapter 3 but with a strange configuration. And it’s broken.
-- You need to update the web component to use a controller that supports high load. We’ll want to run dozens of these in production.
-- The API needs to be updated, too. It needs to be replicated for high availability, but the app uses a hardware random-number generator attached to the server, which can be used by only one Pod at a time. Nodes with the right hardware have the label rng=hw (you’ll need to simulate that in your cluster).
-- This isn’t a clean upgrade, so you need to plan your deployment to make sure there’s no downtime for the web app.
+Kubernetes 在过去的几年里发生了很大的变化。我们在本章中使用的控制器是推荐的，但在过去也有替代方案。在这个实验室中，您的工作是使用一些旧方法的应用程序规范，并将其更新为使用您所了解的控制器。
 
-Sounds scary, but you shouldn’t find this too bad. My solution is on GitHub for you to check: https://github.com/sixeyed/kiamol/blob/master/ch06/lab/README.md.
+- 首先在ch06/lab/numbers中部署应用程序-这是第3章中的随机数应用程序，但配置很奇怪。它坏了。
+- 需要更新web组件以使用支持高负载的控制器。我们希望在生产环境中运行几十个这样的测试。
+- API也需要更新。它需要被复制以获得高可用性，但该应用程序使用了连接到服务器的硬件随机数生成器，一次只能被一个Pod使用。具有正确硬件的节点具有标签rng=hw(您需要在您的集群中模拟该标签)。
+- 这不是一个干净的升级，所以你需要计划你的部署，以确保没有停机的web应用程序。
+
+听起来很可怕，但你不应该觉得这太糟糕。我的解决方案在GitHub上供你查看: https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch06/lab/README.md.
