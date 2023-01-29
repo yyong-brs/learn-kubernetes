@@ -111,17 +111,16 @@ kubectl exec deploy/sleep -- sh -c 'for i in 1 2 3; do curl -w \\n -s http://who
 
 ## 6.2 使用 Deployments 和 ReplicaSets 来扩展负载
 
-ReplicaSets make it incredibly easy to scale your app: you can scale up or down in seconds just by changing the number of replicas in the spec. It’s perfect for stateless components that run in small,lean containers, and that’s why applications built for Kubernetes typically use a distributed architecture, breaking down functionality across many pieces, which can be individually updated and scaled.
+ReplicaSets 使得扩展应用变得非常容易:你可以在几秒钟内通过改变 spec 中的副本数量来扩展或缩小应用。它非常适合运行在小型精简容器中的无状态组件，这就是为什么 Kubernetes 构建的应用程序通常使用分布式架构，将功能分解为许多块，可以单独更新和扩展。
 
-Deployments add a useful management layer on top of ReplicaSets. Now that we know how they work, we won’t be using ReplicaSets directly anymore—Deployments should be your first choice for defining applications. We won’t explore all the features of Deployments until we get to application upgrades and rollbacks in chapter 9,but it’s useful to understand exactly what the extra abstraction gives you. Figure 6.6 shows this.
+部署在 ReplicaSets 之上添加了一个有用的管理层。既然我们知道了它们的工作原理，我们就不再直接使用 ReplicaSets 了—— Deployments 应该是定义应用程序的首选。在第9章介绍应用程序升级和回滚之前，我们不会探讨 deployment 的所有特性，但是准确地理解额外的抽象会给您带来什么是很有用的。图6.6显示了这一点。
 
 ![图6.6](./images/Figure6.6.png)
+<center>图 6.6 0 是所需副本的有效数量; Deployment 将旧的ReplicaSets缩小到零</center>
 
-<center>图 6.6 Zero is a valid number of desired replicas; Deployments scale down old ReplicaSets to zero.</center>
+Deployment 是 ReplicaSet 的一个控制器，为了大规模运行，您需要在Deployment spec 中包含相同的replicas字段，并将其传递给ReplicaSet。清单6.2显示了Pi web应用程序的缩略YAML，它显式地设置了两个副本。
 
-A Deployment is a controller for ReplicaSets, and to run at scale, you include the same replicas field in the Deployment spec, and that is passed to the ReplicaSet. Listing 6.2 shows the abbreviated YAML for the Pi web application, which explicitly sets two replicas.
-
-**Listing 6.2 web.yaml, a Deployment to run multiple replicas**
+> 清单 6.2 web.yaml, 一个 Deployment 运行多个副本
 
 ```
 apiVersion: apps/v1
@@ -129,143 +128,135 @@ kind: Deployment
 metadata:
   name: pi-web
 spec:
-  replicas: 2 # The replicas field is optional; it defaults to 1.
+  replicas: 2 # replicas 是可选项; 默认值 1.
 selector:
   matchLabels:
     app: pi-web
-  template: # The Pod spec follows.
+  template: # 后续就是 Pod 的 Template 配置.
 ```
 
-The label selector for the Deployment needs to match the labels defined in the Pod template, and those labels are used to express the chain of ownership from Pod to ReplicaSet to Deployment. When you scale a Deployment, it updates the existing ReplicaSet to set the new number of replicas, but if you change the Pod spec in the Deployment, it replaces the ReplicaSet and scales the previous one down to zero. That gives the Deployment a lot of control over how it manages the update and how it deals with any problems.
+Deployment 的标签选择器需要匹配 Pod 模板中定义的标签，这些标签用于表示从 Pod 到 ReplicaSet 到 Deployment 的所有权链。当您扩展一个 Deployment 时，它会更新现有的 ReplicaSet 以设置新的副本数量，但是如果您更改了 Deployment 中的 Pod spec，它会替换 ReplicaSet 并将之前的ReplicaSet缩小到零。这使得 Deployment 在如何管理更新以及如何处理任何问题方面拥有很大的控制权。
 
-**TRY IT NOW** Create a Deployment and Service for the Pi web application, and make some updates to see how the ReplicaSets are managed.
+<b>现在就试试</b> 为Pi web应用程序创建一个 Deployment和 Service，并进行一些更新，以查看如何管理ReplicaSets。
 
 ```
-# deploy the Pi app:
+# 部署 Pi app:
 kubectl apply -f pi/web/
-# check the ReplicaSet:
+# 检查 ReplicaSet:
 kubectl get rs -l app=pi-web
-# scale up to more replicas:
+# 增加副本 replicas:
 kubectl apply -f pi/web/update/web-replicas-3.yaml
-# check the RS:
+# 检查 RS:
 kubectl get rs -l app=pi-web
-# deploy a changed Pod spec with enhanced logging:
+# 使用增强的日志记录部署更改的 Pod Spec:
 kubectl apply -f pi/web/update/web-logging-level.yaml
-# check ReplicaSets again:
+# 再次检查 ReplicaSets:
 kubectl get rs -l app=pi-web
 ```
 
-This exercise shows that the ReplicaSet is still the scale mechanism: when you increase or decrease the number of replicas in your Deployment, it just updates the ReplicaSet. The Deployment is the, well, deployment mechanism, and it manages application updates through multiple ReplicaSets. My output, which appears in figure 6.7, shows how the Deployment waits for the new ReplicaSet to be fully operational before completely scaling down the old one.
+这个练习表明 ReplicaSet 仍然是缩放机制:当您增加或减少部署中的副本数量时，它只是更新ReplicaSet。Deployment是部署机制，它通过多个replicaset管理应用程序更新。我的输出(如图6.7所示)显示了Deployment如何等待新的ReplicaSet完全可操作，然后再完全缩小旧的ReplicaSet。
 
-You can use the kubectl scale command as a shortcut for scaling controllers. You should use it sparingly because it’s an imperative way to work, and it’s much better to use declarative YAML files, so that the state of your apps in production always exactly matches the spec stored in source control. But if your app is underperforming and the automated deployment takes 90 seconds, it’s a quick way to scale—as long as you remember to update the YAML file, too.
+![图6.7](./images/Figure6.7.png)
+<center>图 6.7 Deployments 管理 ReplicaSets 以在更新期间保持所需数量的pod可用</center>
 
-**TRY IT NOW** Scale up the Pi application using kubectl directly, and then see what happens with the ReplicaSets when another full deployment happens.
+可以使用 kubectl scale 命令作为缩放控制器的快捷方式。你应该谨慎使用它，因为它是一种强制的工作方式，使用声明性YAML文件要好得多，这样你的应用程序在生产中的状态总是与源代码控制中存储的规范完全匹配。但是，如果您的应用程序性能不佳，并且自动部署需要90秒，那么这是一种快速扩展的方法——只要您还记得更新YAML文件。
+
+<b>现在就试试</b> 直接使用 kubectl 扩展 Pi 应用程序，然后看看在另一个完全部署发生时ReplicaSets会发生什么。
 
 ```
-# we need to scale the Pi app fast:
+# 我们需要快速扩展 Pi app:
 kubectl scale --replicas=4 deploy/pi-web
-# check which ReplicaSet makes the change:
+# 检查哪一个 ReplicaSet 发生了变化:
 kubectl get rs -l app=pi-web
-# now we can revert back to the original logging level:
+# 现在我们可以恢复到原始的日志级别:
 kubectl apply -f pi/web/update/web-replicas-3.yaml
-# but that will undo the scale we set manually:
+# 但这将撤销我们手动设置的副本:
 kubectl get rs -l app=pi-web
-# check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=pi-web
 ```
 
-![图6.7](./images/Figure6.7.png)
-
-<center>图 6.7 Deployments manage ReplicaSets to keep the desired number of Pods available during updates.**
-
-You’ll see two things when you apply the updated YAML: the app scales back down to three replicas, and the Deployment does that by scaling the new ReplicaSet down to zero Pods and scaling the old ReplicaSet back up to three Pods. Figure 6.8 shows that the updated Deployment results in three new Pods being created.
-
-It shouldn’t be a surprise that the Deployment update overwrote the manual scale level; the YAML definition is the desired state, and Kubernetes does not attempt to retain any part of the current spec if the two differ. It might be more of a surprise that the Deployment reused the old ReplicaSet instead of creating a new one, but that’s a more efficient way for Kubernetes to work, and it’s possible because of more labels.
-
-Pods created from Deployments have a generated name that looks random but actually isn’t. The Pod name contains a hash of the template in the Pod spec for the Deployment, so if you make a change to the spec that matches a previous Deployment, then it will have the same template hash as a scaled-down ReplicaSet, and the Deployment can find that ReplicaSet and scale it up again to effect the change. The Pod template hash is stored in a label.
-
-**TRY IT NOW** Check out the labels for the Pi Pods and ReplicaSets to see the template hash.
+当你应用更新后的 YAML 时，你会看到两件事:应用程序缩小到三个副本，部署通过将新的ReplicaSet缩小到0个pod和将旧的ReplicaSet 回归到3个pod来实现这一点。图 6.8显示了更新后的Deployment将创建三个新的pod。
 
 ![图6.8](./images/Figure6.8.png)
+<center>图 6.8 Deployment 知道它们的 ReplicaSet 的 spec 信息，并且可以通过扩展旧的ReplicaSet来回滚。</center>
 
-<center>图 6.8 Deployments know the spec for their ReplicaSets and can roll back by scaling an old ReplicaSet.</center>
+部署更新覆盖了手动缩放级别，这并不奇怪;YAML定义是理想的状态，如果两者不一致，Kubernetes不会试图保留当前规范的任何部分。部署重用旧的ReplicaSet而不是创建一个新的ReplicaSet，这可能更令人惊讶，但这是Kubernetes工作的更有效的方式，因为有更多的标签。
 
-Pods created from Deployments have a generated name that looks random but actually isn’t. The Pod name contains a hash of the template in the Pod spec for the Deployment, so if you make a change to the spec that matches a previous Deployment, then it will have the same template hash as a scaled-down ReplicaSet, and the Deployment can find that ReplicaSet and scale it up again to effect the change. The Pod template hash is stored in a label.
+从部署中创建的Pods有一个生成的名称，看起来是随机的，但实际上不是。Pod名称包含部署的Pod spec 中的模板哈希，因此如果您对 spec 进行了与以前的部署相匹配的更改，那么它将具有与缩小的 ReplicaSet 相同的模板哈希，并且部署可以找到该 ReplicaSet 并再次扩大它以实现更改。Pod模板哈希存储在一个标签中。
 
-**TRY IT NOW** Check out the labels for the Pi Pods and ReplicaSets to see the template hash.
+<b>现在就试试</b> 查看Pi Pods和ReplicaSets的标签以查看 template hash 信息。
 
 ```
-# list ReplicaSets with labels:
+# 查询 ReplicaSets 并显示 labels:
 kubectl get rs -l app=pi-web --show-labels
-# list Pods with labels:
+# 查询 Pods 显示 labels:
 kubectl get po -l app=pi-web --show-labels
 ```
 
-Figure 6.9 shows that the template hash is included in the object name, but this is just for convenience—Kubernetes uses the labels for management.
+图6.9显示 template hash 包含在对象名称中，但这只是为了方便——kubernetes使用标签进行管理。
 
 ![图6.9](./images/Figure6.9.png)
+<center>图 6.9 Kubernetes 生成的对象名称不仅仅是随机的——它们包括 template hash 值</center>
 
-<center>图 6.9 Object names generated by Kubernetes aren’t just random—they include the template hash.</center>
+了解一个 Deployment 如何与它的 Pods 相关的内部机制，将帮助您理解更改是如何推出的，并在您看到大量Pod数为零的ReplicaSets时消除任何困惑。但是Pods中的计算层和服务中的网络层之间的交互是以相同的方式工作的。
 
-Knowing the internals of how a Deployment is related to its Pods will help you understand how changes are rolled out and clear up any confusion when you see lots of ReplicaSets with desired Pod counts of zero. But the interaction between the compute layer in the Pods and the network layer in the Services works in the same way.
+在典型的分布式应用程序中，每个组件都有不同的规模需求，您将使用 Service 来实现它们之间的多层负载平衡。到目前为止，我们部署的Pi应用程序只有一个ClusterIP Service——它不是面向公众的组件。公共组件是一个代理(实际上，它是一个反向代理，因为它处理传入流量而不是传出流量)，并且使用LoadBalancer Service。我们可以大规模地运行web组件和代理，并实现从客户端到代理Pods以及从代理到应用程序Pods的负载平衡。
 
-In a typical distributed application, you’ll have different scale requirements for each component, and you’ll make use of Services to achieve multiple layers of load balancing between them. The Pi application we’ve deployed so far has only a ClusterIP Service—it’s not a public-facing component. The public component is a proxy (actually, it’s a reverse proxy because it handles incoming traffic rather than outgoing traffic), and that uses a LoadBalancer Service. We can run both the web component and the proxy at scale and achieve load balancing from the client to the proxy Pods and from the proxy to the application Pods.
-
-**TRY IT NOW** Create the proxy Deployment, which runs with two replicas, along with a Service and ConfigMap, which sets up the integration with the Pi web app.
+<b>现在就试试</b> 创建代理 Deployment，它运行两个副本，以及一个Service和ConfigMap，用于设置与Pi web应用程序的集成。
 
 ```
-# deploy the proxy resources:
+# 部署 proxy 资源:
 kubectl apply -f pi/proxy/
-# get the URL to the proxied app:
+# 获取代理应用 URL:
 kubectl get svc whoami-web -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080/?dp=10000'
-# browse to the app, and try a few different values for 'dp' in the URL
+# 访问 app, 多尝试几个不同的  dp 参数值
 ```
 
-If you open the developer tools in your browser and look at the network requests, you can find the response headers sent by the proxy. These include the hostname of the proxy server—which is actually the Pod name—and the web page itself includes the name of the web application Pod that generated the response. My output, which appears in figure 6.10, shows a response that came from the proxy cache.
+如果您在浏览器中打开开发人员工具并查看网络请求，您可以找到代理发送的响应头。其中包括代理服务器的主机名(实际上是Pod名)，以及网页本身包括生成响应的web应用程序Pod的名称。我的输出(如图6.10所示)显示了来自代理缓存的响应。
 
 ![图6.10](./images/Figure6.10.png)
+<center>图 6.10 Pi的响应包括发送它们的Pod的名称，所以你可以看到负载均衡在工作。</center>
 
-<center>图 6.10 The Pi responses include the name of the Pod that sent them, so you can see the load balancing at work.</center>
-
-This configuration is a simple one, which makes it easy to scale. The Pod spec for the proxy uses two volumes: a ConfigMap to load the proxy configuration file and an EmptyDir to store the cached responses. ConfigMaps are read-only, so one ConfigMap can be shared by all the proxy Pods. EmptyDir volumes are writable, but they’re unique to the Pod, so each proxy gets its own volume to use for cache files. Figure 6.11 shows the setup.
+这个配置很简单，很容易扩展。代理的Pod spec 使用两个卷:ConfigMap用于加载代理配置文件，EmptyDir用于存储缓存的响应。ConfigMap是只读的，所以一个ConfigMap可以被所有的代理pod共享。EmptyDir卷是可写的，但它们对于Pod是唯一的，因此每个代理都有自己的卷用于缓存文件。图6.11显示了设置过程。
 
 ![图6.11](./images/Figure6.11.png)
 
-<center>图 6.11 Running Pods at scale—some types of volume can be shared, whereas others are unique to the Pod.</center>
+<center>图 6.11 大规模运行Pod——一些类型的卷可以共享，而另一些则是Pod独有的。</center>
 
-This architecture presents a problem, which you’ll see if you request Pi to a high number of decimal places and keep refreshing the browser. The first request will be slow because it is computed by the web app; subsequent responses will be fast, because they come from the proxy cache, but soon your request will go to a different proxy Pod that doesn’t have that response in its cache, so the page will load slowly again.
+这种架构提出了一个问题，如果您请求将 Pi 移到小数点后很多位，并不断刷新浏览器，您就会看到这个问题。第一个请求会很慢，因为它是由web应用程序计算的;随后的响应将很快，因为它们来自代理缓存，但很快你的请求将转到另一个代理Pod，它的缓存中没有响应，所以页面将再次加载缓慢。
 
-It would be nice to fix this by using shared storage, so every proxy Pod had access to the same cache. Doing so will bring us back to the tricky area of distributed storage that we thought we’d left behind in chapter 5, but let’s start with a simple approach and see where it gets us.
+通过使用共享存储来解决这个问题会很好，这样每个代理Pod都可以访问相同的缓存。这样做将把我们带回到分布式存储的棘手领域，我们认为我们已经在第5章中离开了，但是让我们从一个简单的方法开始，看看它会给我们带来什么。
 
-**TRY IT NOW** Deploy an update to the proxy spec, which uses a HostPath volume for cache files instead of an EmptyDir. Multiple Pods on the same node will use the same volume, which means they’ll have a shared proxy cache.
+<b>现在就试试</b>  部署对代理 spec 的更新，该更新使用HostPath卷来缓存文件，而不是EmptyDir卷。同一节点上的多个pod将使用相同的卷，这意味着它们将有一个共享的代理缓存。
 
 ```
-# deploy the updated spec:
+# 部署更新后的 spec:
 kubectl apply -f pi/proxy/update/nginx-hostPath.yaml
-# check the Pods—the new spec adds a third replica:
+# 检查 Pods—新的配置有 3个副本:
 kubectl get po -l app=pi-proxy
-# browse back to the Pi app, and refresh it a few times
-# check the proxy logs:
+# 访问 Pi app, 多刷新几次
+# 检查 proxy 的日志:
 kubectl logs -l app=pi-proxy --tail 1
 ```
 
-Now you should be able to refresh away to your heart’s content, and responses will always come from the cache, no matter which proxy Pod you are directed to. Figure 6.12 shows all my proxy Pods responding to requests, which are shared between them by the Service.
-For most stateful applications, this approach wouldn’t work. Apps that write data tend to assume they have exclusive access to the files, and if another instance of the same app tries to use the same file location, you’d get unexpected but disappointing results—like the app crashing or the data being corrupted. The reverse proxy I’m using is called Nginx; it’s unusually lenient here, and it will happily share its cache directory with other instances of itself.
-
-If your apps need scale and storage, you have a couple of other options for using different types of controller. In the rest of this chapter, we’ll look at the DaemonSet; the final type is the StatefulSet, which gets complicated quickly, and we’ll come to it in chapter 8 where it gets most of the chapter to itself. DaemonSets and StatefulSets are both Pod controllers, and although you’ll use them a lot less frequently than Deployments, you need to know what you can do with them because they enable some powerful patterns.
+现在你应该能够刷新到你想要的内容，并且响应总是来自缓存，无论你被指向哪个代理Pod。图6.12显示了所有响应请求的代理pod，这些请求由服务在它们之间共享。
+对于大多数有状态应用程序，这种方法不起作用。写数据的应用程序倾向于假设它们对文件有独占访问权，如果同一个应用程序的另一个实例试图使用相同的文件位置，你会得到意想不到但令人失望的结果——比如应用程序崩溃或数据损坏。我使用的反向代理叫做Nginx;它在这里非常宽容，并且它很乐意与它自己的其他实例共享它的缓存目录。
 
 ![图6.12](./images/Figure6.12.png)
+<center>图 6.12 在规模上，您可以使用标签选择器使用kubectl查看所有Pod日志</center>
 
-<center>图 6.12 At scale, you can see all the Pod logs with kubectl, using a label selector.</center>
+如果你的应用需要伸缩性和存储空间，你可以选择使用不同类型的控制器。在本章的剩余部分，我们将查看DaemonSet;最后一种类型是StatefulSet，它很快就会变得复杂，我们将在第8章讲到它，在那里它得到了本章的大部分内容。DaemonSets和StatefulSets都是Pod控制器，尽管使用它们的频率远低于 Deployment ，但您需要知道可以使用它们做什么，因为它们支持一些强大的模式。
 
 ## 6.3 使用 DaemonSets 实现高可用性
 
-The DaemonSet takes its name from the Linux daemon, which is usually a system process that runs constantly as a single instance in the background (the equivalent of a Windows Service in the Windows world). In Kubernetes, the DaemonSet runs a single replica of a Pod on every node in the cluster, or on a subset of nodes, if you add a selector in the spec.
-DaemonSets are common for infrastructure-level concerns, where you might want to grab information from every node and send it on to a central collector. A Pod runs on each node, grabbing just the data for that node. You don’t need to worry about any resource conflicts, because there will be only one Pod on the node. We’ll use DaemonSets later in this book to collect logs from Pods, and metrics about the node’s activity.
+DaemonSet 得名于 Linux 守护进程，它通常是一个在后台作为单个实例不断运行的系统进程(相当于Windows世界中的Windows Service)。在Kubernetes中，DaemonSet 在集群中的每个节点上运行 Pod 的单个副本，如果在 spec 中添加选择器，则在节点的子集上运行 Pod 的单个副本。
 
-You can also use them in your own designs when you want high availability without the load requirements for many replicas on each node. A reverse proxy is a good example: a single Nginx Pod can handle many thousands of concurrent connections, so you don’t necessarily need a lot of them, but you may want to be sure there’s one running on every node, so a local Pod can respond wherever the traffic lands. Listing 6.3 shows the abbreviated YAML for a DaemonSet—it looks much like the other controllers but without the replica count.
+daemonset 通常用于基础设施级的关注点，您可能希望从每个节点获取信息并将其发送到中央收集器。Pod 在每个节点上运行，只为该节点抓取数据。您不需要担心任何资源冲突，因为节点上只有一个Pod。我们将在本书后面使用 DaemonSets 从 Pods 收集日志，以及关于节点活动的度量。
 
-**Listing 6.3 nginx-ds.yaml, a DaemonSet for the proxy component**
+当您希望获得高可用性，而不需要在每个节点上加载多个副本时，也可以在自己的设计中使用它们。反向代理就是一个很好的例子:单个Nginx Pod可以处理数千个并发连接，所以你不一定需要很多，但你可能想确保每个节点上都有一个运行，这样本地Pod就可以响应任何流量到达的地方。清单6.3显示了daemonset的缩略YAML——它看起来很像其他控制器，但没有 replica 计数。
+
+> 清单 6.3 nginx-ds.yaml, 代理组件的 DamonSet
 
 ```
 apiVersion: apps/v1
@@ -274,128 +265,124 @@ metadata:
   name: pi-proxy
 spec:
   selector:
-    matchLabels: # DaemonSets use the same label selector mechanism.
-      app: pi-proxy # Finds the Pods that the set owns
+    matchLabels: # DaemonSets使用相同的标签选择器机制.
+      app: pi-proxy 
 template:
   metadata:
     labels:
-      app: pi-proxy # Labels applied to the Pods must match the selector.
+      app: pi-proxy # 应用于Pods的标签必须与选择器匹配。
 spec:
-# Pod spec follows
+# 后续就是 pod 常规的 spec 信息
 ```
 
-This spec for the proxy still uses a HostPath volume. That means each Pod will have its own proxy cache, so we don’t get ultimate performance from a shared cache. This approach would work for other stateful apps, which are fussier than Nginx, because there’s no issue with multiple instances using the same data files.
+代理的这个 spec 仍然使用HostPath卷。这意味着每个Pod都有自己的代理缓存，所以我们无法从共享缓存中获得最佳性能。这种方法适用于其他有状态应用，它们比Nginx更麻烦，因为多个实例使用相同的数据文件没有问题。
 
-**TRY IT NOW** You can’t convert from one type of controller to another, but we can make the change from Deployment to DaemonSet without breaking the app.
+<b>现在就试试</b> 你不能从一种类型的控制器转换为另一种类型的控制器，但是我们可以在不破坏应用程序的情况下将Deployment转换为DaemonSet。
 
 ```
-# deploy the DaemonSet:
+# 部署 DaemonSet:
 kubectl apply -f pi/proxy/daemonset/nginx-ds.yaml
-# check the endpoints used in the proxy service:
+# 检查代理服务中使用的端点:
 kubectl get endpoints pi-proxy
-# delete the Deployment:
+# 删除 Deployment:
 kubectl delete deploy pi-proxy
-# check the DaemonSet:
+# 检查 DaemonSet:
 kubectl get daemonset pi-proxy
-# check the Pods:
+# 检查 Pods:
 kubectl get po -l app=pi-proxy
-# refresh your latest Pi calculation on the browser
+# 在浏览器上刷新最新的圆周率计算
 ```
 
-Figure 6.13 shows my output. Creating the DaemonSet before removing the Deployment means there are always Pods available to receive requests from the Service. Deleting the Deployment first would make the app unavailable until the DaemonSet started. If you check the HTTP response headers, you should also see that your request came from the proxy cache, because the new DaemonSet Pod uses the same HostPath volume as the Deployment Pods.
+图 6.13 显示了我的输出。在删除 Deployment 之前创建DaemonSet意味着始终有可用的Pods来接收来自服务的请求。首先删除Deployment将使应用程序不可用，直到DaemonSet启动。如果您检查HTTP响应头，您还应该看到您的请求来自代理缓存，因为新的DaemonSet Pod使用与Deployment Pods相同的HostPath卷。
 
 ![图6.13](./images/Figure6.13.png)
+<center>图 6.13 你需要为一个大的改变计划部署的顺序，以保持你的应用在线</center>
 
-<center>图 6.13 You need to plan the order of the deployment for a big change to keep your app online.</center>
+我使用的是单节点集群，所以我的 DaemonSet 运行一个Pod;如果节点更多，每个节点上就有一个Pod。控制循环监视加入集群的节点，任何新节点都将在加入集群后立即启动一个副本Pod。控制器还会监视Pod状态，因此如果Pod被移除，则会启动一个替换。
 
-I’m using a single-node cluster, so my DaemonSet runs a single Pod; with more nodes, I’d have one Pod on each node. The control loop watches for nodes joining the cluster, and any new nodes will be scheduled to start a replica Pod as soon as they join. The controller also watches the Pod status, so if a Pod is removed, then a replacement starts up.
-
-**TRY IT NOW** Manually delete the proxy Pod. The DaemonSet will start a replacement.
+<b>现在就试试</b> 手动删除代理Pod。DaemonSet将启动一个替换。
 
 ```
-# check the status of the DaemonSet:
+# 检查 DaemonSet 状态:
 kubectl get ds pi-proxy
-# delete its Pod:
+# 删除 Pod:
 kubectl delete po -l app=pi-proxy
-# check the Pods:
+# 检查 Pods:
 kubectl get po -l app=pi-proxy
 ```
 
-If you refresh your browser while the Pod is being deleted, you’ll see it doesn’t respond until the DaemonSet has started a replacement. This is because you’re using a single-node lab cluster. Services send traffic only to running Pods, so in a multinode environment, the request would go to a node that still had a healthy Pod. Figure 6.14 shows my output.
+如果你在 Pod 被删除时刷新浏览器，你会看到它在 DaemonSet 启动替换之前没有响应。这是因为您使用的是单节点实验室集群。服务只向正在运行的Pod发送流量，因此在多节点环境中，请求将发送到仍然拥有健康Pod的节点。图6.14显示了我的输出。
 
 ![图6.14](./images/Figure6.14.png)
+<center>图 6.14 DaemonSets 监视节点和 pod，以确保始终满足所需的副本计数。</center>
 
-<center>图 6.14 DaemonSets watch nodes and Pods to ensure the desired replica count is always met.</center>
+需要 DaemonSet 的情况通常比只想在每个节点上运行Pod更加微妙。在这个代理示例中，您的生产集群可能只有一个可以从internet接收流量的节点子集，因此您希望只在这些节点上运行代理Pods。您可以通过标签来实现这一点，添加任何您想要标识节点的任意标签，然后在Pod spec 中选择该标签。清单6.4使用 nodeSelector字段显示了这一点。
 
-Situations where you need a DaemonSet are often a bit more nuanced than just wanting to run a Pod on every node. In this proxy example, your production cluster might have only a subset of nodes that can receive traffic from the internet, so you’d want to run proxy Pods only on those nodes. You can achieve that with labels, adding whatever arbitrary label you’d like to identify your nodes and then selecting that label in the Pod spec. Listing 6.4 shows this with a nodeSelector field.
-
-**Listing 6.4 nginx-ds-nodeSelector.yaml, a DaemonSet with node selection**
+> 清单 6.4 nginx-ds-nodeSelector.yaml, 配置了 node selection 的 daemonset
 
 ```
-# This is the Pod spec within the template field of the DaemonSet.
+# 这是在DaemonSet的 template 域中的Pod spec。
 spec:
   containers:
     # ...
   volumes:
     # ...
-  nodeSelector: # Pods will run only on certain nodes.
-    kiamol: ch06 # Selected with the label kiamol=ch06
+  nodeSelector: # Pods 将只在某些节点上运行.
+    kiamol: ch06 
 ```
 
-The DaemonSet controller doesn’t just watch to see nodes joining the cluster; it looks at all nodes to see if they match the requirements in the Pod spec. When you deploy this change, you’re telling the DaemonSet to run on only nodes that have the label kiamol set to the value of ch06. There will be no matching nodes in your cluster, so the DaemonSet will scale down to zero.
+DaemonSet 控制器不只是观察加入集群的节点;它会查看所有节点，看看它们是否符合Pod spec 中的要求。当你部署这个更改时，你会告诉DaemonSet只在标签kiamol设置为ch06值的节点上运行。集群中没有匹配的节点，因此DaemonSet将缩小到零。
 
-**TRY IT NOW** Update the DaemonSet to include the node selector from listing 6.4. Now there are no nodes that match the requirements, so the existing Pod will be removed. Then label a node, and a new Pod will be scheduled.
+<b>现在就试试</b> 更新 DaemonSet 以包含清单 6.4 中的节点选择器。现在没有符合要求的节点，所以现有Pod将被移除。然后标记一个节点，一个新的Pod将被调度。
 
 ```
-# update the DaemonSet spec:
+# 更新 DaemonSet spec:
 kubectl apply -f pi/proxy/daemonset/nginx-ds-nodeSelector.yaml
-# check the DS:
+# 检查 DS:
 kubectl get ds pi-proxy
-# check the Pods:
+# 检查 Pods:
 kubectl get po -l app=pi-proxy
-# now label a node in your cluster so it matches the selector:
+# 现在标记集群中的一个节点，使其与选择器匹配:
 kubectl label node $(kubectl get nodes -o jsonpath='{.items[0].metadata.name}') kiamol=ch06 --overwrite
-# check the Pods again:
+# 再次检查 pod:
 kubectl get ds pi-proxy
 ```
 
-You can see the control loop for the DaemonSet in action in figure 6.15. When the node selector is applied, no nodes meet the selector, so the desired replica count for the DaemonSet drops to zero. The existing Pod is one too many for the desired count, so it is removed. Then, when the node is labeled, there’s a match for the selector, and the desired count increases to one, so a new Pod is created.
+您可以在图 6.15 中看到 DaemonSet 的控制循环。当应用节点选择器时，没有节点符合选择器，因此DaemonSet所需的副本计数降为零。现有Pod对于所需的计数来说多了一个，因此将其删除。然后，当节点被标记时，有一个匹配的选择器，所需的计数增加到1，因此创建一个新的Pod。
 
 ![图6.15](./images/Figure6.15.png)
+<center>图 6.15 DaemonSets 监视节点及其标签，以及当前 Pod 状态。</center>
 
-<center>图 6.15 DaemonSets watch nodes and their labels, as well as the current Pod status.</center>
+DaemonSets 与 ReplicaSets 具有不同的控制循环，因为它们的逻辑需要监视节点活动以及Pod计数，但从根本上讲，它们都是管理Pod的控制器。所有控制器都对其托管对象的生命周期负责，但这些链接可能会断开。我们将在另一个练习中使用DaemonSet来演示如何将pod从控制器中释放出来。
 
-DaemonSets have a different control loop from ReplicaSets because their logic needs to watch node activity as well as Pod counts, but fundamentally, they are both controllers that manage Pods. All controllers are responsible for the life cycle of their managed objects, but the links can be broken. We’ll use the DaemonSet in one more exercise to show how Pods can be set free from their controllers.
-
-**TRY IT NOW** Kubectl has a cascade option on the delete command, which you can use to delete a controller without deleting its managed objects. Doing so leaves orphaned Pods behind, which can be adopted by another controller if they are a match for their previous owner.
+<b>现在就试试</b> Kubectl 在 delete 命令上有一个级联选项，您可以使用该选项删除控制器而不删除其管理对象。这样做会留下孤儿pod，如果它们与之前的主人匹配，就可以被另一个控制器收养。
 
 ```
-# delete the DaemonSet, but leave the Pod alone:
+# 删除 DaemonSet, 留下 Pod:
 kubectl delete ds pi-proxy --cascade=false
-# check the Pod:
+# 检查 pod:
 kubectl get po -l app=pi-proxy
-# recreate the DS:
+# 重新创建 DS:
 kubectl apply -f pi/proxy/daemonset/nginx-ds-nodeSelector.yaml
-# check the DS and Pod:
+# 检查 DS and Pod:
 kubectl get ds pi-proxy
 kubectl get po -l app=pi-proxy
-# delete the DS again, without the cascade option:
+# 再次删除 DS, 不增加 cascade 选项:
 kubectl delete ds pi-proxy
-# check the Pods:
+# 检查 Pods:
 kubectl get po -l app=pi-proxy
 ```
 
-Figure 6.16 shows the same Pod survives through the DaemonSet being deleted and recreated. The new DaemonSet requires a single Pod, and the existing Pod is a match for its template, so it becomes the manager of the Pod. When this DaemonSet is deleted, the Pod is removed too.
-
-Putting a halt on cascading deletes is one of those features you’re going to use rarely, but you’ll be very glad you knew about it when you do need it. In this scenario, you might be happy with all your existing Pods but have some maintenance tasks coming up on the nodes. Rather than have the DaemonSet adding and removing Pods while you work on the nodes, you could delete it and reinstate it after the maintenance is done.
-
-The example we’ve used here for DaemonSets is about high availability, but it’s limited to certain types of application—where you want multiple instances and it’s acceptable for each instance to have its own independent data store. Other applications where you need high availability might need to keep data synchronized between instances, and for those, you can use StatefulSets. Don’t skip on to chapter 8 yet, though, because you’ll learn some neat patterns in chapter 7 that help with stateful apps, too.
+图 6.16 显示了同一个 Pod 在 DaemonSet 被删除和重新创建的过程中仍然存在。新的 DaemonSet 需要一个Pod，现有的Pod与它的 template 匹配，因此它成为Pod的管理器。当这个DaemonSet被删除时，Pod也会被删除。
 
 ![图6.16](./images/Figure6.16.png)
+<center>图 6.16 孤儿 Pod 已经失去了他们的控制器，所以他们不再是高可用集的一部分。</center>
 
-<center>图 6.16 Orphaned Pods have lost their controller, so they're not part of a highly available set anymore.</center>
+暂停级联删除是您将很少使用的功能之一，但当您确实需要它时，您将非常高兴了解它。在这种情况下，您可能对现有的所有pod都很满意，但在节点上有一些维护任务。与让DaemonSet在处理节点时添加和删除Pods不同，您可以在维护完成后删除它并恢复它。
 
-StatefulSets, DaemonSets, ReplicaSets, and Deployments are the tools you use to model your apps, and they should give you enough flexibility to run pretty much any- thing in Kubernetes. We’ll finish this chapter with a quick look at how Kubernetes actually manages objects that own other objects, and then we’ll review how far we’ve come in this first section of the book.
+我们在这里为DaemonSets使用的示例是关于高可用性的，但它仅限于某些类型的应用程序——您需要多个实例，并且每个实例都有自己独立的数据存储是可以接受的。其他需要高可用性的应用程序可能需要在实例之间保持数据同步，对于这些应用程序，您可以使用StatefulSets。不过，不要直接跳到第8章，因为在第7章中你也会学到一些有助于有状态应用的简洁模式。
+
+statfulsets, DaemonSets, ReplicaSets和deployment是你用来建模应用的工具，它们应该给你足够的灵活性，让你在Kubernetes中运行几乎任何东西。我们将快速浏览一下Kubernetes实际上是如何管理拥有其他的对象来结束本章，然后我们将回顾本书第一部分的内容。
 
 ## 6.4 理解 Kubernetes 中的对象所有权
 
