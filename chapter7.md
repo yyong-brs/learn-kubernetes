@@ -1,17 +1,17 @@
 # 第七章 使用多容器 Pods 扩展应用程序
 
-We met Pods in chapter 2, when you learned that you can run many containers in one Pod, but you didn’t actually do it. In this chapter, you’re going to see how it works and understand the patterns it enables. This is the first of the more advanced topics in this part of the book, but it’s not a complicated subject—it just helps to have all the background knowledge from the previous chapters. Conceptually, it’s quite simple: one Pod runs many containers, which is typically your app container plus some helper containers. It’s what you can do with those helpers that makes this feature so interesting.
+我们在第 2 章中见识了 Pod，那时你知道你可以在一个 Pod 中运行多个容器，但实际上你并没有这样做。在本章中，您将看到它是如何工作的，并理解它所支持的模式。这是本书这一部分的第一个更高级的主题，但它不是一个复杂的主题——它只是帮助您了解前面章节的所有背景知识。从概念上讲，这很简单:一个Pod 运行许多容器，通常是您的应用程序容器加上一些 helper 容器。正是使用这些 helper 可以做的事情使得这个特性如此有趣。
 
-Containers in a Pod share the same virtual environment, so when one container takes an action, other containers can see it and react to it. They can even modify the intended action without the original container knowing. This behavior lets you model your application so that the app container is very simple—it just focuses on its work, and it has helpers that take care of integrating the app with other components and with the Kubernetes platform. It’s a great way to add a consistent management API to all your apps, whether new or legacy.
+Pod 中的容器共享相同的虚拟环境，因此当一个容器执行一个操作时，其他容器可以看到它并对其做出反应。它们甚至可以在原始容器不知道的情况下修改预期的操作。这种行为允许您对应用程序进行建模，这样应用程序容器就非常简单了——它只专注于自己的工作，并且有帮助程序负责将应用程序与其他组件和Kubernetes平台集成。这是向所有应用程序(无论是新应用程序还是旧应用程序)添加一致的管理API的好方法。
 
 ## 7.1 Pod 中多个容器如何通信
 
-The Pod is a virtual environment that creates a shared networking and filesystem space for one or more containers. The containers are isolated units; they have their own processes and environment variables, and they can use different images with different technology stacks. The Pod is a single unit, so when it is allocated to run on a node, all the Pod containers run on the same node. You can have one container running Python and another running Java, but you can’t have some Linux and some Windows containers in the same Pod (yet), because Linux containers need to run on a Linux node and Windows containers on a Windows node.
+Pod 是一个虚拟环境，为一个或多个容器创建共享网络和文件系统空间。容器是孤立的单元;它们有自己的流程和环境变量，并且可以使用不同技术堆栈的不同镜像。Pod 是一个单独的单元，因此当它被分配到一个节点上运行时，所有 Pod 容器都运行在同一个节点上。你可以让一个容器运行 Python，另一个运行 Java，但你不能让一些 Linux 容器和一些 Windows 容器在同一个Pod中(目前)，因为 Linux 容器需要运行在 Linux 节点上，而Windows 容器需要运行在 Windows 节点上。
 
-Containers in a Pod share the network, so each container has the same IP address—the IP address of the Pod. Multiple containers can receive external traffic, but they need to listen on different ports, and containers within the Pod can communicate using the localhost address. Each container has its own filesystem, but it can mount volumes from the Pod, so containers can exchange information by sharing the same mounts. Figure 7.1 shows the layout of a Pod with two containers.
+Pod 中的容器共享网络，因此每个容器都有相同的IP地址——Pod 的 IP 地址。多个容器可以接收外部流量，但它们需要侦听不同的端口，Pod 中的容器可以使用本地主机地址进行通信。每个容器都有自己的文件系统，但它可以从 Pod 挂载卷，因此容器可以通过共享相同的挂载来交换信息。图7.1显示了带有两个容器的 Pod 的布局。
 
-![Figure7.1](./images/Figure7.1.png)
-**Figure 7.1 The Pod is a shared network and storage environment for many containers.**
+![图7.1](./images/Figure7.1.png)
+<center>图 7.1 Pod 是许多容器的共享网络和存储环境</center>
 
 That’s all the theory we need for now, and as we go through the chapter, you’ll be surprised at some of the smart things you can do just with shared networking and disk. We’ll start with some simple exercises in this section to explore the Pod environment. Listing 7.1 shows the multicontainer Pod spec for a Deployment. Two containers are defined that happen to use the same image, and they both mount an EmptyDir volume, which is defined in the Pod.
 
@@ -59,8 +59,8 @@ My output, which appears in figure 7.2, shows the Pod has two containers with a 
 
 Both of the containers in that exercise use the sleep image, so they’re not doing anything, but the containers keep running, and the Pod stays available to work with. The containers both mount the EmptyDir volume from the Pod, so that’s a shared part of the filesystem, and you can use it in both containers.
 
-![Figure7.2](./images/Figure7.2.png)
-**Figure 7.2 You always work with a Pod as a single unit, except when you need to specify a container.**
+![图7.2](./images/Figure7.2.png)
+<center>图 7.2 You always work with a Pod as a single unit, except when you need to specify a container.</center>
 
 **TRY IT NOW** One container mounts the volume as read-write and the other one as read-only. You can write files in one container and read them in the other.
 
@@ -77,8 +77,8 @@ kubectl exec deploy/sleep -c file-reader -- sh -c 'echo more >> /data-ro/hostnam
 
 You’ll see when you run this exercise that the first container can write data into the shared volume, and the second container can read it, but it can’t write data itself. That’s because the volume mount is defined as read-only for the second container in this Pod spec. It’s not a generic Pod limitation; mounts can be defined as writable for multiple containers if you need that. Figure 7.3 shows my output.
 
-![Figure7.3](./images/Figure7.3.png)
-**Figure 7.3 Containers can mount the same Pod volume to share data but with different access levels.**
+![图7.3](./images/Figure7.3.png)
+<center>图 7.3 Containers can mount the same Pod volume to share data but with different access levels.</center>
 
 A good old empty directory volume shows its worth again here; it’s a simple scratch pad that all the Pod containers can access. Volumes are defined at the Pod level and mounted at the container level, which means you can use any type of volume or PVC and make it available for many containers to use. Decoupling the volume definition from the volume mount also allows selective sharing, so one container may be able to see Secrets whereas the others can’t.
 
@@ -133,15 +133,15 @@ kubectl get svc sleep -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:80
 kubectl logs -l app=sleep -c server
 ```
 
-![Figure7.4](./images/Figure7.4.png)
-**Figure 7.4 Network communication between containers in the same Pod is over localhost.**
+![图7.4](./images/Figure7.4.png)
+<center>图 7.4 Network communication between containers in the same Pod is over localhost.</center>
 
 Figure 7.5 shows my output. From the outside world, it’s just network traffic going to a Service, which gets routed to a Pod. The Pod is running multiple containers, but that’s a detail that is hidden from the consumer.
 
 You should be getting a feel for how powerful running multiple containers in a Pod is, and in the rest of the chapter, we’ll put the ideas to work in real-world scenarios. There’s one thing that needs to be stressed, though: a Pod is not a replacement for a VM, so don’t think you can run all the components of an app in one Pod. You might be tempted to model an app like that, with a web server container and an API container running in the same Pod—don’t. A Pod is a single unit, and it should be used for a single component of your app. Additional containers can be used to support the app container, but you shouldn’t be running different apps in the same Pod. Doing so ruins your ability to update, scale, and manage those components independently.
 
-![Figure7.5](./images/Figure7.5.png)
-**Figure 7.5 Services can route network requests to any Pod containers that have published ports.**
+![图7.5](./images/Figure7.5.png)
+<center>图 7.5 Services can route network requests to any Pod containers that have published ports.</center>
 
 ## 7.2 使用 init 容器设置应用程序
 
@@ -151,8 +151,8 @@ Init containers work differently from sidecars. You can have multiple init conta
 
 All containers can access volumes defined in the Pod, so the major use case is for an init container to write data that prepares the environment for the application container. Listing 7.3 shows a simple extension to the HTTP server in the sleep Pod from the previous exercise. An init container runs and generates an HTML file, which it writes in a mount for an EmptyDir volume. The server container responds to HTTP requests by sending the contents of that file.
 
-![Figure7.6](./images/Figure7.6.png)
-**Figure 7.6 Init containers are useful for startup tasks to prepare the Pod for the app containers.**
+![图7.6](./images/Figure7.6.png)
+<center>图 7.6 Init containers are useful for startup tasks to prepare the Pod for the app containers.</center>
 
 **Listing 7.3 sleep-with-html-server.yaml, an init container in the Pod spec**
 
@@ -186,8 +186,8 @@ kubectl exec deploy/sleep -c server -- ls -l /data-ro
 
 You’ll pick up a few things from this exercise. App containers are guaranteed not to run until init containers complete successfully, so your app can safely make assumptions about the environment that the init container prepares. In this case, the HTML file is sure to exist before the server container starts. Init containers are a different part of the Pod spec, but some management features work in the same way as app containers—you can read the logs from init containers even after they have exited. My output appears in figure 7.7.
 
-![Figure7.7](./images/Figure7.7.png)
-**Figure 7.7 Init containers are useful for preparing the Pod environment for app and sidecar containers.**
+![图7.7](./images/Figure7.7.png)
+<center>图 7.7 Init containers are useful for preparing the Pod environment for app and sidecar containers.</center>
 
 That still isn’t a very real-world example, though, so let’s do something better. We covered app configuration in chapter 4 and saw how to use environment variables, ConfigMaps, and Secrets to build up a hierarchy of configuration settings. That’s great if your app supports it, but many older apps don’t have that flexibility; they expect to find a single config file in one place, and they don’t go looking anywhere else. Let’s look at an app like that.
 
@@ -206,8 +206,8 @@ kubectl exec deploy/timecheck -- cat /config/appsettings.json
 
 You can see my output in figure 7.8. A limited configuration framework isn’t the only reason this app isn’t a good citizen in a container platform—there are no logs in the Pod, either—but we can address all the problems with additional containers in the Pod.
 
-![Figure7.8](./images/Figure7.8.png)
-**Figure 7.8 Older apps that use a single configuration source can’t benefit from a configuration hierarchy.**
+![图7.8](./images/Figure7.8.png)
+<center>图 7.8 Older apps that use a single configuration source can’t benefit from a configuration hierarchy.</center>
 
 An init container is a perfect tool to bring this app into line with the configuration approach we want to use for all our apps. We can store the settings in ConfigMaps, Secrets, and environment variables, and use an init container to read from all the different inputs, merge the contents, and write the output to the single file location that the app uses. Listing 7.4 shows the init container in the Pod spec.
 
@@ -256,8 +256,8 @@ You’ll see when you run this that the app works with the new configuration, an
 
 This approach works because the config file is loaded from a dedicated directory. Remember that a volume mount overwrites a directory from the image, if it already exists. If the app loaded a config file from the same directory as the app binaries, you couldn’t do this because the EmptyDir mount would overwrite the whole app folder. In that scenario, you would need an additional step in the app container startup to copy the config file from the mount into the application directory.
 
-![Figure7.9](./images/Figure7.9.png)
-**Figure 7.9 Init containers can change app behavior without changes to the app code or Docker image.**
+![图7.9](./images/Figure7.9.png)
+<center>图 7.9 Init containers can change app behavior without changes to the app code or Docker image.</center>
 
 Applying a standard configuration approach to nonstandard apps is a great use for init containers, but older apps still won’t play nicely in a modern platform, and that’s where sidecar containers can help.
 
@@ -310,8 +310,8 @@ Receiving configuration from the platform and writing logs to the platform are p
 
 Sidecars can help there, too, either by running custom containers, which provide information tailored to the app, or by having standard health and metrics container images, which you apply to all your Pod specs. We’ll round off the exercises using the timecheck app and add those features that make it a good citizen for Kubernetes. We’ll cheat, though, with some more static HTTP server containers, which you can see in listing 7.6.
 
-![Figure7.10](./images/Figure7.10.png)
-**Figure 7.10 Adapters bring a layer of consistency to Pods, making old apps behave like new apps.**
+![图7.10](./images/Figure7.10.png)
+<center>图 7.10 Adapters bring a layer of consistency to Pods, making old apps behave like new apps.</center>
 
 **Listing 7.6 timecheck-good-citizen.yaml, more sidecars to extend the app**
 
@@ -358,15 +358,15 @@ kubectl exec deploy/sleep -c sleep -- wget -q -O - http://timecheck:8081
 
 When you run the exercise, you’ll see everything works as expected, as shown in figure 7.11. You may also see the updates weren’t as speedy as you’re used to, with the new Pod taking longer to start up and the old Pod taking longer to terminate. The additional startup time is from having the init container, the app container, and all the sidecars—they all need to be ready before the new Pod is considered ready. The additional termination time is because the replaced Pod also had multiple containers, which are each given a grace period for the container process to shut down.
 
-![Figure7.11](./images/Figure7.11.png)
-**Figure 7.11 Multiple adapter sidecars give the app a consistent management API.**
+![图7.11](./images/Figure7.11.png)
+<center>图 7.11 Multiple adapter sidecars give the app a consistent management API.</center>
 
 There is an overhead to running all these sidecar containers as adapters. You’ve seen that it increases deployment times, but it also increases the ongoing compute requirements of the app—even storage and basic sidecars, which just tail log files and serve simple HTTP responses, all use memory and compute cycles. But if you want to move existing apps to Kubernetes that don’t have those features, it’s an acceptable approach to get all your apps behaving in the same way, as shown in figure 7.12.
 
 In the previous exercise, we used an old sleep Pod we had lying around to call the new HTTP endpoints for the timecheck app. Remember that Kubernetes has a flat networking model, where Pods can send traffic to any other Pods via a Service. You may want more control over the network communication in your app, and you can do that with sidecars, too, by running a proxy container that manages the outgoing traffic from your app container.
 
-![Figure7.12](./images/Figure7.12.png)
-**Figure 7.12 A consistent management API makes it easy to work with Pods—it doesn’t matter how the API is provided inside the Pod.**
+![图7.12](./images/Figure7.12.png)
+<center>图 7.12 A consistent management API makes it easy to work with Pods—it doesn’t matter how the API is provided inside the Pod.</center>
 
 ## 7.4 通过 ambassador 容器抽象连接
 
@@ -374,8 +374,8 @@ The ambassador pattern lets you control and simplify outgoing connections from y
 
 Taking control of the network away from the application is hugely powerful. A proxy container can do service discovery, load balancing, retries, and even layer encryption onto an unencrypted channel. Perhaps you’ve heard of the service mesh architecture, using technologies like Linkerd and Istio—they’re all powered by proxy sidecar containers in a variation of the ambassador pattern.
 
-![Figure7.13](./images/Figure7.13.png)
-**Figure 7.13 The ambassador pattern has lots of potential, from simplifying app logic to increasing performance.**
+![图7.13](./images/Figure7.13.png)
+<center>图 7.13 The ambassador pattern has lots of potential, from simplifying app logic to increasing performance.</center>
 
 We won’t use a service mesh architecture here because that would take us well past lunchtime and on into the night, but we’ll get a flavor of what it can do with a simplified example. The starting point is the random-number app we’ve used before. There’s a web app running in a Pod, which consumes an API running in another Pod. The API is the only component the web app uses, so ideally we would restrict network calls to any other address, but in the initial deployment that doesn’t happen.
 
@@ -393,8 +393,8 @@ kubectl exec deploy/numbers-web -c web -- wget -q -O -http://timecheck:8080
 
 The web Pod can reach the API using the ClusterIP Service and the domain name numbers-api, but it can also access any other address, which could be a URL on the public internet or another ClusterIP Service. Figure 7.14 shows the app can read the health endpoint of the timecheck app—that should be a private endpoint, and it might expose information that is useful to someone up to no good.
 
-![Figure7.14](./images/Figure7.14.png)
-**Figure 7.14 Kubernetes doesn’t have any default restrictions on outgoing connections from Pod containers.**
+![图7.14](./images/Figure7.14.png)
+<center>图 7.14 Kubernetes doesn’t have any default restrictions on outgoing connections from Pod containers.</center>
 
 You have a lot of options for restricting network access besides using a proxy sidecar, but the ambassador pattern comes with some additional features that make it worth considering. Listing 7.7 shows an update to the web app spec, using a simple proxy container as an ambassador.
 
@@ -440,8 +440,8 @@ Now the web app is decoupled even further from the API, because it doesn’t eve
 
 The ambassador for this web app proxies HTTP calls outside of the Pod, but the ambassador pattern is wider than that. It plugs into the network at the transport layer,so it can work on any kind of traffic. A database ambassador can make some smart choices, like sending queries to a read-only database replica and using only the master database for writes. That’s going to improve performance and scale, while keeping complex logic out of the application.
 
-![Figure7.15](./images/Figure7.15.png)
-**Figure 7.15 All network access is via the ambassador, which can implement its own access rules.**
+![图7.15](./images/Figure7.15.png)
+<center>图 7.15 All network access is via the ambassador, which can implement its own access rules.</center>
 
 We’ll round out the chapter by taking a closer look at what it means to use the Pod as a shared environment for many containers.
 
@@ -478,8 +478,8 @@ The Pod is a single compute environment, but when you add multiple moving parts 
 
 There’s one last part of the Pod environment that we haven’t covered: the compute layer. Pod containers have a shared network and can share parts of the filesystem, but they can’t access each other’s processes—the container boundary still provides compute isolation. That’s the default behavior, but in some cases, you want your sidecar to have access to the processes in the application container, either for interprocess communication or so the sidecar can fetch metrics about the app process.
 
-![Figure7.16](./images/Figure7.16.png)
-**igure 7.16 Adding more containers to your Pod spec adds more opportunities for the Pod to fail**
+![图7.16](./images/Figure7.16.png)
+<center>图 7.16 Adding more containers to your Pod spec adds more opportunities for the Pod to fail</center>
 
 You can enable this access with a simple setting in the Pod spec: shareProcess-Namespace: true. That means every container in the Pod shares the same compute space and can see each other’s processes.
 
@@ -498,8 +498,8 @@ kubectl exec deploy/sleep -c sleep -- ps
 
 You can see my output in figure 7.17. The sleep container can see all the server container’s processes, and it could happily kill them all and leave the Pod in a confused state.
 
-![Figure7.17](./images/Figure7.17.png)
-**Figure 7.17 You can configure a Pod so all containers can see all processes—use with care.**
+![图7.17](./images/Figure7.17.png)
+<center>图 7.17 You can configure a Pod so all containers can see all processes—use with care.</center>
 
 That’s all for multicontainer Pods. You’ve seen in this chapter that you can use init containers to prepare the environment for your application container and run sidecar containers to add features to your app, all without changing the app code or the Docker image. There are some caveats to using multiple containers, but it’s a pattern you’ll use often to extend your applications. Just remember that the Pod should be one logical component: I don’t want to see you running Nginx, WordPress, and MySQL in a single Pod just because you can. Let’s tidy up now and get ready for the lab.
 
