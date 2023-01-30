@@ -93,3 +93,19 @@
     - 6.4 [理解 Kubernetes 中的对象所有权](./chapter6.md#64-理解-kubernetes-中的对象所有权)
 
     - 6.5 [实验室](./chapter6.md#65-实验室)
+
+- **第二部分** 现实世界中的 Kubernetes
+
+  - 第七章 [使用多容器 Pods 扩展应用程序](./chapter7.md)
+
+    - 7.1 [Pod 中多个容器如何通信](./chapter7.md#71-pod-中多个容器如何通信)
+
+    - 7.2 [使用 init 容器设置应用程序](./chapter7.md#72-使用-init-容器设置应用程序)
+
+    - 7.3 [通过 adapter 容器以应用一致性](./chapter7.md#73-通过-adapter-容器以应用一致性)
+
+    - 7.4 [通过 ambassador 容器抽象连接](./chapter7.md#74-通过-ambassador-容器抽象连接)
+
+    - 7.5 [理解 Pod 环境](./chapter7.md#75-理解-pod-环境)
+
+    - 7.6 [实验室](./chapter7.md#76-实验室)
