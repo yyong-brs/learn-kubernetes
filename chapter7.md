@@ -13,135 +13,133 @@ Pod 中的容器共享网络，因此每个容器都有相同的IP地址——Po
 ![图7.1](./images/Figure7.1.png)
 <center>图 7.1 Pod 是许多容器的共享网络和存储环境</center>
 
-That’s all the theory we need for now, and as we go through the chapter, you’ll be surprised at some of the smart things you can do just with shared networking and disk. We’ll start with some simple exercises in this section to explore the Pod environment. Listing 7.1 shows the multicontainer Pod spec for a Deployment. Two containers are defined that happen to use the same image, and they both mount an EmptyDir volume, which is defined in the Pod.
+这就是我们现在需要的所有理论，当我们阅读本章时，您会惊讶地发现仅使用共享网络和磁盘就可以完成一些聪明的事情。在本节中，我们将从一些简单的练习开始探索 Pod 环境。清单7.1显示了一个 Deployment 的多容器 Pod Spec 配置。定义了恰好使用相同镜像的两个容器，它们都挂载了 Pod 中定义的 EmptyDir 卷。
 
-**Listing 7.1 sleep-with-file-reader.yaml, a simple multicontainer Pod spec**
+> 清单 7.1 sleep-with-file-reader.yaml, 一个简单的多容器 Pod spec
 
 ```
 spec:
-  containers: # The containers field is an array.
+  containers: # containers 字段是个数组
     - name: sleep
       image: kiamol/ch03-sleep
       volumeMounts:
         - name: data
-          mountPath: /data-rw # Mounts a volume as writable
-    - name: file-reader # Containers need different names.
-      image: kiamol/ch03-sleep # But containers can use the same or
-                               # different images.
+          mountPath: /data-rw # 可写挂载一个卷
+    - name: file-reader # 多个容器的名字不能一样
+      image: kiamol/ch03-sleep # 但是可以使用相同或者不同的镜像
       volumeMounts:
         - name: data
           mountPath: /data-ro
-          readOnly: true # Mounts the same volume as read-only
+          readOnly: true # 只读挂载同一个卷
   volumes:
-    - name: data # Volumes can be mounted by many
+    - name: data # Volumes 可以被多个目标挂载
       containers.
         emptyDir: {}
 ```
 
-This is a single Pod spec that runs two containers. When you deploy it, you’ll see that there are some differences in how you work with multicontainer Pods.
+这是一个运行两个容器的 Pod Spec。当您部署它时，您将看到在如何使用多容器 Pods 方面存在的一些差异。
 
-**TRY IT NOW** Deploy listing 7.1, and run a Pod with two containers.
+<b>现在就试试</b> 部署清单 7.1, 运行两个容器的 Pod
 
 ```
-# switch to the chapter folder:
+# 进入到章节练习目录:
 cd ch07
-# deploy the Pod spec:
+# 部署 Pod:
 kubectl apply -f sleep/sleep-with-file-reader.yaml
-# get the detailed Pod information:
+# 查看 Pod 详细信息:
 kubectl get pod -l app=sleep -o wide
-# show the container names:
+# 显示 container 名称:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[*].name}'
-# check the Pod logs—this will fail:
+# 检查日志—将会失败:
 kubectl logs -l app=sleep
 ```
 
-My output, which appears in figure 7.2, shows the Pod has two containers with a single IP address, which both run on the same node. You can see the details of the Pod as a single unit, but you can’t print the logs at a Pod level; you need to specify a container from which to fetch the logs.
-
-Both of the containers in that exercise use the sleep image, so they’re not doing anything, but the containers keep running, and the Pod stays available to work with. The containers both mount the EmptyDir volume from the Pod, so that’s a shared part of the filesystem, and you can use it in both containers.
+我的输出(如图 7.2 所示)显示Pod有两个具有单个IP地址的容器，它们都运行在同一个节点上。您可以看到 Pod 作为单个单元的详细信息，但不能在Pod级别打印日志;您需要指定一个容器，从中获取日志。
 
 ![图7.2](./images/Figure7.2.png)
-<center>图 7.2 You always work with a Pod as a single unit, except when you need to specify a container.</center>
+<center>图 7.2 您总是将 Pod 作为单个单元使用，除非需要指定容器</center>
 
-**TRY IT NOW** One container mounts the volume as read-write and the other one as read-only. You can write files in one container and read them in the other.
+该练习中的两个容器都使用 sleep 镜像，因此它们没有做任何事情，但容器继续运行，Pod保持可用。这两个容器都从 Pod 挂载 EmptyDir 卷，因此这是文件系统的共享部分，您可以在两个容器中使用它。
+
+<b>现在就试试</b> 一个容器以读写方式挂载卷，另一个容器以只读方式挂载卷。您可以在一个容器中写入文件，在另一个容器中读取文件。
 
 ```
-# write a file to the shared volume using one container:
+# 使用一个容器将文件写入共享卷:
 kubectl exec deploy/sleep -c sleep -- sh -c 'echo ${HOSTNAME} > /data-rw/hostname.txt'
-# read the file using the same container:
+# 使用相同的容器读取文件:
 kubectl exec deploy/sleep -c sleep -- cat /data-rw/hostname.txt
-# read the file using the other container:
+# 使用另一个容器读取文件:
 kubectl exec deploy/sleep -c file-reader -- cat /data-ro/hostname.txt
-# try to add to the file to the read-only container—this will fail:
+# 尝试将文件添加到只读容器-这将失败:
 kubectl exec deploy/sleep -c file-reader -- sh -c 'echo more >> /data-ro/hostname.txt'
 ```
 
-You’ll see when you run this exercise that the first container can write data into the shared volume, and the second container can read it, but it can’t write data itself. That’s because the volume mount is defined as read-only for the second container in this Pod spec. It’s not a generic Pod limitation; mounts can be defined as writable for multiple containers if you need that. Figure 7.3 shows my output.
+在运行这个练习时，您将看到第一个容器可以向共享卷写入数据，第二个容器可以读取数据，但它本身不能写入数据。这是因为在Pod spec 中，第二个容器的卷挂载被定义为只读。这不是一般的 Pod 限制;如果需要，可以将挂载定义为多个容器的可写。图7.3显示了我的输出。
 
 ![图7.3](./images/Figure7.3.png)
-<center>图 7.3 Containers can mount the same Pod volume to share data but with different access levels.</center>
+<center>图 7.3 容器可以挂载相同的Pod卷以共享数据，但具有不同的访问级别。</center>
 
-A good old empty directory volume shows its worth again here; it’s a simple scratch pad that all the Pod containers can access. Volumes are defined at the Pod level and mounted at the container level, which means you can use any type of volume or PVC and make it available for many containers to use. Decoupling the volume definition from the volume mount also allows selective sharing, so one container may be able to see Secrets whereas the others can’t.
+一个好的 empty 卷在这里再次显示了它的价值;这是一个简单的便签，所有的 Pod 容器都可以访问。卷是在 Pod 级别定义的，并安装在容器级别，这意味着您可以使用任何类型的卷或PVC，并使其可供许多容器使用。将卷定义与卷挂载解耦还允许选择性共享，因此一个容器可能能够看到Secrets，而其他容器则不能。
 
-The other shared space is the network, where containers can listen on different ports and provide independent pieces of functionality. This is useful if your app con- tainer is doing some background work but doesn’t have any features to report on progress. Another container in the same Pod can provide a REST API, which reports on what the app container is doing.
-Listing 7.2 shows a simplified version of this process. This is an update to the sleep deployment that replaces the file-sharing container with a new container spec that runs a simple HTTP server.
+另一个共享空间是网络，其中容器可以侦听不同的端口并提供独立的功能。如果你的应用容器正在做一些后台工作，但没有任何功能来报告进度，这是很有用的。同一Pod中的另一个容器可以提供REST API，该API报告应用程序容器正在做什么。
+清单7.2显示了这个过程的简化版本。这是对sleep deployment 的更新，它将文件共享容器替换为运行简单 HTTP 服务的新容器 spec。
 
-**Listing 7.2 sleep-with-server.yaml, running a web server in a second container**
+> 清单 7.2 sleep-with-server.yaml, 在另一个容器里面运行 web 服务
 
 ```
 spec:
   containers:
     - name: sleep
-      image: kiamol/ch03-sleep # The same container spec as listing 7.1
+      image: kiamol/ch03-sleep # 和清单 7.1 相同的容器
     - name: server
-      image: kiamol/ch03-sleep # The second container is different.
+      image: kiamol/ch03-sleep # 第二个容器不一样
       command: ['sh', '-c', "while true; do echo -e 'HTTP/1.1 ..."]
     ports:
-      - containerPort: 8080 # Including the port just documents
-                            # which port the application uses.
+      - containerPort: 8080 # 包括端口只记录应用程序使用的端口。
 ```
 
-Now the Pod will run with the original app container—the sleep container, which isn’t really doing anything—and a server container, which provides an HTTP endpoint on port 8080. The two containers share the same network space, so the sleep container can access the server using the localhost address.
+现在 Pod 将使用原始的应用程序容器(sleep 容器，实际上什么都不做)和服务器容器(在端口8080上提供HTTP端点)运行。这两个容器共享相同的网络空间，因此 Sleep 容器可以使用本地主机地址访问服务器。
 
-**TRY IT NOW** Update the sleep Deployment using the file from listing 7.2, and confirm that the server container is accessible.
+<b>现在就试试</b> 使用清单 7.2 中的文件更新 sleep Deployment，并确认 server 容器是可访问的。
 
 ```
-# deploy the update:
+# 部署更新的内容:
 kubectl apply -f sleep/sleep-with-server.yaml
-# check the Pod status:
+# 检查 Pod 状态:
 kubectl get pods -l app=sleep
-# list the container names in the new Pod:
+# 列出新 Pod 中容器的名称:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[*].name}'
-# make a network call between the containers:
+# 在容器之间进行网络调用:
 kubectl exec deploy/sleep -c sleep -- wget -q -O - localhost:8080
-# check the server container logs:
+# 检查 server 容器 logs:
 kubectl logs -l app=sleep -c server
 ```
 
-You can see my output in figure 7.4. Although these are separate containers, at the network level they function as though they were different processes running on the same machine, using the local address for communication.
-
-It’s not just within the Pod that the network is shared. The Pod has an IP address on the cluster, and if any containers in the Pod are listening on ports, then other Pods can access them. You can create a Service that routes traffic to the Pod on a specific port, and whichever container is listening on that port will receive the request.
-
-**TRY IT NOW** Use a kubectl command to expose the Pod port—this is a quick way to create a Service without writing YAML—and then test that the HTTP server is accessible externally.
-
-```
-# create a Service targeting the server container port:
-kubectl expose -f sleep/sleep-with-server.yaml --type LoadBalancer --port 8020 --target-port 8080
-# get the URL for your service:
-kubectl get svc sleep -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8020'
-# open the URL in your browser
-# check the server container logs:
-kubectl logs -l app=sleep -c server
-```
+可以在图 7.4 中看到我的输出。虽然它们是独立的容器，但在网络级别上，它们的功能就像运行在同一台机器上的不同进程一样，使用本地地址进行通信。
 
 ![图7.4](./images/Figure7.4.png)
-<center>图 7.4 Network communication between containers in the same Pod is over localhost.</center>
+<center>图 7.4 同一 Pod 中的容器之间的网络通信是通过本地主机进行的 </center>
 
-Figure 7.5 shows my output. From the outside world, it’s just network traffic going to a Service, which gets routed to a Pod. The Pod is running multiple containers, but that’s a detail that is hidden from the consumer.
+网络不仅在 Pod 内部是共享的。Pod 在集群上有一个 IP 地址，如果 Pod 中的任何容器正在侦听端口，那么其他 Pod 就可以访问它们。您可以创建一个Service，将流量路由到特定端口上的 Pod，在该端口上侦听的容器将接收请求。
 
-You should be getting a feel for how powerful running multiple containers in a Pod is, and in the rest of the chapter, we’ll put the ideas to work in real-world scenarios. There’s one thing that needs to be stressed, though: a Pod is not a replacement for a VM, so don’t think you can run all the components of an app in one Pod. You might be tempted to model an app like that, with a web server container and an API container running in the same Pod—don’t. A Pod is a single unit, and it should be used for a single component of your app. Additional containers can be used to support the app container, but you shouldn’t be running different apps in the same Pod. Doing so ruins your ability to update, scale, and manage those components independently.
+<b>现在就试试</b> 使用 kubectl 命令公开 Pod 端口——这是一种无需编写yaml就可以快速创建服务的方法，然后测试HTTP服务是否可以从外部访问。
+
+```
+# 创建一个针对 server 容器端口的 Service:
+kubectl expose -f sleep/sleep-with-server.yaml --type LoadBalancer --port 8020 --target-port 8080
+# 获取你的 service 的URL:
+kubectl get svc sleep -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8020'
+# 打开浏览器输入地址
+# 检查 server 容器日志:
+kubectl logs -l app=sleep -c server
+```
+
+图 7.5 显示了我的输出。从外部世界来看，它只是流向服务的网络流量，服务被路由到Pod。Pod正在运行多个容器，但这是一个对消费者隐藏的细节。
 
 ![图7.5](./images/Figure7.5.png)
-<center>图 7.5 Services can route network requests to any Pod containers that have published ports.</center>
+<center>图 7.5 Service 可以将网络请求路由到任何已发布端口的Pod容器</center>
+
+你应该能感受到在 Pod 中运行多个容器是多么强大，在本章的剩余部分，我们将把这些想法应用到现实场景中。有一件事需要强调:Pod不是 VM 的替代品，所以不要认为你可以在一个 Pod 中运行应用程序的所有组件。你可能会想用一个web服务器容器和一个 API 容器在同一个 pod 中运行来建模一个应用程序。Pod是一个单独的单元，它应该用于应用程序的单个组件。可以使用其他容器来支持应用程序容器，但你不应该在同一个 Pod 中运行不同的应用程序。这样做会破坏您独立更新、扩展和管理这些组件的能力。
 
 ## 7.2 使用 init 容器设置应用程序
 
@@ -169,7 +167,7 @@ spec: # Pod spec in the Deployment template
 
 This example uses the same sleep image for the init container, but it can be any image. You might use an init container to set up the application environment using tools that you don’t want to be present in the running application. An init container can use a Docker image with the Git command line installed and clone a repository into the shared filesystem. The app container can access to the files without you having to set up the Git client in your app image.
 
-**TRY IT NOW** Deploy the update from listing 7.3, and see how init containers work.
+<b>现在就试试</b> Deploy the update from listing 7.3, and see how init containers work.
 
 ```
 # apply the updated spec with the init container:
@@ -191,7 +189,7 @@ You’ll pick up a few things from this exercise. App containers are guaranteed 
 
 That still isn’t a very real-world example, though, so let’s do something better. We covered app configuration in chapter 4 and saw how to use environment variables, ConfigMaps, and Secrets to build up a hierarchy of configuration settings. That’s great if your app supports it, but many older apps don’t have that flexibility; they expect to find a single config file in one place, and they don’t go looking anywhere else. Let’s look at an app like that.
 
-**TRY IT NOW** This chapter has a new demo app, because if I’m getting bored with looking at Pi, then you must be, too. This one isn’t much more fun, but at least it’s different. It just writes a timestamp to a log file every few seconds. It has an old-style configuration framework, so we can’t use any of the configuration techniques we’ve learned so far.
+<b>现在就试试</b> This chapter has a new demo app, because if I’m getting bored with looking at Pi, then you must be, too. This one isn’t much more fun, but at least it’s different. It just writes a timestamp to a log file every few seconds. It has an old-style configuration framework, so we can’t use any of the configuration techniques we’ve learned so far.
 
 ```
 # run the app, which uses a single config file:
@@ -239,7 +237,7 @@ There are a few things to note before we update the deployment:
 - Containers map the volumes they need. Both containers mount the EmptyDir volume, which they share, but only the init container mounts the ConfigMap.
 When we apply this update, the app’s behavior will change in line with the ConfigMap and environment variables, even though the app container doesn’t use them as configuration sources.
 
-**TRY IT NOW** Update the timecheck app using listing 7.4 so the app container is configured from multiple sources.
+<b>现在就试试</b> Update the timecheck app using listing 7.4 so the app container is configured from multiple sources.
 
 ```
 # apply the ConfigMap and the new Deployment spec:
@@ -289,7 +287,7 @@ containers:
 
 All the sidecar does is mount the log volume (go EmptyDir!) and use the standard Linux tail command to read from the log file. The -f option means the command will follow the file; effectively, it just sits and watches for new writes, and when any lines are written to the file, they’re echoed to standard out. It’s a relay that adapts the app’s actual logging implementation to the expectations of Kubernetes.
 
-**TRY IT NOW** Apply the update from listing 7.5, and check the app logs are available.
+<b>现在就试试</b> Apply the update from listing 7.5, and check the app logs are available.
 
 ```
 # add the sidecar logging container:
@@ -341,7 +339,7 @@ containers: # The previous app and logging containers are the same.
 
 The full YAML file also includes a ClusterIP Service, which publishes on port 8080 for the health endpoint and port 8081 for the metrics endpoint. In a production cluster, these would be used by other components to collect monitoring stats. The Deployment is an extension of the previous releases, so the app uses an init container for configuration and has a logging sidecar along with the new sidecars.
 
-**TRY IT NOW** Deploy the update, and check the new management endpoints for the health and performance of the app.
+<b>现在就试试</b> Deploy the update, and check the new management endpoints for the health and performance of the app.
 
 ```
 # apply the update:
@@ -379,7 +377,7 @@ Taking control of the network away from the application is hugely powerful. A pr
 
 We won’t use a service mesh architecture here because that would take us well past lunchtime and on into the night, but we’ll get a flavor of what it can do with a simplified example. The starting point is the random-number app we’ve used before. There’s a web app running in a Pod, which consumes an API running in another Pod. The API is the only component the web app uses, so ideally we would restrict network calls to any other address, but in the initial deployment that doesn’t happen.
 
-**TRY IT NOW** Run the random-number app, and verify that the web app container can use any network address.
+<b>现在就试试</b> Run the random-number app, and verify that the web app container can use any network address.
 
 ```
 # deploy the app and Services:
@@ -422,7 +420,7 @@ containers:
 
 This example shows the major pieces of the ambassador pattern: the app container uses localhost addresses for any services it consumes, and it’s configured to route all network calls through the proxy container. The proxy is a custom app that logs network calls, maps localhost addresses to real addresses, and blocks any addresses that are not listed in the map. All that becomes functionality in the Pod, but it’s transparent to the application container.
 
-**TRY IT NOW** Update the random-number app, and confirm the network is now locked down.
+<b>现在就试试</b> Update the random-number app, and confirm the network is now locked down.
 
 ```
 # apply the update from listing 7.5:
@@ -450,7 +448,7 @@ We’ll round out the chapter by taking a closer look at what it means to use th
 The Pod is a boundary around one or more containers, just like the container is a boundary around one or more processes. Pods create layers of virtualization without adding overhead, so they’re flexible and efficient. The cost of that flexibility is—as always—complexity, and you need to be aware of some nuances to working with multicontainer Pods.
 The main thing to understand is that the Pod is still the single unit of compute, even if lots of containers are running inside it. Pods aren’t ready until all the containers in the Pod are ready, and Services send traffic only to Pods that are ready. Adding sidecars and init containers adds to the failure modes for your application.
 
-**TRY IT NOW** You can break your application if an init container fails. This update to the numbers app won’t be successful because the init container is misconfigured.
+<b>现在就试试</b> You can break your application if an init container fails. This update to the numbers app won’t be successful because the init container is misconfigured.
 
 ```
 # apply the update:
@@ -483,7 +481,7 @@ There’s one last part of the Pod environment that we haven’t covered: the co
 
 You can enable this access with a simple setting in the Pod spec: shareProcess-Namespace: true. That means every container in the Pod shares the same compute space and can see each other’s processes.
 
-**TRY IT NOW** Deploy an update to the sleep Pod so the containers use a shared compute space and can access each other’s processes.
+<b>现在就试试</b> Deploy an update to the sleep Pod so the containers use a shared compute space and can access each other’s processes.
 
 ```
 # check the processes in the current container:
@@ -503,7 +501,7 @@ You can see my output in figure 7.17. The sleep container can see all the server
 
 That’s all for multicontainer Pods. You’ve seen in this chapter that you can use init containers to prepare the environment for your application container and run sidecar containers to add features to your app, all without changing the app code or the Docker image. There are some caveats to using multiple containers, but it’s a pattern you’ll use often to extend your applications. Just remember that the Pod should be one logical component: I don’t want to see you running Nginx, WordPress, and MySQL in a single Pod just because you can. Let’s tidy up now and get ready for the lab.
 
-**TRY IT NOW** Remove everything matching this chapter’s label.
+<b>现在就试试</b> Remove everything matching this chapter’s label.
 
 ```
 kubectl delete all -l kiamol=ch07
