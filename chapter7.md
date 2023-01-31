@@ -143,49 +143,49 @@ kubectl logs -l app=sleep -c server
 
 ## 7.2 使用 init 容器设置应用程序
 
-So far we’ve run Pods with multiple containers where all the containers run in parallel: they start together, and the Pod isn’t considered to be ready until all the containers are ready. You’ll hear that referred to as the sidecar pattern, which reinforces the idea that additional containers (the sidecars) play a supporting role to the application container (the motorcycle). There’s another pattern that Kubernetes supports when you need a container to run before the app container to set up part of the environment. This is called an init container.
+到目前为止，我们已经运行了带有多个容器的 Pod，其中所有容器都是并行运行的:它们一起启动，直到所有容器都准备好了，Pod 才被认为是准备好了。您将听到一种被称为 sidecar 的模式，它强化了附加容器(sidecar)对应用程序容器(摩托车)发挥支持作用的想法。Kubernetes 还支持另一种模式，当你需要在应用容器之前运行一个容器来设置部分环境时。这被称为 init 容器。
 
-Init containers work differently from sidecars. You can have multiple init containers defined for the Pod, and they run in sequence, in the order in which they’re written in the Pod spec. Each init container needs to complete successfully before the next one starts, and all must complete successfully before the Pod containers are started. Figure 7.6 shows the startup sequence for a Pod with init containers.
-
-All containers can access volumes defined in the Pod, so the major use case is for an init container to write data that prepares the environment for the application container. Listing 7.3 shows a simple extension to the HTTP server in the sleep Pod from the previous exercise. An init container runs and generates an HTML file, which it writes in a mount for an EmptyDir volume. The server container responds to HTTP requests by sending the contents of that file.
+Init 容器的工作方式与 sidecars 不同。你可以为 Pod 定义多个 init 容器，它们按照 Pod spec 中写的顺序依次运行。每个 init 容器需要在下一个容器启动之前成功完成，并且所有的 init 容器都必须在 Pod 容器启动之前成功完成。图 7.6 显示了带有 init 容器的 Pod 的启动顺序。
 
 ![图7.6](./images/Figure7.6.png)
-<center>图 7.6 Init containers are useful for startup tasks to prepare the Pod for the app containers.</center>
+<center>图 7.6 Init 容器对于启动任务很有用，可以为应用程序容器准备 Pod</center>
 
-**Listing 7.3 sleep-with-html-server.yaml, an init container in the Pod spec**
+所有容器都可以访问 Pod 中定义的卷，因此主要的用例是 init 容器写入为应用程序容器准备环境的数据。清单 7.3 显示了前面练习中的 sleep Pod 中对HTTP服务的简单扩展。init 容器运行并生成 HTML 文件，它将该文件写入 EmptyDir 卷的挂载中。server 容器通过发送该文件的内容来响应 HTTP 请求。
+
+> 清单 7.3 sleep-with-html-server.yaml, Pod spec 配置中的 init 容器
 
 ```
-spec: # Pod spec in the Deployment template
-  initContainers: # Init containers have their own array,
-    - name: init-html # and they run in sequence.
+spec: # Deployment template 下的 Pod spec 配置
+  initContainers: #  init 容器同样也是一个数组
+    - name: init-html # 它们顺序运行
       image: kiamol/ch03-sleep
       command: ['sh', '-c', "echo '<!DOCTYPE html...' > /data/index.html"]
       volumeMounts:
     - name: data
-      mountPath: /data # Init containers can mount Pod volumes.
+      mountPath: /data # Init 容器同样可以挂在 Pod volumes.
 ```
 
-This example uses the same sleep image for the init container, but it can be any image. You might use an init container to set up the application environment using tools that you don’t want to be present in the running application. An init container can use a Docker image with the Git command line installed and clone a repository into the shared filesystem. The app container can access to the files without you having to set up the Git client in your app image.
+本例为 init 容器使用相同的 sleep 镜像，但它可以是任何镜像。您可以使用 init 容器来设置应用程序环境，使用的工具不希望出现在正在运行的应用程序中。init 容器可以使用安装了 Git 命令行的Docker 镜像，并将存储库克隆到共享文件系统中。应用程序容器可以访问这些文件，而无需在应用程序镜像中设置Git客户端。
 
-<b>现在就试试</b> Deploy the update from listing 7.3, and see how init containers work.
+<b>现在就试试</b> 部署清单 7.3 的更新, 看一下 init 容器是如何工作的
 
 ```
-# apply the updated spec with the init container:
+# 部署 init 容器的部署更新:
 kubectl apply -f sleep/sleep-with-html-server.yaml
-# check the Pod containers:
+# 检查 Pod 容器:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.containerStatuses[*].name}'
-# check the init containers:
+# 检查 init 容器:
 kubectl get pod -l app=sleep -o jsonpath='{.items[0].status.initContainerStatuses[*].name}'
-# check logs from the init container—there are none:
+# 检查 init container 的日志—什么都没有:
 kubectl logs -l app=sleep -c init-html
-# check that the file is available in the sidecar:
+# 检查 pod 容器中的那个文件是否可用:
 kubectl exec deploy/sleep -c server -- ls -l /data-ro
 ```
 
-You’ll pick up a few things from this exercise. App containers are guaranteed not to run until init containers complete successfully, so your app can safely make assumptions about the environment that the init container prepares. In this case, the HTML file is sure to exist before the server container starts. Init containers are a different part of the Pod spec, but some management features work in the same way as app containers—you can read the logs from init containers even after they have exited. My output appears in figure 7.7.
+从这个练习中你会学到一些东西。App 容器被保证在 init 容器成功完成之前不会运行，所以你的应用可以安全地假设 init 容器准备的环境。在这种情况下，HTML 文件必须在 Server 容器启动之前存在。Init 容器是Pod Spec 配置的不同部分，但一些管理特性的工作方式与应用程序容器相同——即使在 Init 容器退出后，您也可以从 Init 容器读取日志。我的输出如图 7.7 所示。
 
 ![图7.7](./images/Figure7.7.png)
-<center>图 7.7 Init containers are useful for preparing the Pod environment for app and sidecar containers.</center>
+<center>图 7.7 Init 容器对于为 app 和 sidecar 容器准备 Pod 环境非常有用。</center>
 
 That still isn’t a very real-world example, though, so let’s do something better. We covered app configuration in chapter 4 and saw how to use environment variables, ConfigMaps, and Secrets to build up a hierarchy of configuration settings. That’s great if your app supports it, but many older apps don’t have that flexibility; they expect to find a single config file in one place, and they don’t go looking anywhere else. Let’s look at an app like that.
 
