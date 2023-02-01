@@ -264,110 +264,109 @@ kubectl exec deploy/timecheck -- cat /config/appsettings.json
 
 ## 7.3 通过 adapter 容器以应用一致性
 
-Moving apps to Kubernetes is a great opportunity to add a layer of consistency across all your apps, so you deploy and manage them the same way using the same tools, no matter what the app is doing, or what technology stack it uses, or when it was developed. My fellow Docker Captain, Sune Keller, has talked about the service hotel (https://bit.ly/376rBcF) concept they use at Alm Brand. Their container platform offers a set of guarantees for “customers” (like high availability and security), provided they adhere to the rules (like pulling the configuration from the platform and writing logs out to it). 
+将应用程序迁移到 Kubernetes 是一个很好的机会，可以在所有应用程序之间添加一致性层，因此无论应用程序正在做什么，或者它使用什么技术堆栈，或者它是什么时候开发的，您都可以使用相同的工具以相同的方式部署和管理它们。我的同事、码头工人队长苏恩·凯勒(Sune Keller)谈到过Alm Brand使用的服务型酒店(https://bit.ly/376rBcF)概念。他们的容器平台为“客户”提供了一组保证(比如高可用性和安全性)，前提是他们遵守规则(比如从平台中提取配置并将日志写入其中)。
 
-Not all apps know about the rules, and some of them can’t be applied by the platform from the outside, but sidecar containers run alongside the app container so they have a privileged position. You can use them as adapters, which understand some aspect of how the app works and adapts it to how the platform wants it to work. Logging is a classic example.
-Every app writes some output to log entries—or should; otherwise, it would be entirely unmanageable, and you should refuse to work with it. Modern app platforms like Node.js and .NET Core write to the standard output stream, which is where Docker fetches container logs and where Kubernetes gets the Pod logs. Older apps have different ideas about logging, and they may write to files or other targets that never get surfaced as container logs, so you never see any Pod logs (see Appendix D in the ebook to learn more about logging in Docker). That’s what the timecheck app does, and we can fix it with a very simple sidecar container. The spec appears in listing 7.5.
+并不是所有的应用程序都知道这些规则，其中一些规则不能从外部被平台应用，但 sidecar 容器与应用程序容器一起运行，因此它们具有特权地位。你可以将它们作为适配器使用，它们理解应用程序工作方式的某些方面，并使其适应平台希望它工作的方式。日志记录就是一个经典的例子。
 
-**Listing 7.5 timecheck-with-logging.yaml, using a sidecar container to expose logs**
+每个应用程序都写一些输出到日志条目——或者应该;否则，它将完全无法管理，您应该拒绝使用它。像Node.js和.net Core这样的现代应用平台写入标准输出流，这是Docker获取容器日志的地方，也是Kubernetes获取Pod日志的地方。旧的应用程序对日志有不同的想法，它们可能会写入文件或其他目标，这些目标永远不会作为容器日志出现，所以你永远不会看到任何Pod日志。这就是timcheck应用程序所做的，我们可以用一个非常简单的sidecar容器来修复它。spec 如清单7.5所示。
+
+> 清单 7.5 timecheck-with-logging.yaml, 通过 sidecar 容器导出日志
 
 ```
 containers:
   - name: timecheck
     image: kiamol/ch07-timecheck
     volumeMounts:
-      - name: logs-dir # The app container writes the log file
-        mountPath: /logs # to an EmptyDir volume mount.
-      # Abbreviated—the full spec also includes the config mount.
+      - name: logs-dir # 应用容器写入日志到一个挂载的 EmptyDir 卷
+        mountPath: /logs 
   - name: logger
-    image: kiamol/ch03-sleep # The sidecar just watches the log file.
+    image: kiamol/ch03-sleep # sidecar 容器仅仅 watch 日志文件
     command: ['sh', '-c', 'tail -f /logs-ro/timecheck.log']
     volumeMounts:
       - name: logs-dir
-        mountPath: /logs-ro # Uses the same volume as the app
+        mountPath: /logs-ro # 使用与 APP 容器相同的卷
         readOnly: true
 ```
 
-All the sidecar does is mount the log volume (go EmptyDir!) and use the standard Linux tail command to read from the log file. The -f option means the command will follow the file; effectively, it just sits and watches for new writes, and when any lines are written to the file, they’re echoed to standard out. It’s a relay that adapts the app’s actual logging implementation to the expectations of Kubernetes.
+sidecar 所做的就是挂载日志卷(进入EmptyDir!)并使用标准的Linux tail命令从日志文件中读取。-f选项表示命令将跟随文件;实际上，它只是等待并观察新的写入，当任何行写入文件时，它们将被回显为标准输出。它是一个中继，使应用程序的实际日志实现适应Kubernetes的期望。
 
-<b>现在就试试</b> Apply the update from listing 7.5, and check the app logs are available.
+<b>现在就试试</b> 应用清单 7.5 中的更新，并检查应用程序日志是否可用。
 
 ```
-# add the sidecar logging container:
+# 添加sidecar日志记录容器:
 kubectl apply -f timecheck/timecheck-with-logging.yaml
-# wait for the containers to start:
+# 等待容器启动:
 kubectl wait --for=condition=ContainersReady pod -l app=timecheck,version=v3
-# check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=timecheck
-# check the containers in the Pod:
+# 检查 Pod 中的容器:
 kubectl get pod -l app=timecheck -o jsonpath='{.items[0].status.containerStatuses[*].name}'
-# now you can see the app logs in the Pod:
+# 现在你可以看到 Pod 中的应用日志:
 kubectl logs -l app=timecheck -c logger
 ```
 
-There’s some inefficiency here because the app container writes logs to a file and then the logging container reads them back out again. There will be a small time lag and potentially a lot of wasted disk, but the Pod will be replaced in the next app update, and all the space used in the volume will be reclaimed. The benefit is that this Pod now behaves like every other Pod, making application logs available to Kubernetes but without any changes needed to the app itself, as is shown in figure 7.10.
-
-Receiving configuration from the platform and writing logs to the platform are pretty much the fundamentals for any application, but as your platform matures, you’ll have more expectations for standard behavior. You’ll want to be able to test that the application inside the container is healthy, and you’ll also want to be able to pull metrics from the app to see what it’s doing and how hard it’s working.
-
-Sidecars can help there, too, either by running custom containers, which provide information tailored to the app, or by having standard health and metrics container images, which you apply to all your Pod specs. We’ll round off the exercises using the timecheck app and add those features that make it a good citizen for Kubernetes. We’ll cheat, though, with some more static HTTP server containers, which you can see in listing 7.6.
+这里有一些低效率，因为应用程序容器将日志写入文件，然后日志容器再次将它们读回来。这将有一个小的时间延迟，可能会浪费很多磁盘，但Pod将在下一次应用程序更新中被替换，卷中使用的所有空间将被回收。好处是这个Pod现在像其他Pod一样，使应用程序日志可用于Kubernetes，但不需要对应用程序本身进行任何更改，如图7.10所示。
 
 ![图7.10](./images/Figure7.10.png)
-<center>图 7.10 Adapters bring a layer of consistency to Pods, making old apps behave like new apps.</center>
+<center>图 7.10 适配器为Pods带来了一层一致性，使旧应用程序像新应用程序一样运行。</center>
 
-**Listing 7.6 timecheck-good-citizen.yaml, more sidecars to extend the app**
+从平台接收配置并将日志写入平台几乎是任何应用程序的基础，但随着平台的成熟，您将对标准行为有更多的期望。您希望能够测试容器内的应用程序是否健康，还希望能够从应用程序中提取指标，以查看它正在做什么以及它的工作强度。
+
+Sidecars 也可以提供帮助，要么运行自定义容器，为应用程序提供定制的信息，要么拥有标准的健康和指标容器镜像，应用于所有 Pod spec。我们将使用时间检查应用程序来完成练习，并添加这些功能，使其成为Kubernetes的好公民。但是，我们将使用一些更静态的HTTP Server 容器，如清单7.6所示。
+
+> 清单 7.6 timecheck-good-citizen.yaml, 更多的 sidecars 扩展应用
 
 ```
-containers: # The previous app and logging containers are the same.
+containers: # 之前的 应用和 日志容器都是一样的
   - name: timecheck
 # ...
   - name: logger
 # ...
-  - name: healthz # A new sidecar that exposes a healthcheck API
-    image: kiamol/ch03-sleep # This is just a static response.
+  - name: healthz # 一个新的 sidecar 容器提供了健康检查 API
+    image: kiamol/ch03-sleep # 仅仅是一个静态的响应
     command: ['sh', '-c', "while true; do echo -e 'HTTP/1.1 200 OK\nContent-
       Type: application/json\nContent-Length: 17\n\n{\"status\": \"OK\"}' | nc
       -l -p 8080; done"]
     ports:
-      - containerPort: 8080 # Available at port 8080 in the Pod
-  - name: metrics # Another sidecar, which adds a metrics API
-    image: kiamol/ch03-sleep # The content is static again.
+      - containerPort: 8080 # 在 Pod 的 8080端口进行暴露
+  - name: metrics # 另一个 sidecar, 添加了 metrics API
+    image: kiamol/ch03-sleep # 内容同样是静态的.
     command: ['sh', '-c', "while true; do echo -e 'HTTP/1.1 200 OK\nContent-
       Type: text/plain\nContent-Length: 104\n\n# HELP timechecks_total The
       total number timechecks.\n# TYPE timechecks_total
       counter\ntimechecks_total 6' | nc -l -p 8081; done"]
       ports:
-        - containerPort: 8081 # The content is avaialable on a different
-                              # port.
+        - containerPort: 8081 # 暴露在不同的端口
 ```
 
-The full YAML file also includes a ClusterIP Service, which publishes on port 8080 for the health endpoint and port 8081 for the metrics endpoint. In a production cluster, these would be used by other components to collect monitoring stats. The Deployment is an extension of the previous releases, so the app uses an init container for configuration and has a logging sidecar along with the new sidecars.
+完整的 YAML 文件还包括一个 ClusterIP Service，它在 health 端点的端口8080上发布，在metrics端点的端口8081上发布。在生产集群中，其他组件将使用这些数据来收集监视统计信息。部署是以前版本的扩展，所以应用程序使用init容器进行配置，并有一个日志sidecar和新的sidecar。
 
-<b>现在就试试</b> Deploy the update, and check the new management endpoints for the health and performance of the app.
+<b>现在就试试</b> 部署更新，并检查应用程序的运行状况和性能的新管理端点。
 
 ```
-# apply the update:
+# 应用更新的内容:
 kubectl apply -f timecheck/timecheck-good-citizen.yaml
-# wait for all the containers to be ready:
+# 等待所有容器 ready:
 kubectl wait --for=condition=ContainersReady pod -l app=timecheck,version=v4
-# check the running containers:
+# 检查运行的容器:
 kubectl get pod -l app=timecheck -o jsonpath='{.items[0].status.containerStatuses[*].name}'
-# use the sleep container to check the timecheck app health:
+# 通过 sleep 容器检查 timecheck 应用的健康:
 kubectl exec deploy/sleep -c sleep -- wget -q -O - http://timecheck:8080
-# check its metrics:
+# 检查 metrics:
 kubectl exec deploy/sleep -c sleep -- wget -q -O - http://timecheck:8081
 ```
 
-When you run the exercise, you’ll see everything works as expected, as shown in figure 7.11. You may also see the updates weren’t as speedy as you’re used to, with the new Pod taking longer to start up and the old Pod taking longer to terminate. The additional startup time is from having the init container, the app container, and all the sidecars—they all need to be ready before the new Pod is considered ready. The additional termination time is because the replaced Pod also had multiple containers, which are each given a grace period for the container process to shut down.
+当您运行这个练习时，您将看到一切都按预期运行，如图7.11所示。你可能还会发现更新速度不如你习惯的那么快，新Pod启动的时间更长，旧Pod终止的时间更长。额外的启动时间来自初始化容器、应用程序容器和所有 sidecar——在新Pod被认为准备好之前，它们都需要准备好。额外的终止时间是因为被替换的Pod也有多个容器，每个容器都有一个关闭容器进程的宽限期。
 
 ![图7.11](./images/Figure7.11.png)
-<center>图 7.11 Multiple adapter sidecars give the app a consistent management API.</center>
+<center>图 7.11 多个适配器sidecars给应用程序一个一致的管理API。</center>
 
-There is an overhead to running all these sidecar containers as adapters. You’ve seen that it increases deployment times, but it also increases the ongoing compute requirements of the app—even storage and basic sidecars, which just tail log files and serve simple HTTP responses, all use memory and compute cycles. But if you want to move existing apps to Kubernetes that don’t have those features, it’s an acceptable approach to get all your apps behaving in the same way, as shown in figure 7.12.
-
-In the previous exercise, we used an old sleep Pod we had lying around to call the new HTTP endpoints for the timecheck app. Remember that Kubernetes has a flat networking model, where Pods can send traffic to any other Pods via a Service. You may want more control over the network communication in your app, and you can do that with sidecars, too, by running a proxy container that manages the outgoing traffic from your app container.
+将所有这些sidecar容器作为适配器运行是有开销的。您已经看到，它增加了部署时间，但也增加了应用程序的持续计算需求——甚至存储和基本的sidecars(它只是跟踪日志文件并提供简单的HTTP响应)都使用内存和计算周期。但如果你想把现有的应用程序转移到没有这些功能的Kubernetes上，让所有应用程序都以相同的方式运行是一种可以接受的方法，如图7.12所示。
 
 ![图7.12](./images/Figure7.12.png)
-<center>图 7.12 A consistent management API makes it easy to work with Pods—it doesn’t matter how the API is provided inside the Pod.</center>
+<center>图 7.12 一个一致的管理API可以很容易地与Pod一起工作——不管API是如何在Pod中提供的。</center>
+
+在前面的练习中，我们使用了一个旧的 sleep Pod来调用时间检查应用程序的新HTTP端点。请记住，Kubernetes有一个平面网络模型，其中Pod可以通过服务向任何其他Pod发送流量。你可能想要在你的应用程序中对网络通信有更多的控制，你也可以用sidecars来做到这一点，通过运行一个代理容器来管理从你的应用程序容器传出的流量。
 
 ## 7.4 通过 ambassador 容器抽象连接
 
