@@ -370,80 +370,80 @@ kubectl exec deploy/sleep -c sleep -- wget -q -O - http://timecheck:8081
 
 ## 7.4 通过 ambassador 容器抽象连接
 
-The ambassador pattern lets you control and simplify outgoing connections from your application: your app makes network requests to the localhost address, which are picked up and performed by the ambassador. You can make use of a generic ambassador container, or one that is specific to your application components, in several situations. Figure 7.13 shows some examples. The logic in the ambassador might be geared to improving performance or increasing reliability or security.
-
-Taking control of the network away from the application is hugely powerful. A proxy container can do service discovery, load balancing, retries, and even layer encryption onto an unencrypted channel. Perhaps you’ve heard of the service mesh architecture, using technologies like Linkerd and Istio—they’re all powered by proxy sidecar containers in a variation of the ambassador pattern.
+ambassador 模式允许您控制和简化应用程序的对外连接:应用程序向 localhost 地址发出网络请求，这些请求由 ambassador 接收和执行。在几种情况下，您可以使用通用的 ambassador 容器，或者特定于应用程序组件的 ambassador 容器。图7.13显示了一些例子。ambassador 中的逻辑可能用于提高性能或提高可靠性或安全性。
 
 ![图7.13](./images/Figure7.13.png)
-<center>图 7.13 The ambassador pattern has lots of potential, from simplifying app logic to increasing performance.</center>
+<center>图 7.13 ambassador 模式有很多潜力，从简化应用程序逻辑到提高性能。</center>
 
-We won’t use a service mesh architecture here because that would take us well past lunchtime and on into the night, but we’ll get a flavor of what it can do with a simplified example. The starting point is the random-number app we’ve used before. There’s a web app running in a Pod, which consumes an API running in another Pod. The API is the only component the web app uses, so ideally we would restrict network calls to any other address, but in the initial deployment that doesn’t happen.
+从应用程序中控制网络是非常强大的。代理容器可以在未加密的通道上执行服务发现、负载平衡、重试，甚至层加密。也许您听说过使用Linkerd和istio等技术的服务网格体系结构——它们都是由 ambassador 模式变体中的代理 sidecar 容器提供支持的。
 
-<b>现在就试试</b> Run the random-number app, and verify that the web app container can use any network address.
+这里我们不打算使用服务网格体系结构，因为那会让我们度过午餐时间，一直到晚上，但是我们将通过一个简化的示例了解它可以做什么。起点是我们之前用过的随机数应用程序。有一个web应用程序在一个Pod中运行，它消耗一个在另一个Pod中运行的 API。API是web应用程序使用的唯一组件，所以理想情况下，我们会将网络调用限制到任何其他地址，但在最初的部署中，这种情况不会发生。
+
+<b>现在就试试</b> 运行随机数应用程序，验证 web 应用程序容器可以使用任何网络地址。
 
 ```
-# deploy the app and Services:
+# 部署应用和 Service:
 kubectl apply -f numbers/
-# find the URL for your app:
+# 获取应用访问 url:
 kubectl get svc numbers-web -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8090'
-# browse and get yourself a nice random number
-# check that the web app has access to other endpoints:
+# 访问它，返回一个完美的随机数
+# 检查 web 应用是否可以访问其他端点:
 kubectl exec deploy/numbers-web -c web -- wget -q -O -http://timecheck:8080
 ```
 
-The web Pod can reach the API using the ClusterIP Service and the domain name numbers-api, but it can also access any other address, which could be a URL on the public internet or another ClusterIP Service. Figure 7.14 shows the app can read the health endpoint of the timecheck app—that should be a private endpoint, and it might expose information that is useful to someone up to no good.
+web Pod 可以使用ClusterIP 服务和域名 numbers-api 到达API，但它也可以访问任何其他地址，这可能是公共互联网上的URL或另一个ClusterIP服务。图7.14显示了应用程序可以读取时间检查应用程序的健康端点——这应该是一个私有端点，它可能会暴露对某些人有用的信息。
 
 ![图7.14](./images/Figure7.14.png)
-<center>图 7.14 Kubernetes doesn’t have any default restrictions on outgoing connections from Pod containers.</center>
+<center>图 7.14 Kubernetes 对 Pod 容器的传出连接没有任何默认限制 </center>
 
-You have a lot of options for restricting network access besides using a proxy sidecar, but the ambassador pattern comes with some additional features that make it worth considering. Listing 7.7 shows an update to the web app spec, using a simple proxy container as an ambassador.
+除了使用代理 sidecar 之外，还有许多限制网络访问的选项，但是 ambassador 模式带有一些额外的特性，值得考虑。清单7.7显示了web应用程序 spec 的更新，使用一个简单的代理容器作为 ambassador。
 
-**Listing 7.7 web-with-proxy.yaml, using a proxy as an ambassador**
+> 清单 7.7 web-with-proxy.yaml, 使用一个代理容器作为 ambassador
 
 ```
 containers:
   - name: web
     image: kiamol/ch03-numbers-web
     env:
-      - name: http_proxy # Sets the container to use the proxy
-        value: http://localhost:1080 # so traffic goes to the ambassador
+      - name: http_proxy # 设置变量让容器使用代理服务
+        value: http://localhost:1080 # 因此流量到达 ambassador
       - name: RngApi__Url
-        value: http://localhost/api # Uses a localhost address for the API
+        value: http://localhost/api # 为API使用本地 localhost 地址
   - name: proxy
-    image: kiamol/ch07-simple-proxy # This is a basic HTTP proxy.
+    image: kiamol/ch07-simple-proxy # 这是一个基础的 HTTP proxy 服务
       env:
-        - name: Proxy__Port # Routes network requests from the app
-          value: "1080" # using the configured URI mapping
+        - name: Proxy__Port # 路由来自应用程序的网络请求
+          value: "1080" # 使用配置的URI映射
         - name: Proxy__Request__UriMap__Source
           value: http://localhost/api
         - name: Proxy__Request__UriMap__Target
           value: http://numbers-api/sixeyed/kiamol/master/ch03/numbers/rng
 ```
 
-This example shows the major pieces of the ambassador pattern: the app container uses localhost addresses for any services it consumes, and it’s configured to route all network calls through the proxy container. The proxy is a custom app that logs network calls, maps localhost addresses to real addresses, and blocks any addresses that are not listed in the map. All that becomes functionality in the Pod, but it’s transparent to the application container.
+这个例子展示了 ambassador 模式的主要部分:应用程序容器为它使用的任何服务使用本地主机地址，并且它被配置为通过代理容器路由所有网络调用。代理是一个自定义应用程序，它可以记录网络呼叫，将本地主机地址映射到真实地址，并阻止映射中未列出的任何地址。所有这些都成为 Pod 中的功能，但对应用程序容器来说是透明的。
 
-<b>现在就试试</b> Update the random-number app, and confirm the network is now locked down.
+<b>现在就试试</b> 更新随机数应用程序，并确认网络现在已锁定。
 
 ```
-# apply the update from listing 7.5:
+# 应用清单 7.5 中的更新:
 kubectl apply -f numbers/update/web-with-proxy.yaml
-# refresh your browser, and get a new number
-# check the proxy container logs:
+# 刷新浏览器, 得到新的数字
+# 检查 proxy 容器 logs:
 kubectl logs -l app=numbers-web -c proxy
-# try to read the health of the timecheck app:
+# 尝试访问 timcheck 应用的健康接口:
 kubectl exec deploy/numbers-web -c web -- wget -q -O -http://timecheck:8080
-# check proxy logs again:
+# 再次查看 proxy 容器日志:
 kubectl logs -l app=numbers-web -c proxy
 ```
 
-Now the web app is decoupled even further from the API, because it doesn’t even know the URL of the API—that’s set in the ambassador, which can be configured independently of the app. The web app is also restricted to using a single address for outgoing requests, and all of those calls are logged by the proxy, as you see in figure 7.15.
-
-The ambassador for this web app proxies HTTP calls outside of the Pod, but the ambassador pattern is wider than that. It plugs into the network at the transport layer,so it can work on any kind of traffic. A database ambassador can make some smart choices, like sending queries to a read-only database replica and using only the master database for writes. That’s going to improve performance and scale, while keeping complex logic out of the application.
+现在 web 应用程序甚至与API进一步解耦，因为它甚至不知道API的URL——这是在 ambassador 中设置的，可以独立于应用程序进行配置。web应用程序也被限制使用单个地址进行外发请求，所有这些调用都由代理记录，如图7.15所示。
 
 ![图7.15](./images/Figure7.15.png)
-<center>图 7.15 All network access is via the ambassador, which can implement its own access rules.</center>
+<center>图 7.15 所有的网络访问都是通过 ambassador，ambassador 可以实现自己的访问规则。</center>
 
-We’ll round out the chapter by taking a closer look at what it means to use the Pod as a shared environment for many containers.
+这个web应用程序的 ambassador 代理 Pod 外部的HTTP调用，但 ambassador 模式比这更广泛。它在传输层插入网络，因此可以处理任何类型的流量。数据库 ambassador 可以做出一些明智的选择，比如将查询发送到只读数据库副本，并且只使用主数据库进行写操作。这将提高性能和规模，同时将复杂的逻辑排除在应用程序之外。
+
+我们将进一步了解使用 Pod 作为许多容器的共享环境意味着什么，从而使本章圆满结束。
 
 ## 7.5 理解 Pod 环境
 
