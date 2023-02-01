@@ -441,69 +441,69 @@ kubectl logs -l app=numbers-web -c proxy
 ![图7.15](./images/Figure7.15.png)
 <center>图 7.15 所有的网络访问都是通过 ambassador，ambassador 可以实现自己的访问规则。</center>
 
-这个web应用程序的 ambassador 代理 Pod 外部的HTTP调用，但 ambassador 模式比这更广泛。它在传输层插入网络，因此可以处理任何类型的流量。数据库 ambassador 可以做出一些明智的选择，比如将查询发送到只读数据库副本，并且只使用主数据库进行写操作。这将提高性能和规模，同时将复杂的逻辑排除在应用程序之外。
+这个 web 应用程序的 ambassador 代理 Pod 外部的 HTTP 调用，但 ambassador 模式比这更广泛。它在传输层插入网络，因此可以处理任何类型的流量。数据库 ambassador 可以做出一些明智的选择，比如将查询发送到只读数据库副本，并且只使用主数据库进行写操作。这将提高性能和规模，同时将复杂的逻辑排除在应用程序之外。
 
 我们将进一步了解使用 Pod 作为许多容器的共享环境意味着什么，从而使本章圆满结束。
 
 ## 7.5 理解 Pod 环境
 
-The Pod is a boundary around one or more containers, just like the container is a boundary around one or more processes. Pods create layers of virtualization without adding overhead, so they’re flexible and efficient. The cost of that flexibility is—as always—complexity, and you need to be aware of some nuances to working with multicontainer Pods.
-The main thing to understand is that the Pod is still the single unit of compute, even if lots of containers are running inside it. Pods aren’t ready until all the containers in the Pod are ready, and Services send traffic only to Pods that are ready. Adding sidecars and init containers adds to the failure modes for your application.
+Pod 是围绕一个或多个容器的边界，就像容器是围绕一个或多个进程的边界一样。pod 在不增加开销的情况下创建了虚拟化层，因此它们灵活而高效。这种灵活性的代价是复杂性，您需要了解使用多容器pod的一些细微差别。
+需要理解的主要事情是，Pod 仍然是单一的计算单元，即使有很多容器在其中运行。在 Pod 中的所有容器都准备好之前，Pod才准备好，服务只向准备好了的Pod发送流量。添加sidecars和init容器会增加应用程序的失败模式。
 
-<b>现在就试试</b> You can break your application if an init container fails. This update to the numbers app won’t be successful because the init container is misconfigured.
+<b>现在就试试</b> 如果 init 容器失败，您可以中断应用程序。对 numbers 应用程序的更新将不会成功，因为 init 容器配置错误。
 
 ```
-# apply the update:
+# 应用更新:
 kubectl apply -f numbers/update/web-v2-broken-init-container.yaml
-# check the new Pod:
+# 检查新 Pod:
 kubectl get po -l app=numbers-web,version=v2
-# check the logs for the new init container:
+# 检查新的 init 容器的日志:
 kubectl logs -l app=numbers-web,version=v2 -c init-version
-# check the status of the Deployment:
+# 检查 deployment 状态:
 kubectl get deploy numbers-web
-# check the status of the ReplicaSets:
+# 检查 ReplicaSets 状态:
 kubectl get rs -l app=numbers-web
 ```
 
-You can see in this exercise that the failed init container effectively prevents the application from updating. The new Pod never enters the running state and won’t receive traffic from the Service. The Deployment never scales down the old ReplicaSet because the new one doesn’t reach the required level of availability, but the basic details of the Deployment look like the update has worked, as shown in figure 7.16.
-
-The same situation will happen if a sidecar container fails on startup—the Pod doesn’t have all of its containers running so the Pod itself isn’t ready. Any deployment checks you have in place need to be extended for multicontainer Pods to ensure all init containers run to completion and all Pod containers are running. You need to be aware of the following restart conditions, too:
-
-- If a Pod with init containers is replaced, then the new Pod runs all the init containers again. You must ensure your init logic can be run repeatedly.
-- If you deploy a change to the init container image(s) for a Pod, that restarts the Pod. Init containers all execute again, and app containers are replaced.
-- If you deploy a Pod spec change to the app container image(s), the app containers are replaced, but the init containers are not executed again.
-- If an application container exits, then the Pod re-creates it. Until the container is replaced, the Pod is not fully running and won’t receive Service traffic.
-
-The Pod is a single compute environment, but when you add multiple moving parts inside that environment, you need to test all the failure scenarios and make sure your app behaves as you expect.
-
-There’s one last part of the Pod environment that we haven’t covered: the compute layer. Pod containers have a shared network and can share parts of the filesystem, but they can’t access each other’s processes—the container boundary still provides compute isolation. That’s the default behavior, but in some cases, you want your sidecar to have access to the processes in the application container, either for interprocess communication or so the sidecar can fetch metrics about the app process.
+在本练习中，您可以看到失败的 init 容器有效地阻止了应用程序的更新。新的 Pod 永远不会进入运行状态，也不会接收来自服务的流量。部署从不缩小旧的ReplicaSet，因为新的ReplicaSet没有达到所需的可用性级别，但是部署的基本细节看起来更新已经工作，如图7.16所示。
 
 ![图7.16](./images/Figure7.16.png)
-<center>图 7.16 Adding more containers to your Pod spec adds more opportunities for the Pod to fail</center>
+<center>图 7.16 在 Pod spec 中添加更多容器会增加 Pod 失败的可能性</center>
 
-You can enable this access with a simple setting in the Pod spec: shareProcess-Namespace: true. That means every container in the Pod shares the same compute space and can see each other’s processes.
+如果 sidecar 容器在启动时失败，也会发生同样的情况——Pod没有运行所有的容器，所以Pod本身还没有准备好。任何部署检查都需要扩展到多容器Pod，以确保所有init容器都运行完毕，所有Pod容器都在运行。您还需要注意以下重启条件:
+ 
+- 如果替换了带有 init 容器的 Pod，那么新的 Pod 将重新运行所有的 init 容器。您必须确保您的 init 逻辑可以重复运行。
+- 如果您为 Pod 部署了 init 容器镜像的更改，则会重新启动 Pod。Init 容器全部重新执行，app 容器被替换。
+- 如果你将 Pod spec 更改部署到应用程序容器镜像，应用程序容器将被替换，但init容器不会再次执行。
+- 如果应用程序容器退出，Pod 将重新创建它。在容器被替换之前，Pod 不会完全运行，不会接收服务流量。
 
-<b>现在就试试</b> Deploy an update to the sleep Pod so the containers use a shared compute space and can access each other’s processes.
+Pod 是一个单一的计算环境，但当你在该环境中添加多个移动部件时，你需要测试所有的故障场景，并确保你的应用程序的行为符合你的预期。
+
+Pod 环境的最后一部分我们还没有介绍:计算层。Pod容器有一个共享的网络，可以共享部分文件系统，但是它们不能访问彼此的进程——容器边界仍然提供了计算隔离。这是默认的行为，但在某些情况下，您希望 sidecar 能够访问应用程序容器中的进程，或者用于进程间通信，或者以便 sidecar 能够获取有关应用程序进程的指标。
+
+你可以在 Pod Spec 中通过一个简单的设置来启用这种访问: shareProcess-Namespace: true。这意味着Pod中的每个容器共享相同的计算空间，并且可以看到彼此的进程。
+
+<b>现在就试试</b> 将更新部署到 sleep Pod，以便容器使用共享的计算空间并可以访问彼此的进程。
 
 ```
-# check the processes in the current container:
+# 检查当前容器进程:
 kubectl exec deploy/sleep -c sleep -- ps
-# apply the update:
+# 应用更新:
 kubectl apply -f sleep/sleep-with-server-shared.yaml
-# wait for the new containers:
+# 等待新容器启动:
 kubectl wait --for=condition=ContainersReady pod -l app=sleep,version=shared
-# check the processes again:
+# 再次查看进程:
 kubectl exec deploy/sleep -c sleep -- ps
 ```
 
-You can see my output in figure 7.17. The sleep container can see all the server container’s processes, and it could happily kill them all and leave the Pod in a confused state.
+可以在图 7.17 中看到我的输出。sleep 容器可以看到所有 server 容器的进程，它可以很高兴地杀死它们，让Pod处于混乱的状态。
 
 ![图7.17](./images/Figure7.17.png)
-<center>图 7.17 You can configure a Pod so all containers can see all processes—use with care.</center>
+<center>图 7.17 您可以配置 Pod，这样所有容器都可以看到所有进程——使用时要小心。</center>
 
-That’s all for multicontainer Pods. You’ve seen in this chapter that you can use init containers to prepare the environment for your application container and run sidecar containers to add features to your app, all without changing the app code or the Docker image. There are some caveats to using multiple containers, but it’s a pattern you’ll use often to extend your applications. Just remember that the Pod should be one logical component: I don’t want to see you running Nginx, WordPress, and MySQL in a single Pod just because you can. Let’s tidy up now and get ready for the lab.
+以上就是多容器 Pod 的全部内容。在本章中你已经看到，你可以使用init容器为你的应用程序容器准备环境，并运行sidecar容器为你的应用程序添加特性，所有这些都不需要改变应用程序代码或Docker镜像。使用多个容器有一些注意事项，但是您将经常使用这种模式来扩展应用程序。只要记住 Pod 应该是一个逻辑组件:我不希望看到你在一个Pod中运行Nginx, WordPress和MySQL只是因为你可以。我们现在收拾一下，准备去实验室。
 
-<b>现在就试试</b> Remove everything matching this chapter’s label.
+<b>现在就试试</b> 删除所有与本章标签匹配的内容。
 
 ```
 kubectl delete all -l kiamol=ch07
@@ -511,12 +511,12 @@ kubectl delete all -l kiamol=ch07
 
 ## 7.6 实验室
 
-It’s back to the Pi app for this lab. The Docker image kiamol/ch05-pi can actually be used in different ways, and to run it as a web app, you need to override the startup command in the container spec. We’ve done that in the YAML files in previous chapters, but now we’ve been asked to use a standard approach to setting up the pod. Here are the requirements and some hints:
+回到这个实验室的 Pi 应用程序。Docker 镜像 kiamol/ch05-pi 实际上可以以不同的方式使用，并且要作为 web 应用程序运行它，你需要覆盖容器 spec 中的启动命令。我们在前几章的YAML文件中已经做到了这一点，但现在我们被要求使用标准方法来设置pod。以下是要求和一些提示:
 
-- The app container needs to use a standard startup command that all Pods in our platform are using. It should run /init/startup.sh.
-- The Pod should use port 80 for the app container.
-- The Pod should also publish port 8080 for an HTTP server, which returns the version number of the app,
-- The app container image doesn’t contain a startup script, so you’ll need to usesomething that can create that script and make it executable for the app container to run.
-- The app doesn’t publish a version API on port 8080 (or anywhere else), so you’ll need something that can provide that (it can just be any static text).
+- 应用程序容器需要使用一个标准的启动命令，我们平台上的所有 Pod 都在使用。它应该运行 /init/startup.sh。
+- Pod 应该使用 80 端口作为应用程序容器。
+- Pod 还应该为 HTTP 服务器发布端口 8080，它返回应用程序的版本号，
+- 应用程序容器镜像不包含启动脚本，所以你需要使用一些可以创建该脚本并使其可执行的应用程序容器运行的东西。
+- 应用程序不会在端口 8080 (或其他任何地方)上发布版本API，所以你需要一些可以提供的东西(它可以是任何静态文本)。
 
-The starting point is the YAML in ch07/lab/pi, which is broken at the moment. You’ll need to do some investigation into how the app ran in previous chapters and apply the techniques we’ve learned in this chapter. You have plenty of ways to approach this one, and you’ll find my sample solution in the usual place: https://github.com/sixeyed/kiamol/blob/master/ch07/lab/README.md.
+起点是 ch07/lab/pi 中的YAML，目前它已经坏了。你需要对前面章节的应用程序是如何运行的做一些调查，并应用我们在本章中学到的技术。您有很多方法来处理这个问题，您可以在通常的位置找到我的示例解决方案:https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch07/lab/README.md。
