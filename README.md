@@ -109,3 +109,17 @@
     - 7.5 [理解 Pod 环境](./chapter7.md#75-理解-pod-环境)
 
     - 7.6 [实验室](./chapter7.md#76-实验室)
+
+  - 第八章 [使用 StatfulSets 和 Jobs 运行数据量大的应用](./chapter8.md)
+
+    - 8.1 [Kubernetes 如何用 StatefulSets 建模稳定性](./chapter8.md#81-kubernetes-如何用-statefulsets-建模稳定性)
+
+    - 8.2 [在 StatefulSets 中使用 init 容器引导 Pod](./chapter8.md#82-在-statefulsets-中使用-init-容器引导-pod)
+
+    - 8.3 [使用卷声明模板请求存储](./chapter8.md#83-使用卷声明模板请求存储)
+
+    - 8.4 [使用 Jobs 和 CronJobs 运行维护任务](./chapter8.md#84-使用-jobs-和-cronjobs-运行维护任务)
+
+    - 8.5 [为有状态应用程序选择平台](./chapter8.md#85-为有状态应用程序选择平台)
+
+    - 8.6 [实验室](./chapter8.md#86-实验室)
