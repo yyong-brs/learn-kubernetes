@@ -349,12 +349,12 @@ metadata:
   name: pi-job
 spec:
   template:
-    spec: # The standard Pod spec
+    spec: # 标准的 Pod spec
       containers:
-        - name: pi # The container should run and exit.
+        - name: pi # 容器将运行并退出.
           image: kiamol/ch05-pi
           command: ["dotnet", "Pi.Web.dll", "-m", "console", "-dp", "50"]
-      restartPolicy: Never # If the container fails, replace the Pod.
+      restartPolicy: Never # 容器若失败，将替换 Pod.
 ```
 
 The Job template contains a standard Pod spec, with the addition of a required restartPolicy field. That field controls the behavior of the Job in response to failure. You can choose to have Kubernetes restart the same Pod with a new container if the run fails or always create a replacement Pod, potentially on a different node. In a normal run of the Job where the Pod completes successfully, the Job and the Pod are retained so the container logs are available.
@@ -362,13 +362,13 @@ The Job template contains a standard Pod spec, with the addition of a required r
 ​	**TRY IT NOW	Run the Pi Job from listing 8.5, and check the output from the Pod.**
 
 ```
-# deploy the Job:
+# 部署 Job:
 kubectl apply -f pi/pi-job.yaml
 
-# check the logs for the Pod:
+# 检查 Pod 日志:
 kubectl logs -l job-name=pi-job
 
-# check the status of the Job:
+# 检查 Job 状态:
 kubectl get job pi-job
 ```
 
@@ -388,16 +388,16 @@ One last Pi example for this chapter: a new Job spec that runs multiple Pods in 
 ​	**TRY IT NOW	Run an alternative Pi Job that uses parallelism and shows that multiple Pods from the same spec can process different workloads.**
 
 ```
-# deploy the new Job:
+# 部署新 Job:
 kubectl apply -f pi/pi-job-random.yaml
 
-# check the Pod status:
+# 检查 Pod 状态:
 kubectl get pods -l job-name=pi-job-random
 
-# check the Job status:
+# 检查 Job 状态:
 kubectl get job pi-job-random
 
-# list the Pod output:
+# 查询 Pod 输出日志:
 kubectl logs -l job-name=pi-job-random
 ```
 
@@ -423,9 +423,9 @@ kind: CronJob
 metadata:
   name: todo-db-backup
 spec:
-  schedule: "*/2 * * * *"   # Creates a Job every 2 minutes
-  concurrencyPolicy: Forbid # Prevents overlap so a new Job won’t be
-  jobTemplate:              # created if the previous one is running
+  schedule: "*/2 * * * *"   # 每两分钟创建一个 Job
+  concurrencyPolicy: Forbid # 防止重叠，因此如果前一个作业正在运行，则不会创建新的作业
+  jobTemplate:              
     spec:
       # job template...
 ```
@@ -435,19 +435,19 @@ The full spec uses the Postgres Docker image, with a command to run the pg_dump 
 ​	**TRY IT NOW	Create a CronJob from the spec in listing 8.6 to run a database backup Job every two minutes.**
 
 ```
-# deploy the CronJob and target PVC for backup files:
+# 部署 CronJob 以及为备份文件的 PVC:
 kubectl apply -f todo-list/db/backup/
 
-# wait for the Job to run—this is a good time to make tea:
+# 等待 Job 运行—可以乘机喝杯茶:
 sleep 150
 
-# check the CronJob status:
+# 检查 CronJob 状态:
 kubectl get cronjob todo-db-backup
 
-# now run a sleep Pod that mounts the backup PVC:
+# 现在运行 sleep Pod 挂载备份 PVC:
 kubectl apply -f sleep/sleep-with-db-backup-mount.yaml
 
-# check if the CronJob Pod created the backup:
+# 检查 CronJob Pod 已创建备份:
 kubectl exec deploy/sleep -- ls -l /backup
 ```
 
@@ -461,14 +461,14 @@ CronJobs don’t perform an automatic cleanup for Pods and Jobs. The time-to-liv
 ​	**TRY IT NOW	Suspend the CronJob so it doesn’t keep creating backup Jobs, and then explore the status of the CronJob and its Jobs.**
 
 ```
-# update the CronJob, and set it to suspend:
+# 更新CronJob，并设置为挂起:
 kubectl apply -f todo-list/db/backup/update/todo-db-backup-cronjob-
   suspend.yaml
   
-# check the CronJob:
+# 检查 CronJob:
 kubectl get cronjob todo-db-backup
 
-# find the Jobs owned by the CronJob:
+# 找到 CronJob 拥有的 job:
 kubectl get jobs -o jsonpath="{.items[?(@.metadata.ownerReferences[0]
   .name=='todo-db-backup')].metadata.name}"
 ```
@@ -506,22 +506,21 @@ you really want to manage all that? And how much time will you need to invest ju
 ​	**TRY IT NOW	All the top-level objects are labeled, so we can remove everything with cascading deletes.**
 
 ```
-# delete all the owning objects:
+# 删除本章相关的对象:
 kubectl delete all -l kiamol=ch08
 
-# delete the PVCs
+# 删除 PVCs
 kubectl delete pvc -l kiamol=ch08
 ```
 
 ## 8.6 实验室
 
-So, how much of your lunchtime do you have left for this lab? Can you model a MySQL database from scratch, with backups? Probably not, but don’t worry—this lab isn’t as involved as that. The goal is just to give you some experience working with StatefulSets and PVCs, so we’ll use a much simpler app. You’re going to run the Nginx web server in a StatefulSet, where each Pod writes log files to a PVC of its own, and then you’ll run a Job that prints the size of each Pod’s log file. The basic pieces are there for you, so it’s about applying some of the techniques from the chapter.
+你还剩多少午餐时间来实验室?你能从头开始建模一个 MySQL 数据库，有备份吗?可能不会，但别担心，这个实验室没有那么复杂。我们的目标只是给你一些使用 StatefulSet 和 PVC 的经验，所以我们将使用一个更简单的应用程序。你将在一个StatefulSet 中运行 Nginx web 服务，每个 Pod 将日志文件写入自己的 PVC，然后你将运行一个 Job，打印每个 Pod 的日志文件的大小。基本的部分都在那里，所以它是关于应用本章中的一些技巧。
 
-- The starting point is the Nginx spec in ch08/lab/nginx, which runs a single Pod writing logs to an EmptyDir volume.
-- The Pod spec needs to be migrated to a StatefulSet definition, which is configured to run with three Pods and provide separate storage for each of them.
+- 起点是 ch08/lab/nginx 中的 Nginx Spec，它运行一个 Pod，将日志写入 EmptyDir 卷。
+- Pod Spec 需要迁移到一个 StatefulSet 定义，它被配置为与三个 Pod 一起运行，并为每个 Pod 提供单独的存储。
+- 当你有StatefulSet工作时，你应该能够调用你的服务，并看到正在写入 Pods 的日志文件。
+- 在 disk-calc-job.yaml 文件中填写 Job Spec。添加卷挂载，这样它就可以从  Nginx Pods 中读取日志文件。
 
-- When you have the StatefulSet working, you should be able to make calls to your Service and see the log files being written in the Pods.
-- Then you can complete the Job spec in the file disk-calc-job.yaml, adding the volume mounts so it can read the log files from the Nginx Pods.
-
-It’s not as bad as it looks, and it will get you thinking about storage and Jobs. My solution is on GitHub for you to check in the usual place: https://github.com/sixeyed/kiamol/blob/master/ch08/lab/README.md.
+它并不像看起来那么糟糕，它会让你想到存储和 Jobs。我的解决方案在 GitHub 上，你可以在通常的地方检查:https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch08/lab/README.md。
 
