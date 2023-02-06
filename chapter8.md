@@ -198,11 +198,11 @@ kubectl logs todo-db-2 --tail 2
 
 ## 8.3 使用卷声明模板请求存储
 
-Volumes are part of the standard Pod spec, and you can load ConfigMaps and Secrets into the Pods for a StatefulSet. You can even include a PVC and mount it into the app container, but that gives you volumes that are shared among all the Pods. That’s fine for read-only configuration settings where you want every Pod to have the same data, but if you mount a standard PVC for data storage, then every Pod will try to write to the same volume.
+卷是标准 Pod Spec 的一部分，您可以为 StatefulSet 将 ConfigMaps 和 Secrets 加载到 Pod 中。你甚至可以包含一个 PVC 并将其挂载到应用程序容器中，但这将为你提供在所有 Pod之间共享的卷。在只读配置设置中，您希望每个 Pod 都有相同的数据，但如果您为数据存储安装了标准 PVC，那么每个 Pod 都将尝试写入相同的卷。
 
-​	You actually want each Pod to have its own PVC, and Kubernetes provides that for StatefulSets with the volumeClaimTemplates field in the spec. Volume claim templates can include a storage class as well as capacity and access mode requirements. When you deploy a StatefulSet with volume claim templates, it creates a PVC for each Pod, and they’re linked, so if Pod 0 is replaced, the new Pod 0 will attach to the PVC used by the previous Pod 0.
+您实际上希望每个 Pod 都有自己的 PVC, Kubernetes 在 Spec 中为 StatefulSets 提供了 volumeClaimTemplates 字段，它可以包括存储类以及容量和访问模式需求。当您部署带有 volume claim templates 的 StatefulSet 时，它为每个Pod 创建一个 PVC，并且它们是链接的，因此如果 Pod 0 被替换，新的 Pod 0 将附加到前一个Pod 0 使用的 PVC 上。
 
-**Listing 8.4	sleep-with-pvc.yaml, a StatefulSet with volume claim templates**
+> 清单8.4 sleep-with-pvc。yaml，一个带有 volume claim templates 的 StatefulSet
 
 ```
 spec:
@@ -216,8 +216,8 @@ spec:
     
   volumeClaimTemplates:
     - metadata:
-        name: data # The name to use for volume mounts in the Pod
-      spec: # This is a standard PVC spec.
+        name: data # 卷挂载到 Pod 中的名字
+      spec: # 这个是标准的 PVC spec
         accessModes:
           - ReadWriteOnce
         resources:
@@ -225,109 +225,113 @@ spec:
             storage: 5Mi
 ```
 
-We’ll use this exercise to see how volume claim templates in StatefulSets work in a simple environment before adding them as the storage layer for our database cluster.
+在将 StatfulSets 中的 volume claim templates 添加为数据库集群的存储层之前，我们将使用这个练习来了解它们在一个简单的环境中是如何工作的。
 
-​	**TRY IT NOW	Deploy the StatefulSet from listing 8.4, and explore the PVCs it creates.**
+<b>现在就试试</b> 部署清单 8.4 中的 StatefulSet，并探索它创建的 Pvc
 
 ```
-# deploy the StatefulSet with volume claim templates:
+# 部署带有 volume claim templates 的 StatefulSet:
 kubectl apply -f sleep/sleep-with-pvc.yaml
 
-# check that the PVCs are created:
+# 检查创建的 PVC:
 kubectl get pvc
 
-# write some data to the PVC mount in Pod 0:
+# 在 Pod 0 挂载的 PVC 中写入一些数据:
 kubectl exec sleep-with-pvc-0 -- sh -c 'echo Pod 0 > /data/pod.txt'
 
-# confirm Pod 0 can read the data:
+# 确认 Pod 0 可以读取到数据:
 kubectl exec sleep-with-pvc-0 -- cat /data/pod.txt
 
-# confirm Pod 1 can’t—this will fail:
+# 确认 Pod 1 读取不到—将会失败:
 kubectl exec sleep-with-pvc-1 -- cat /data/pod.txt
 ```
 
-You’ll see that each Pod in the set gets a PVC created dynamically, which in turn creates a PersistentVolume using the default storage class (or the requested storage class, if I had included one in the spec). The PVCs all have the same configuration, and they use the same stable approach as Pods in the StatefulSet: they have a predictable name, and, as you see in figure 8.8, each Pod has its own PVC, giving the replicas independent storage.
+您将看到集合中的每个 Pod 都得到一个动态创建的 PVC，而 PVC 又使用默认存储类(或者是请求的存储类，如果我在 spec 中包含了一个)创建了一个PersistentVolume。PVC 都具有相同的配置，并且它们使用与 StatfulSet中的 Pod 相同的稳定方法:它们具有可预测的名称，并且如图8.8所示，每个 Pod 都有自己的PVC，为副本提供独立的存储。
 
 ![图8.8](.\images\Figure8.8.png)
-<center>图 8.8 Volume claim templates dynamically create storage for Pods in StatefulSets</center>
+<center>图 8.8 volume claim templates 在 StatefulSets 中动态地为 Pods 创建存储空间</center>
 
-The link between the Pod and its PVC is maintained when Pods are replaced, which is what really gives StatefulSets the power to run data-heavy applications. When you roll out an update to your app, the new Pod 0 will attach to the PVC from the previous Pod 0, and the new app container will have access to the exact same state as the replaced app container.
+Pod 和它的 PVC 之间的链接在替换 Pods 时得到维护，这才是真正赋予 StatefulSets 运行数据量大的应用程序的能力。当你推出一个更新到你的应用程序，新的 Pod 0 将附加到从以前的 Pod 0 的 PVC，新的应用程序容器将访问与替换的应用程序容器完全相同的状态。
 
-​	**TRY IT NOW	Trigger a Pod replacement by removing Pod 0. It will be replaced with another Pod 0 that attaches to the same PVC.**
+<b>现在就试试</b> 通过移除0号 Pod 触发 Pod 更换。它将被替换为另一个Pod 0，连接到相同的PVC
 
 ```
-# delete the Pod:
+# 删除 Pod:
 kubectl delete pod sleep-with-pvc-0
 
-# check that the replacement gets created:
+# 检查替换的 Pod 已创建:
 kubectl get pods -l app=sleep-with-pvc
 
-# check that the new Pod 0 can see the old data:
+# 检查新的 Pod 0 可以看到旧数据:
 kubectl exec sleep-with-pvc-0 -- cat /data/pod.txt
 ```
 
-This simple example makes this clear—you can see in figure 8.9 that the new Pod 0 has access to all the data from the original Pod. In a production cluster, you would specify a storage class that uses a volume type that any node can access, so replace- ment Pods can run on any node, and the app container can still mount the PVC.
+这个简单的例子说明了这一点——在图 8.9 中可以看到，新的 Pod 0 可以访问原始 Pod 中的所有数据。在生产集群中，您可以指定一个存储类，该存储类使用任何节点都可以访问的卷类型，因此替换 Pods 可以在任何节点上运行，而应用程序容器仍然可以挂载 PVC。
 
 ![图8.9](.\images\Figure8.9.png)
-<center>图 8.9 Stability in a StatefulSet extends to preserving the PVC link between Pod replacements</center>
+<center>图 8.9 StatefulSet 中的稳定性扩展到保留 Pod 替换之间的 PVC 链接</center>
 
-Volume claim templates are the final piece we need to add to the Postgres deployment to model a fully reliable database. StatefulSets are intended to present a stable environment for your app, so they’re less flexible than other controllers when it comes to updates—you can’t update an existing StatefulSet and make a fundamental change, like adding volume claims. You need to make sure your design meets the app requirements for a StatefulSet because it’s hard to maintain service levels during big changes.
+Volume claim templates 是我们需要添加到 Postgres 部署中的最后一部分，以建模完全可靠的数据库。StatefulSet 旨在为您的应用程序提供一个稳定的环境，因此当涉及到更新时，它们不如其他控制器灵活—您不能更新现有的 StatefulSet 并进行根本性的更改，例如添加卷声明。您需要确保您的设计满足 StatefulSet的应用程序需求，因为在大的更改期间很难保持服务水平。
 
-​	**TRY IT NOW	We’ll update the Postgres deployment, but first we need to remove the existing StatefulSet.**
+
+<b>现在就试试</b> 我们将更新 Postgres 部署，但首先我们需要删除现有的StatefulSet
 
 ```
-# apply the update with volume claim templates—this will fail:
+# 对 volume claim templates 应用更新—这将失败:
 kubectl apply -f todo-list/db/replicated/update/todo-db-pvc.yaml
 
-# delete the existing set:
+# 删除 StatefulSet:
 kubectl delete statefulset todo-db
 
-# create a new one with volume claims:
+# 创建一个包含 volume claims 的新的 StatefulSet:
 kubectl apply -f todo-list/db/replicated/update/todo-db-pvc.yaml
 
-# check the volume claims:
+# 检查 volume claims:
 kubectl get pvc -l app=todo-db
 ```
 
-When you run this exercise, you should see clearly how the StatefulSet preserves order and waits for each Pod to be running before it starts the next Pod. PVCs are created for each Pod in sequence, too, as you can see from my output, shown in figure 8.10.
+当您运行这个练习时，您应该清楚地看到 StatefulSet 如何保持顺序，并在启动下一个 Pod 之前等待每个 Pod 运行。PVC 也是按顺序为每个 Pod 创建的，从我的输出中可以看到，如图8.10所示。
 
 ![图8.10](.\images\Figure8.10.png)
-<center>图 8.10 PVCs are created and allocated to the Postgres Pods</center>
+<center>图 8.10 PVC 被创建并分配给 Postgres Pods</center>
+ 
+感觉我们在 StatefulSets 上花了很长时间，但这是一个你应该很好地理解的主题，所以当有人要求你将他们的数据库移动到 Kubernetes(他们会的)时，你不会感到惊讶。StatefulSets 具有相当大的复杂性，您将在大多数情况下避免使用它们。但是如果你想把现有的应用程序迁移到 Kubernetes上，StatefulSets可以让你在同一个平台上运行所有的东西，或者不得不保留几个 vm 来运行一两个应用程序。
 
-It feels like we’ve spent a long time on StatefulSets, but it’s a topic you should understand well so you’re not taken by surprise when someone asks you to move their database to Kubernetes (which they will). StatefulSets come with a good deal of complexity, and you’ll avoid using them most of the time. But if you are looking to migrate existing apps to Kubernetes, StatefulSets could be the difference between being able to run everything on the same platform or having to keep a handful of VMs just to run one or two apps.
+我们将通过一个练习来结束本节，以展示集群数据库的强大功能。Postgres 辅助服务器从主服务器复制所有数据，客户端可以使用它进行只读访问。如果我们的待办事项列表应用程序出现了严重的生产问题，导致它丢失数据，我们可以选择切换到只读模式，并在调查问题时使用次要模式。这样可以让应用程序以最小的功能安全地运行，这绝对比让它脱机要好。
 
-​	We’ll finish the section with an exercise to show the power of our clustered database. The Postgres secondary replicates all the data from the primary, and it can be used by clients for read-only access. If we had a serious production issue with our todo list app that was causing it to lose data, we have the option to switch to read-only mode and use the secondary while we investigate the problem. That keeps the app running safely with minimal functionality, which is definitely preferable to taking it offline.
-
-​	**TRY IT NOW	Run the to-do web app and enter some items. In the default configuration, it connects to the Postgres primary in Pod 0 of the StatefulSet. Then we’ll switch the app configuration to put it into read-only mode. This makes it connect to the read-only Postgres standby in Pod 1, which has replicated all the data from Pod 0.**
+<b>现在就试试</b> 运行待办事项 web 应用程序并输入一些项目。在默认配置中，它连接到 statfulset 的 Pod 0 中的Postgres主节点。然后我们将切换应用程序配置，将其设置为只读模式。这使得它连接到 Pod 1 中的只读Postgres备用，后者已经从 Pod 0复制了所有数据
 
 ```
-# deploy the web app:
+# 部署 web app:
 kubectl apply -f todo-list/web/
 
-# get the URL for the app:
+# 获取应用访问 url:
 kubectl get svc todo-web -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8081/new'
 
-# browse and add a new item
+# 访问并添加新的待办项
 
-# switch to read-only mode, using the database secondary:
+# 切换到 read-only 模式, 使用数据库备用节点:
 kubectl apply -f todo-list/web/update/todo-web-readonly.yaml
 
-# refresh the app—the /new page is read-only;
-# browse to /list and you'll see your original data
+# 刷新应用—现在/new的页面只读;
+# 访问 /list 你将看到原始的数据
 
-# check that there are no clients using the primary in Pod 0:
+# 检查 Pod 0 中是否没有使用主服务器的客户端:
 kubectl exec -it todo-db-0 -- sh -c "psql -U postgres -t -c 'SELECT
   datname, query FROM pg_stat_activity WHERE datid > 0'"
 
-# check that the web app really is using the secondary in Pod 1:
+# 检查 web 应用程序是否真的在使用 Pod 1 中的备用:
 kubectl exec -it todo-db-1 -- sh -c "psql -U postgres -t -c 'SELECT
   datname, query FROM pg_stat_activity WHERE datid > 0'"
 ```
 
-You can see my output in figure 8.11, with some tiny screenshots to show the app running in read-only mode but still with access to all the data.
+您可以在图 8.11 中看到我的输出，其中有一些小屏幕截图，显示应用程序以只读模式运行，但仍然可以访问所有数据。
 
-​	Postgres has existed as a SQL database engine since 1996—it predates Kubernetes by almost 25 years. Using a StatefulSet, you can model an application environment that suits Postgres and other clustered applications like it, providing stable networking, storage, and initialization in the dynamic world of containers.
+![图8.11](.\images\Figure8.11.png)
+<center>图 8.11 如果出现数据问题，将应用程序切换到只读模式是一个有用的选择</center>
+
+Postgres 作为 SQL 数据库引擎存在于 1996 年，比 Kubernetes 早了将近 25 年。使用 StatefulSet，您可以为适合 Postgres 和其他类似的集群应用程序的应用程序环境建模，从而在容器的动态世界中提供稳定的网络、存储和初始化。
 
 ## 8.4 使用 Jobs 和 CronJobs 运行维护任务
 
@@ -335,8 +339,6 @@ Data-intensive apps need replicated data with storage aligned to compute, and th
 
 ​	Jobs aren’t just for stateful apps; they’re a great way to bring a standard approach to any batch-processing problems, where you can hand off all the scheduling and monitoring and retry logic to the cluster. You can run any container image in the Pod for a Job, but it should start a process that ends; otherwise, your jobs will keep running forever. Listing 8.5 shows a Job spec that runs the Pi application in batch mode.
 
-![图8.11](.\images\Figure8.11.png)
-<center>图 8.11 Switching an app to read-only mode is a useful option if there's a data issue</center>
 
 **Listing 8.5	pi-job.yaml, a simple Job to calculate Pi**
 
