@@ -84,35 +84,35 @@ StatefulSet 只是对稳定环境建模的第一部分。您可以获取每个 P
 
 ## 8.2 在 StatefulSets 中使用 init 容器引导 Pod
 
-The Kubernetes API composes objects from other objects: the Pod template in a StatefulSet definition is the same object type you use in the template for a Deployment and in a bare Pod definition. That means all the Pod features are available for StatefulSets even though the Pods themselves are managed in a different way. We learned about init containers in chapter 7, and they’re a perfect tool for the complicated initialization steps you often need in clustered applications.
+Kubernetes API 从其他对象中组合对象: 在 StatefulSet 定义中的 Pod 模板与在 Deployment 模板和 裸Pod定义中使用的对象类型相同。这意味着 Pod 的所有功能都可以用于 StatefulSets，尽管 Pod 本身是以不同的方式管理的。我们在第7章学习了 init 容器，对于集群应用程序中经常需要的复杂初始化步骤，它们是一个完美的工具。
 
-​	Listing 8.2 shows the first init container for an update to the Postgres deployment.Multiple init containers in this Pod spec run in sequence, and because the Pods also start in sequence, you can guarantee that the first init container in Pod 1 won’t run until Pod 0 is fully initialized and ready.
+清单 8.2 显示了用于更新 Postgres 部署的第一个init容器。这个Pod Spec 中的多个 init 容器是按顺序运行的，而且由于 Pod 也是按顺序启动的，所以可以保证Pod 1 中的第一个init容器在 Pod 0 完全初始化并准备就绪之前不会运行。
 
-**Listing 8.2	todo-db.yaml, the replicated Postgres setup with initialization**
+> 清单8.2 todo-db.yaml，复制的 Postgres 设置初始化
 
 ```
 initContainers:
   - name: wait-service
     image: kiamol/ch03-sleep
-    envFrom: # env file for sharing between containers
+    envFrom: # env 文件用于在容器之间共享
       - configMapRef:
         name: todo-db-env
     command: ['/scripts/wait-service.sh']
     volumeMounts:
-      - name: scripts # Volume loads scripts from ConfigMap.
+      - name: scripts # 卷从 ConfigMap 装载脚本
         mountPath: "/scripts"
 ```
 
-The script that runs in this init container has two functions: if it’s running in Pod 0, it just prints a log to confirm that this is the database primary, and then the container exits; if it’s running in any other Pod, it makes a DNS lookup call to the primary, to make sure it’s accessible before continuing. The next init container will start the replication process, so this one makes sure everything is in place.
+在这个 init 容器中运行的脚本有两个功能: 如果它在 Pod 0 中运行，它只是打印一个日志来确认这是数据库主容器，然后容器退出;如果它在任何其他 Pod 中运行，它会对主 Pod 进行 DNS 查找调用，以确保在继续之前可以访问它。下一个init 容器将启动复制进程，因此这个容器将确保一切就绪。
 
-​	The exact steps in this example are specific to Postgres, but the pattern is the same for many clustered and replicated applications—MySQL, Elasticsearch, RabbitMQ,and NATS all have broadly similar requirements. Figure 8.4 shows how you can model that pattern using init containers in a StatefulSet.
+本例中的具体步骤是特定于 Postgres 的，但许多集群和复制应用程序的模式是相同的——mysql、Elasticsearch、RabbitMQ和nat都有大致相似的需求。图 8.4 显示了如何在 StatefulSet 中使用init容器对该模式建模。
 
-![图8.4](.\images\Figure8.4.png)
-</center>图 8.4 The stable environment of a StatefulSet gives guarantees you can use in initialization</center>
+[图8.4](.\images\Figure8.png)
+<center>图 8.4 StatefulSet的稳定环境保证了您可以在初始化中使用</center>
 
-You define DNS names for the individual Pods in a StatefulSet by identifying a Service in the spec, but it needs to be a special configuration of headless Service. Listing 8.3 shows how the database Service is configured with no ClusterIP address and with a selector for the Pods.
+您可以通过在 spec 中标识服务来为 StatefulSet 中的各个 Pods 定义 DNS 名称，但它需要是 headless Service 的特殊配置。清单 8.3 显示了如何在没有 ClusterIP 地址的情况下配置数据库服务，并为 Pods 配置一个选择器。
 
-**Listing 8.3	todo-db-service.yaml, a headless Service for a StatefulSet**
+> 清单8.3 todo-db-service。yaml，一个 StatefulSet 的 headless Service
 
 ```
 apiVersion: v1
@@ -121,79 +121,80 @@ metadata:
   name: todo-db
 spec:
   selector:
-    app: todo-db # The Pod selector matches the StatefulSet.
-  clusterIP: None # The service will not get its own IP address.
+    app: todo-db # Pod 选择器与 StatefulSet 相匹配.
+  clusterIP: None # Service 将不会拥有自己的 Ip 地址.
   ports:
     # ports follow
 ```
 
-A Service with no ClusterIP is still available as a DNS entry in the cluster, but it doesn’t use a fixed IP address for the Service. There’s no virtual IP that is routed to the real destination by the networking layer. Instead, the DNS entry for the service returns an IP address for each Pod in the StatefulSet, and each Pod additionally gets its own DNS entry.
+没有 ClusterIP 的 Service 仍然可以作为集群中的 DNS 条目，但它不会为该服务使用固定的 IP 地址。没有由网络层路由到真实目的地的虚拟 IP。相反，服务的 DNS 条目为 StatefulSet 中的每个 Pod 返回一个 IP 地址，并且每个 Pod 还获得自己的 DNS 条目。
 
-​	**TRY IT NOW	We’ve already deployed the headless Service, so we can use a sleep Deployment to query DNS for the StatefulSet and see how it compares to a typical ClusterIP service.**
+<b>现在就试试</b> 我们已经部署了 headless Service，所以我们可以使用 sleep Deployment 来查询 StatefulSet 的 DNS，看看它与典型的 ClusterIP 服务相比如何
 
 ```
-# show the Service details:
+# 查看 Service 明细:
 kubectl get svc todo-db
-# run a sleep Pod to use for network lookups:
+# 运行一个 sleep Pod 用于网络查找:
 kubectl apply -f sleep/sleep.yaml
-# run a DNS query for the Service name:
+# 运行 Service 名称的 DNS 查询:
 kubectl exec deploy/sleep -- sh -c 'nslookup todo-db | grep "^[^*]"'
-# run a DNS lookup for Pod 0:
+# 运行 Pod 0 的 DNS 查找:
 kubectl exec deploy/sleep -- sh -c 'nslookup todo-db-0.todo-
   db.default.svc.cluster.local | grep "^[^*]"'
 ```
 
-You’ll see in this exercise that the DNS lookup for the service returns two IP addresses, which are the internal Pod IPs. The Pods themselves have their own DNS entry in the format pod-name.service-name with the usual cluster domain suffix. Figure 8.5 shows my output.
-
-​	Predictable startup order and individually addressable Pods are the foundation for initializing a clustered app in a StatefulSet. The details will differ wildly between applications, but broadly, the startup logic for the Pod will be something like this: if I am Pod 0, then I’m the primary, so I do all the primary setup stuff; otherwise, I’m a secondary, so I’ll give the primary some time to get set up, check that everything’s working, and then synchronize using the Pod 0 address.
-
-The actual setup for Postgres is quite involved, so I’ll skip over it here. It uses scripts in ConfigMaps with init containers to set up the primary and secondaries. I use various techniques we’ve covered in the book so far in the spec for the StatefulSet, which is worth exploring, but the details of the scripts are all specific to Postgres.
+在本练习中，您将看到 Service 的 DNS 查找返回两个 IP 地址，它们是 Pod 内部IP。Pods 本身有自己的格式为 pod-name 的 DNS 条目。带有通常集群域后缀的服务名称。图 8.5 显示了我的输出。
 
 ![图8.5](.\images\Figure8.5.png)
-</center>图 8.5 StatefulSets give each Pod its own DNS entry, so they are individually addressable</center>
+</center>图 8.5 StatefulSets 为每个 Pod 提供自己的 DNS 条目，因此它们是单独可寻址的</center>
 
-​	**TRY IT NOW	Update the database to make it a replicated setup. There are configuration files and startup scripts in ConfigMaps, and the StatefulSet is updated to use them in init containers.**
+可预测的启动顺序和单独可寻址的 Pod 是在 StatefulSet 中初始化集群应用的基础。具体细节在不同的应用程序之间会有很大的不同，但从广义上讲，Pod 的启动逻辑将是这样的: 如果我是Pod 0，那么我是主设备，所以我做所有的主设备设置工作;否则，我是一个辅助，所以我将给主服务器一些时间来设置，检查一切都正常工作，然后使用 Pod 0 地址进行同步。
+
+Postgres 的实际设置相当复杂，所以我在这里略过。它使用 ConfigMaps 中的脚本和 init 容器来设置主服务器和备用服务器。到目前为止，我在 StatefulSet 的 spec 中使用了书中介绍的各种技术，值得探索，但脚本的细节都是特定于Postgres 的。
+
+
+<b>现在就试试</b> 更新数据库，使其成为一个复制的设置。ConfigMaps 中有配置文件和启动脚本，并且更新 StatefulSet 以在 init 容器中使用它们
 
 ```
-# deploy the replicated StatefulSet setup:
+# 部署副本方式的 StatefulSet 应用设置:
 kubectl apply -f todo-list/db/replicated/
 
-# wait for the Pods to spin up
+# 等待 Pods 就绪
 kubectl wait --for=condition=Ready pod -l app=todo-db
 
-# check the logs of Pod 0—the primary:
+# 检查 Pod 0日志—主节点:
 kubectl logs todo-db-0 --tail 1
 
-# and of Pod 1—the secondary:
+# 以及 Pod 1—从节点:
 kubectl logs todo-db-1 --tail 2
 ```
 
-Postgres uses an active-passive model for replication, so the primary is used for database reads and writes, and the secondaries sync data from the primary and can be used by clients, but only for read access. Figure 8.6 shows how the init containers recognize the role for each Pod and initialize them.
+Postgres 使用主-被动模型进行复制，因此主服务器用于数据库读写，从服务器从主服务器同步数据，可供客户端使用，但仅用于读访问。图 8.6 显示了 init 容器如何识别每个 Pod 的角色并初始化它们。
 
 ![图8.6](.\images\Figure8.6.png)
-<center>图 8.6 Pods are replicas, but they can have different behavior, using init containers to choose a role</center>
+<center>图 8.6 Pod 是副本，但它们可以有不同的行为，使用 init 容器选择一个角色</center>
 
-Most of the complexity in initializing replicated apps like this is around modelling the workflow, which is specific to the app. The init container scripts here use the pg_isready tool to verify that the primary is ready to receive connections and the pb_basebackup tool to start the replication. Those implementation details are abstracted away from operators managing the system. They can add more replicas by scaling up the StatefulSet, like with any other replication controller.
+像这样初始化复制应用的大部分复杂性都是围绕工作流建模，这是特定于应用的。这里的 init 容器脚本使用 pg_isready 工具来验证主应用是否准备好接收连接，并使用 pb_basebackup 工具来启动复制。这些实现细节从管理系统的操作员那里抽象出来。他们可以通过扩大 StatefulSet 来添加更多的副本，就像使用任何其他复制控制器一样。
 
-​	**TRY IT NOW	Scale up the database to add another replica, and confirm that the new Pod also starts as a secondary.**
+<b>现在就试试</b> 扩大数据库以添加另一个副本，并确认新的 Pod 也作为备用启动
 
 ```
-# add another replica:
+# 添加另一个副本:
 kubectl scale --replicas=3 statefulset/todo-db
 
-# wait for Pod 2 to spin up
+# 等待 Pod 2 就绪
 kubectl wait --for=condition=Ready pod -l app=todo-db
 
-# check that the new Pod sets itself up as another secondary:
+# 检查新 Pod 是否设置为另一个备用:
 kubectl logs todo-db-2 --tail 2
 ```
 
-I wouldn’t call this an enterprise-grade production setup, but it’s a good starting point where a real Postgres expert could take over. You now have a functional, replicated Postgres database cluster with a primary and two secondaries—Postgres calls them standbys. As you can see in figure 8.7, all the standbys start in the same way, syncing data from the primary, and they can all be used by clients for read-only access.
+我不认为这是一个企业级的产品设置，但这是一个很好的起点，真正的 Postgres 专家可以接管它。现在，您有了一个功能良好的复制 Postgres 数据库集群，其中有一个主数据库和两个备用数据库——Postgres称它们为备用数据库。如图8.7所示，所有备用服务器都以相同的方式启动，从主服务器同步数据，客户端都可以使用它们进行只读访问。
 
 ![图8.7](.\images\Figure8.7.png)
-<center>图 8.7 Using individually addressable Pods means secondaries can always find the primary</center>
+<center>图 8.7 使用单独可寻址的 pod 意味着辅助设备总能找到主设备</center>
 
-One obvious part is missing here—the actual storage of the data. The setup we have isn’t really usable because it doesn’t have any volumes for storage, so each database container writes data in its own writable layer, not in a persistent volume. StatefulSets have a neat way of defining volume requirements: you can include a set of Persistent Volume Claim (PVC) templates in the spec.
+这里遗漏了一个明显的部分——数据的实际存储。我们所拥有的设置并不是真正可用的，因为它没有任何用于存储的卷，因此每个数据库容器都在自己的可写层中写入数据，而不是在持久卷中写入数据。StatefulSets 有一种定义卷需求的简洁方法:您可以在 spec 中包含一组持久卷声明(PVC)模板。
 
 ## 8.3 使用卷声明模板请求存储
 
