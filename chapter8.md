@@ -6,21 +6,20 @@
 
 ## 8.1 Kubernetes 如何用 StatefulSets 建模稳定性
 
-A StatefulSet is a Pod controller with predictable management features: it lets you run applications at scale within a stable framework. When you deploy a ReplicaSet,it creates Pods with random names, which are not individually addressable over the domain name system (DNS), and it starts them in parallel. When you deploy a StatefulSet, it creates Pods with predictable names, which can be individually accessed over DNS, and starts them in order; the first Pod needs to be up and running
-before the second Pod is created.
+StatefulSet 是一个具有可预测管理特性的 Pod 控制器:它允许您在一个稳定的框架内大规模运行应用程序。当您部署 ReplicaSet 时，它会使用随机名称创建 Pod，这些名称不能通过域名系统(DNS)单独寻址，并且它会并行启动它们。当你部署一个 StatefulSet 时，它会创建具有可预测名称的 Pod，这些 Pod 可以通过 DNS 单独访问，并按顺序启动它们;第一个 Pod 需要启动并运行在第二个 Pod 创建之前。
 
-​Clustered applications are a great candidate for StatefulSets. Typically they’re designed with a primary instance and one or more secondaries, which gives them high availability. You might be able to scale the secondaries, but they all need to reach the primary and then use it to synchronize their own data. You can’t model that with a Deployment because in the ReplicaSet, there is no way to identify a single Pod as the primary, so you’d end up with bizarre and unpredictable conditions with multiple primaries or zero primaries.
+集群应用程序是 StatefulSet的一个很好的候选。它们通常设计有一个主实例和一个或多个辅助实例，这使它们具有高可用性。您可能能够扩展辅助服务器，但它们都需要到达主服务器，然后使用主服务器同步它们自己的数据。你不能用Deployment 来建模，因为在 ReplicaSet 中，没有办法将单个 Pod 识别为主节点，所以你最终会遇到多个主节点或零主节点的奇怪且不可预测的情况。
 
-​	Figure 8.1 shows an example of that, which could be used to run the Postgres database we’ve used in previous chapters for the to-do list application, but it uses a StatefulSet to achieve replicated data and high availability.
+图 8.1 显示了一个例子，它可以用来运行我们在前几章中为待办事项列表应用程序使用的 Postgres 数据库，但是它使用了一个 StatefulSet 来实现复制数据和高可用性。
 
 ![图8.1](.\images\Figure8.1.png)
-​<center>图 8.1 In a StatefulSet,each Pod can have its own copy of data replicated from the first Pod</center>
+​<center>图 8.1 在 StatefulSet 中，每个 Pod 都可以从第一个 Pod 复制自己的数据副本</center>
 
-The setup for this is quite involved, and we’ll spend a couple of sections getting there in stages, so you learn how all the pieces of a working StatefulSet fit together. It’s a pattern that is useful for more than just databases—many older applications were designed for a static runtime environment and made assumptions about stability that don’t hold true in Kubernetes. StatefulSets allow you to model that stability, and if your goal is to move your existing apps to Kubernetes, then they may be something you use early in that journey.
+为此的设置相当复杂，我们将分阶段花几个部分来完成，以便您了解工作中的 StatefulSet 的所有部分是如何组合在一起的。这种模式不仅对数据库有用——许多旧的应用程序是为静态运行时环境设计的，并且对稳定性做出了假设，但这些假设在Kubernetes 中并不成立。StatfulSets 允许你对这种稳定性建模，如果你的目标是将你现有的应用程序转移到 Kubernetes，那么它们可能是你在这一旅程的早期使用的东西。
 
-​	Let’s start with a simple StatefulSet that shows the basics. Listing 8.1 shows that StatefulSets have pretty much the same specs as other Pod controllers, except that they also need to include the name of a Service.
+让我们从一个简单的 StatefulSet 开始，它展示了基础知识。清单 8.1 显示了 StatefulSets 具有与其他 Pod 控制器几乎相同的 spec，除了它们还需要包含服务的名称。
 
-**Listing 8.1	todo-db.yaml, a simple StatefulSet**
+> 清单 8.1	todo-db.yaml, 一个简单的 StatefulSet
 
 ```
 apiVersion: apps/v1
@@ -28,61 +27,60 @@ kind: StatefulSet
 metadata:
   name: todo-db
 spec:
-  selector: # StatefulSets use the same selector mechanism.
+  selector: # StatefulSets 使用了相同的选择器机制
     matchLabels:
 	  app: todo-db
-  serviceName: todo-db # StatefulSets must be linked to a Service.
+  serviceName: todo-db # StatefulSets 必须关联 Service.
   replicas: 2
   template:
 	# pod spec...
 ```
 
-When you deploy this YAML file, you’ll get a StatefulSet running two Postgres pods,but don’t get too excited—they’re just two separate database servers that happen to be managed by the same controller. There’s more work needed to get two Pods to be a replicated database cluster, and we’ll get there over the next few sections.
+当您部署这个 YAML 文件时，您将得到一个运行两个 Postgres pod 的 StatefulSet，但不要太兴奋——它们只是两个单独的数据库服务器，恰好由同一个控制器管理。要使两个 pod 成为一个复制的数据库集群，还需要做更多的工作，我们将在接下来的几节中实现这一点。
 
-​	**TRY IT NOW	Deploy the StatefulSet from listing 8.1, and see how the Pods it creates compare to Pods managed by a ReplicaSet.**
+<b>现在就试试</b> 部署清单 8.1 中的 StatefulSet，看看它创建的 pod 与 ReplicaSet 管理的 pod 有什么不同
 
 ```
-# switch to the chapter's source:
+# 切换到本章的源码目录:
 cd ch08
-# deploy the StatefulSet, Service, and a Secret for the Postgres
-# password:
+# 部署 StatefulSet, Service, 以及用于 Postgres 密码的 Secret:
 kubectl apply -f todo-list/db/
-# check the StatefulSet:
+# 检查 StatefulSet:
 kubectl get statefulset todo-db
-# check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=todo-db
-# find the hostname of Pod 0:
+# 查看 Pod 0 的主机名:
 kubectl exec pod/todo-db-0 -- hostname
-# check the logs of Pod 1:
+# 检查 Pod 1 的日志:
 kubectl logs todo-db-1 --tail 1
 ```
 
-You can see from figure 8.2 that a StatefulSet works in a very different way from a ReplicaSet or a DaemonSet. The Pods have a predictable name, which is the StatefulSet name followed by the index of the Pod, so you can manage the Pods using their names instead of having to use a label selector.
+从图 8.2 中可以看到，StatefulSet 的工作方式与 ReplicaSet 或 DaemonSet 非常不同。Pod 有一个可预测的名称，即 StatefulSet 名称后面跟着 Pod 的索引，因此您可以使用它们的名称来管理 Pod，而不必使用标签选择器。
 
-​	The Pods are still managed by the controller, but in a more predictable way than with a ReplicaSet. Pods are created in order from zero up to n; if you scale down the set, the controller will remove them in the reverse order, starting from n and working down. If you delete a Pod, the controller will create a replacement. It will have the same name and configuration as the original, but it will be a new Pod.
+Pod 仍然由控制器管理，但以一种比 ReplicaSet 更可预测的方式。Pod 是按照从 0 到 n 的顺序创建的;如果您缩小集合，控制器将以相反的顺序删除它们，从 n 开始向下。如果删除 Pod，控制器将创建一个替换。它的名称和配置将与原来的相同，但它将是一个新的Pod。
 
 ![图8.2](.\images\Figure8.2.png)
-<center>图 8.2 A StatefulSet can create the environment for a clustered application, but the app needs to configure itself</center>
+<center>图 8.2 StatefulSet 可以为集群应用程序创建环境，但应用程序需要自行配置</center>
 
-​	**TRY IT NOW	Delete Pod 0 of the StatefulSet, and see that Pod 0 comes back again.**
+<b>现在就试试</b> 删除Pod 0 的 StatefulSet，并看到 Pod 0 再次返回
 
 ```
-# check the internal ID of Pod 0:
+# 检查 Pod 0 的内部 id:
 kubectl get pod todo-db-0 -o jsonpath='{.metadata.uid}'
-# delete the Pod:
+# 删除 Pod:
 kubectl delete pod todo-db-0
-# check Pods:
+# 检查 Pods:
 kubectl get pods -l app=todo-db
-# check that the new Pod is a new Pod:
+# 检查新的 Pod 完全是全新的:
 kubectl get pod todo-db-0 -o jsonpath='{.metadata.uid}'
 ```
 
-You can see in figure 8.3 that a StatefulSet provides a stable environment for the app.Pod 0 is replaced with an identical Pod 0, but that doesn’t trigger a whole new set; the original Pod 1 remains. Ordering is applied only for creation and scaling, not for replacing missing Pods.
+你可以在图 8.3 中看到，StatefulSet 为 app 提供了一个稳定的环境。Pod 0 被替换为一个相同的Pod 0，但这不会触发一个全新的设置; 原来的 Pod 1仍然存在。仅在创建和扩展时应用顺序，不用于替换缺失的 Pod。
 
-​	The StatefulSet is only the first part of modeling a stable environment. You can get DNS names for each Pod linking the StatefulSet to a service, and that means you can configure Pods to initialize themselves by working with other replicas at known addresses.
+[图8.3](.\images\Figure8.3.png)
+<center>图 8.3 StatefulSets 替换丢失的副本，就像它们之前的模样</center>
 
-![图8.3](.\images\Figure8.3.png)
-<center>图 8.3 StatefulSets replace missing replicas exactly as they were</center>
+StatefulSet 只是对稳定环境建模的第一部分。您可以获取每个 Pod 的 DNS 名称，将 StatefulSet 链接到一个服务，这意味着您可以配置 Pod，通过使用已知地址上的其他副本来初始化它们自己。
 
 ## 8.2 在 StatefulSets 中使用 init 容器引导 Pod
 
