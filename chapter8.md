@@ -488,26 +488,25 @@ kubectl get jobs -o jsonpath="{.items[?(@.metadata.ownerReferences[0]
 
 ## 8.5 为有状态应用程序选择平台
 
-The great promise of Kubernetes is that it gives you a single platform that can run all your apps, on any infrastructure. It’s hugely appealing to think that you can model all
-the aspects of any application in a chunk of YAML, deploy it with some kubectl commands, and know it will run in the same way on any cluster, taking advantage of all the extended features the platform offers. But data is precious and usually irreplaceable,so you need to think carefully before you decide that Kubernetes is the place to run data-heavy apps.
+Kubernetes 最大的承诺是，它为你提供了一个单一的平台，可以在任何基础设施上运行你的所有应用。认为你可以建模所有的东西是非常吸引人的,使用kubectl命令部署它，并且知道它将以相同的方式在任何集群上运行，利用平台提供的所有扩展功能。但数据是宝贵的，通常是不可替代的，所以在决定将 Kubernetes 作为运行数据量大的应用程序的地方之前，你需要仔细考虑。
 
-Figure 8.17 shows the full setup we’ve built in this chapter to run an almost-production-grade SQL database in Kubernetes. Just look at all the moving parts—do
-
-
-you really want to manage all that? And how much time will you need to invest just testing this setup with your own data sizes: validating that the replicas are syncing correctly, verifying the backups can be restored, running chaos experiments to be sure that failures are handled in the way you expect?
+图 8.17 显示了我们在本章中构建的在 Kubernetes 中运行几乎是生产级 SQL 数据库的完整设置。只要看看这些活动的部分就行了.
 
 ![图8.17](.\images\Figure8.17.png)
-​	<center>图 8.17 Yikes! And this is a simplification that doesn’t show volumes or init containers</center>
+​	<center>图 8.17 呵!这是一个简化，没有显示卷或init容器</center>
 
-​	Compare that to a managed database in the cloud. Azure, AWS, and GCP all offer managed services for Postgres, MySQL, and SQL Server, as well as their own custom cloud-scale databases. The cloud provider takes care of scale and high availability, including features for backups to cloud storage and more advanced options like threat detection. An alternative architecture just uses Kubernetes for compute and plugs in to managed cloud services for data and communication.
 
-​	Which is the better option? Well, I’m a consultant by day, and I know the only real answer is: “It depends.” If you’re running in the cloud, then I think you need a very good reason not to use managed services in production, where data is critical. In nonproduction environments, it often makes sense to run equivalent services in Kubernetes instead, so you run a containerized database and message queue in your development and test environments for lower costs and ease of deployment and swap out to managed versions in production. Kubernetes makes a swap like that very simple, with all the Pod and Service configuration options.
+你真想搞定这些吗?仅用自己的数据大小测试这个设置需要花费多少时间:验证副本正在正确同步，验证备份可以恢复，运行混乱实验以确保以您期望的方式处理故障?
 
-​	In the data center, the picture is a little different. If you’re already invested in running Kubernetes on your own infrastructure, you’re taking on a lot of management, and it might make sense to maximize utilization of your clusters and use them for everything. If you choose to go that way, Kubernetes gives you the tools to migrate data-heavy apps into the cluster and run them with the levels of availability and scale that you need. Just don’t underestimate the complexity of getting there.
+将其与云中的托管数据库进行比较。Azure、AWS和GCP都为Postgres、MySQL和SQL Server提供托管服务，以及他们自己的自定义云规模数据库。云提供商负责规模和高可用性，包括备份到云存储的功能和更高级的选项，如威胁检测。另一种架构只是使用 Kubernetes 进行计算，并插入托管云服务进行数据和通信。
 
-​	We’re done with StatefulSets and Jobs now, so we can clean up before going on to the lab.
+哪个是更好的选择?我白天是个顾问，我知道唯一真实的答案是:“看情况而定。”如果您在云中运行，那么我认为您需要一个很好的理由不在生产环境中使用托管服务，因为在生产环境中数据至关重要。在非生产环境中，在 Kubernetes 中运行相同的服务通常是有意义的，因此您可以在开发和测试环境中运行容器化的数据库和消息队列，以降低成本和简化部署，并在生产环境中切换到托管版本。Kubernetes 让这样的交换非常简单，包括所有 Pod 和 Service 配置选项。
 
-​	**TRY IT NOW	All the top-level objects are labeled, so we can remove everything with cascading deletes.**
+在数据中心，情况略有不同。如果您已经投资在自己的基础设施上运行 Kubernetes，那么您将承担大量的管理工作，因此最大限度地利用集群并将它们用于所有事情可能是有意义的。如果您选择这样做，Kubernetes 为您提供了将数据密集型应用程序迁移到集群的工具，并以所需的可用性和规模运行它们。只是不要低估实现这一目标的复杂性。
+
+我们现在已经完成了 StatefulSets 和 job，因此可以在进入实验室之前进行清理。
+
+<b>现在就试试</b> 所有顶级对象都被标记，因此我们可以使用级联删除删除所有对象
 
 ```
 # 删除本章相关的对象:
