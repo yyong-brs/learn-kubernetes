@@ -335,16 +335,16 @@ Postgres 作为 SQL 数据库引擎存在于 1996 年，比 Kubernetes 早了将
 
 ## 8.4 使用 Jobs 和 CronJobs 运行维护任务
 
-Data-intensive apps need replicated data with storage aligned to compute, and they usually also need some independent nurturing of the storage layer. Data backups and reconciliation are well suited to another type of Pod controller: the Job. Kubernetes Jobs are defined with a Pod spec, and they run the Pod as a batch job, ensuring it runs to completion.
+数据密集型应用程序需要复制数据，并将存储与计算对齐，它们通常还需要一些独立的存储层。数据备份和协调非常适合另一种类型的 Pod 控制器:Job。Kubernetes Job 是用 Pod Spec 定义的，它们将 Pod 作为批处理作业运行，确保它运行到完成。
 
-​	Jobs aren’t just for stateful apps; they’re a great way to bring a standard approach to any batch-processing problems, where you can hand off all the scheduling and monitoring and retry logic to the cluster. You can run any container image in the Pod for a Job, but it should start a process that ends; otherwise, your jobs will keep running forever. Listing 8.5 shows a Job spec that runs the Pi application in batch mode.
+Jobs 不仅仅适用于有状态应用;它们是为任何批处理问题提供标准的好方法，您可以将所有调度、监视和重试逻辑移交给集群。你可以在 Pod 中为 Job 运行任何容器镜像，但它应该启动一个结束的进程;否则，您的作业将永远运行。清单 8.5 显示了以批处理模式运行 Pi 应用程序的 Job Spec。
 
 
-**Listing 8.5	pi-job.yaml, a simple Job to calculate Pi**
+> 清单8.5 pi-job。yaml，一个简单的计算Pi 的 Job
 
 ```
 apiVersion: batch/v1
-kind: Job # Job is the object type.
+kind: Job # Job 是对象类型
 metadata:
   name: pi-job
 spec:
@@ -357,9 +357,9 @@ spec:
       restartPolicy: Never # 容器若失败，将替换 Pod.
 ```
 
-The Job template contains a standard Pod spec, with the addition of a required restartPolicy field. That field controls the behavior of the Job in response to failure. You can choose to have Kubernetes restart the same Pod with a new container if the run fails or always create a replacement Pod, potentially on a different node. In a normal run of the Job where the Pod completes successfully, the Job and the Pod are retained so the container logs are available.
+Job template 包含一个标准 Pod spec，并添加了一个必需的 restartPolicy 字段。该字段控制 Job 在响应失败时的行为。如果运行失败，您可以选择让 Kubernetes 用一个新容器重新启动同一个Pod，或者总是在不同的节点上创建一个替换Pod。在 Pod 成功完成的正常作业运行中，作业和 Pod 将被保留，因此容器日志可用。
 
-​	**TRY IT NOW	Run the Pi Job from listing 8.5, and check the output from the Pod.**
+<b>现在就试试</b> 运行清单 8.5 中的Pi Job，并检查 Pod 的输出
 
 ```
 # 部署 Job:
@@ -372,20 +372,20 @@ kubectl logs -l job-name=pi-job
 kubectl get job pi-job
 ```
 
-Jobs add their own labels to the Pods they create. The job-name label is always added, so you can navigate to Pods from the Job. My output in figure 8.12 shows that the Job has had one successful completion and the calculation result is available in the logs.
+Jobs 将他们自己的标签添加到他们创建的 Pods 中。始终添加作业名称标签，因此您可以从作业导航到 Pods。图 8.12 中的输出显示 Job 已经成功完成了一次，计算结果可以在日志中找到。
 
 ![图8.12](.\images\Figure8.12.png)
-<center>图 8.12 Jobs create Pods, make sure they complete, and then leave them in the cluster</center>
+<center>图 8.12 Job 创建 Pod，确保它们完成，然后将它们留在集群中</center>
 
-It’s always useful to have different options for computing Pi, but this is just a simple example. You can use any container image in the Pod spec so you can run any kind of batch process with a Job. You might have a set of input items that need the same work done on them; you can create one Job for the whole set, which creates a Pod for each item, and Kubernetes distributes the work all throughout the cluster. The Job spec supports this with the following two optional fields:
+有不同的选项来计算圆周率总是有用的，但这只是一个简单的例子。您可以使用 Pod spec 中的任何容器镜像，因此您可以使用 Job 运行任何类型的批处理。你可能有一组输入项，需要对它们做相同的工作;您可以为整个集合创建一个 Job，它为每个项目创建一个 Pod, Kubernetes 将工作分布到整个集群中。Job spec 支持以下两个可选字段:
 
-- completions—specifies how many times the Job should run. If your Job is processing a work queue, then the app container needs to understand how to fetch the next item to work on. The Job itself just ensures that it runs a number of Pods equal to the desired number of completions.
+- completions - 指定 Job 应该运行多少次。如果 Job 正在处理一个工作队列，那么应用程序容器需要了解如何获取下一个要处理的项。Job 本身只是确保它运行的 pod 数量等于所需的完成数量。
+- parallelism - 指定在多个完成设置的作业中并行运行多少 pod。此设置允许您调整 Job 的运行速度，以平衡集群上的计算需求。
 
-- parallelism—specifies how many Pods to run in parallel for a Job with multiple completions set. This setting lets you tweak the speed of running the Job, balancing that with the compute requirements on the cluster.
+本章最后一个圆周率的例子:一个并行运行多个 pod 的新 Job spec，每个 pod 都将圆周率计算到一个随机的小数点后数位。该 spec 使用 init 容器生成要使用的小数点后数位，应用程序容器使用共享 EmptyDir 挂载读取输入。这是一种很好的方法，因为应用程序容器不需要修改就可以在并行环境中工作。你可以用一个 init 容器来扩展它，从队列中获取一个工作项，这样应用程序本身就不需要知道队列。
 
-One last Pi example for this chapter: a new Job spec that runs multiple Pods in parallel, each computing Pi to a random number of decimal places. This spec uses an init container to generate the number of decimal places to use, and the app container reads that input using a shared EmptyDir mount. This is a nice approach because the app container doesn’t need to be modified to work in a parallel environment. You could extend this with an init container that fetched a work item from a queue, so the app itself wouldn’t need to be aware of the queue.
-
-​	**TRY IT NOW	Run an alternative Pi Job that uses parallelism and shows that multiple Pods from the same spec can process different workloads.**
+​	**TRY IT NOW	.**
+<b>现在就试试</b> 运行另一个使用并行性的 Pi Job，并显示来自相同 spec 的多个 pod 可以处理不同的工作负载
 
 ```
 # 部署新 Job:
@@ -401,21 +401,21 @@ kubectl get job pi-job-random
 kubectl logs -l job-name=pi-job-random
 ```
 
-This exercise may take a while to run, depending on your hardware and the number of decimal places it generates. You’ll see all the Pods running in parallel, working on their own calculations. The final output will be three sets of Pi, probably to thousands of decimal places. I’ve abbreviated my results, shown in figure 8.13.
-
-Jobs are a great tool to have in your pocket. They’re perfect for anything compute intensive or IO intensive, where you want to make sure a process completes but don’t mind when. You can even submit Jobs from your own application—a web app running in Kubernetes has access to the Kubernetes API server, and it can create Jobs to run work for users.
+这个练习可能需要一段时间才能运行，这取决于您的硬件和它生成的小数位数。你会看到所有的 pod 都在并行运行，各自进行计算。最终输出的是三组圆周率，可能精确到小数点后几千位。我简化了结果，如图8.13所示。
 
 ![图8.13](.\images\Figure8.13.png)
-<center>图 8.13 Jobs can run multiple Pods from the same spec that each process different workloads</center>
+<center>图 8.13 Job 可以运行相同 spec 的多个 pod，每个 pod 处理不同的工作负载</center>
 
-​	The real power of Jobs is that they run in the context of the cluster, so they have all the cluster resources available to them. Back to the Postgres example, we can run a database-backup process in a Job, and the Pod it runs can access the Pods in the StatefulSet or the PVCs, depending on what it needs to do. That takes care of the nurturing aspect of these data-intensive apps, but those Jobs need to be run regularly, which is where the CronJob comes in. The CronJob is a Job controller, which creates Jobs on a regular schedule. Figure 8.14 shows the workflow.
+Job 是你口袋里的好工具。它们非常适合任何计算密集型或IO密集型的情况，在这些情况下，您希望确保进程完成，但不介意何时完成。你甚至可以从你自己的应用程序中提交 job——一个运行在Kubernetes中的web应用程序可以访问Kubernetes API服务，它可以创建 job 来为用户运行任务。
 
-​	CronJob specs include a Job spec, so you can do anything in a CronJob that you can do in a Job, including running multiple completions in parallel. The schedule for running the Job uses the Linux Cron format, which lets you express everything from simple “every minute” or “every day” schedules to more complex “at 4 a.m. and 6 a.m. every Sunday” routines. Listing 8.6 shows part of the CronJob spec for running database backups.
+Jobs 的真正强大之处在于它们在集群上下文中运行，因此它们拥有所有可用的集群资源。回到 Postgres 的例子，我们可以在 Job 中运行一个数据库备份进程，它运行的 Pod 可以访问 statfulset 中的 Pods 或 pvc，这取决于它需要做什么。这就解决了这些数据密集型应用程序的培育方面的问题，但这些 job 需要定期运行，这就是 CronJob 发挥作用的地方。CronJob 是一个 Jo b控制器，它定期创建 Job。图 8.14 显示了工作流。
 
 ![图8.14](.\images\Figure8.14.png)
-<center>图 8.14 CronJobs are the ultimate owner of the Job Pods, so everything can be removed with cascading deletes</center>
+<center>图 8.14 CronJobs 是 Job Pods 的最终所有者，因此可以级联删除所有内容</center>
 
-**Listing 8.6	todo-db-backup-cronjob.yaml, a CronJob for database backups**
+CronJob spec 包括一个 Job spec，所以你可以在 CronJob 中做任何你可以在 Job 中做的事情，包括并行运行多个补全。运行 Job 的计划使用 Linux Cron 格式，该格式允许您表达从简单的“每分钟”或“每天”计划到更复杂的“每个星期天早上4点和6点”例程的所有内容。清单 8.6 显示了运行数据库备份的部分 CronJob spec。
+
+> 清单 8.6	todo-db-backup-cronjob.yaml, 用于数据库备份的 CronJob
 
 ```
 apiVersion: batch/v1beta1
@@ -434,6 +434,10 @@ The full spec uses the Postgres Docker image, with a command to run the pg_dump 
 
 ​	**TRY IT NOW	Create a CronJob from the spec in listing 8.6 to run a database backup Job every two minutes.**
 
+完整 spec 使用 Postgres Docker 镜像，并使用命令运行 pg_dump 备份工具。Pod 从 StatefulSet 使用的相同 configmap 和 Secrets 中加载环境变量和密码，因此在配置文件中没有重复。它还使用自己的 PVC 作为存储位置来写入备份文件。
+
+<b>现在就试试</b> 根据清单 8.6 中的 spec 创建一个 CronJob，每两分钟运行一次数据库备份作业
+
 ```
 # 部署 CronJob 以及为备份文件的 PVC:
 kubectl apply -f todo-list/db/backup/
@@ -451,14 +455,14 @@ kubectl apply -f sleep/sleep-with-db-backup-mount.yaml
 kubectl exec deploy/sleep -- ls -l /backup
 ```
 
-The CronJob is set to run every two minutes, so you’ll need to give it time to fire up during this exercise. On schedule, the CronJob creates a Job, which creates a Pod, which runs the backup command. The Job ensures the Pod completes successfully. You can confirm the backup file is written by mounting the same PVC in another Pod. You can see it all works correctly in figure 8.15.
+CronJob 设置为每两分钟运行一次，因此在这个练习中，您需要给它一些时间来启动它。CronJob 按照计划创建一个 Job, Job 创建一个 Pod, Pod 运行备份命令。Job 确保 Pod 成功完成。您可以通过在另一个 Pod 中挂载相同的 PVC 来确认备份文件已被写入。您可以在图 8.15 中看到它都正常工作。
 
 ![图8.15](.\images\Figure8.15.png)
-<center>图 8.15 CronJobs run Pods, which can access other Kubernetes objects. This one connects to a database Pod</center>
+<center>图 8.15 CronJobs 运行 Pods，可以访问其他 Kubernetes 对象。这个连接到一个数据库 Pod</center>
 
-CronJobs don’t perform an automatic cleanup for Pods and Jobs. The time-to-live(TTL) controller does this, but it’s an alpha-grade feature that isn’t available in many Kubernetes platforms. Without it you need to manually delete the child objects when you’re sure you no longer need them. You can also move CronJobs to a suspended state, which means the object spec still exists in the cluster, but it doesn’t run until the CronJob is activated again.
+CronJobs 不会为 Pods 和 Jobs 执行自动清理。生存时间(TTL)控制器可以做到这一点，但这是一个 alpha 级功能，在许多 Kubernetes 平台上都无法使用。如果没有它，当您确定不再需要子对象时，您需要手动删除它们。您还可以将 CronJob移动到挂起状态，这意味着对象 spec 仍然存在于集群中，但直到 CronJob 再次激活它才会运行。
 
-​	**TRY IT NOW	Suspend the CronJob so it doesn’t keep creating backup Jobs, and then explore the status of the CronJob and its Jobs.**
+<b>现在就试试</b> 暂停 CronJob，这样它就不会一直创建备份 job，然后查看 CronJob 及其 job 的状态
 
 ```
 # 更新CronJob，并设置为挂起:
@@ -473,14 +477,14 @@ kubectl get jobs -o jsonpath="{.items[?(@.metadata.ownerReferences[0]
   .name=='todo-db-backup')].metadata.name}"
 ```
 
-If you explore the object hierarchy, you’ll see that CronJobs don’t follow the standard controller model, with a label selector to identify the Jobs it owns. You can add your own labels in the Job template for the CronJob, but if you don’t do that, you need to identify Jobs where the owner reference is the CronJob, as shown in figure 8.16.
+如果您研究对象层次结构，您会发现 CronJobs 不遵循标准控制器模型，没有标签选择器来标识它拥有的 job。您可以在 CronJob 的 Job template 中添加自己的标签，但如果不这样做，则需要标识所有者引用为 CronJob 的 Job，如图8.16所示。
 
 ![图8.16](.\images\Figure8.16.png)
-<center>图 8.16 CronJobs don’t use a label selector to model ownership, because they don’t keep track of Jobs</center>
+<center>图 8.16 CronJobs 不使用标签选择器来建模所有权，因为它们不跟踪 Jobs</center>
 
-As you start to make more use of Jobs and CronJobs, you’ll realize that the simplicity of the spec masks some complexity in the process and presents some interesting failure modes. Kubernetes does its best to make sure your batch jobs start when you want them to and run to completion, which means your containers need to be resilient.Completing a Job might mean restarting a Pod with a new container or replacing the Pod on a new node, and for CronJobs, multiple Pods could be running if the process takes longer than the schedule interval. Your container logic needs to allow for all those scenarios.
+当您开始更多地使用 Jobs 和 CronJobs 时，您将意识到 spec 的简单性掩盖了过程中的一些复杂性，并呈现了一些有趣的故障模式。Kubernetes 尽其所能确保批处理作业在您希望它们启动时启动，并运行到完成，这意味着您的容器需要具有弹性。完成一个 Job 可能意味着用一个新的容器重新启动 Pod，或者在一个新的节点上替换 Pod，对于 CronJobs，如果进程花费的时间超过调度间隔，则可能运行多个Pod。容器逻辑需要考虑所有这些场景。
 
-Now you know how to run data-heavy apps in Kubernetes, with StatefulSets to model a stable runtime environment and initialize the app, and CronJobs to process data backups and other regular maintenance work. We’ll close out the chapter thinking about whether this is really a good idea.
+现在你知道了如何在 Kubernetes 中运行数据量大的应用程序，使用 StatefulSets 来建模稳定的运行时环境并初始化应用程序，使用 CronJobs 来处理数据备份和其他常规维护工作。我们将在这一章的结尾思考这是否真的是个好主意。
 
 ## 8.5 为有状态应用程序选择平台
 
