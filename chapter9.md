@@ -10,7 +10,7 @@ We’ll start with Deployments—actually, you’ve already done plenty of Deplo
 
 ![图9.1](.\images\Figure9.1.png)
 
-​											**Figure 9.1 Deployments control multiple ReplicaSets so they can manage rolling updates.**
+<center>图 9.1 Deployments control multiple ReplicaSets so they can manage rolling updates</center>
 
 Rollouts aren’t triggered from every change to a Deployment, only from a change to the Pod spec. If you make a change that the Deployment can manage with the current ReplicaSet, like updating the number of replicas, that’s done without a rollout.
 
@@ -39,10 +39,7 @@ kubectl rollout history deploy/vweb
 The kubectl rollout command has options to view and manage rollouts. You can see from my output in figure 9.2 that there’s only one rollout in this exercise, which was the initial deployment that created the ReplicaSet. The scale update changed only the existing ReplicaSet, so there was no second rollout.
 
 ![图9.2](.\images\Figure9.2.png)
-
-​	
-
-​													**Figure 9.2	Deployments manage changes through rollouts but only if the Pod spec changes.**
+<center>图 9.2	Deployments manage changes through rollouts but only if the Pod spec changes.</center>
 
 Your ongoing application updates will center on deploying new Pods running an updated version of your container image. You should manage that with an update to your YAML specs, but kubectl provides a quick alternative with the set command. Using this command is an imperative way to update an existing Deployment, and you should view it the same as the scale command—it’s a useful hack to get out of a sticky situation, but it needs to be followed up with an update to the YAML files.
 
@@ -62,8 +59,7 @@ kubectl rollout history deploy/vweb
 The kubectl set command changes the spec of an existing object. You can use it to change the image or environment variables for a Pod or the selector for a Service. It’s a shortcut to applying a new YAML spec, but it is implemented in the same way. In this exercise, the change caused a rollout, with a new ReplicaSet created to run the new Pod spec and the old ReplicaSet scaled down to zero. You can see this in figure 9.3.
 
 ![图9.3](.\images\Figure9.3.png)
-
-​											**Figure 9.3 Imperative updates go through the same rollout process, but now your YAML is out of sync.**
+<center>图 9.3 Imperative updates go through the same rollout process, but now your YAML is out of sync.</center>
 
 Kubernetes uses the same concept of rollouts for the other Pod controllers, DaemonSets and StatefulSets. They’re an odd part of the API because they don’t map directly to an object (you don’t create a resource with the kind “rollout”), but they’re an important management tool to work with your releases. You can use rollouts to track release history and to revert back to previous releases.
 
@@ -99,8 +95,7 @@ My output appears in figure 9.4. Adding the record flag saves the kubectl comman
 ​	Listing 9.1 shows the Pod labels and the selector for the Deployment in the previous exercise. The app label is used in the selector, which the Deployment uses to find  its Pods. The Pod also contains a version label for our convenience, but that’s not part of the selector. If it were, then the Deployment would be linked to one version, because you can’t change the selector once a Deployment is created.
 
 ![图9.4](.\images\Figure9.4.png)
-
-​												**Figure 9.4 Kubernetes uses labels for key information, and extra detail is stored in annotations.**
+<center>图 9.4 Kubernetes uses labels for key information, and extra detail is stored in annotations.</center>
 
 **Listing 9.1	vweb-v11.yaml, a Deployment with additional labels in the Pod spec**
 
@@ -167,14 +162,12 @@ curl $(cat url.txt)
 ```
 
 ![图9.5](.\images\Figure9.5.png)
-
-​												**Figure 9.5 Kubernetes manages rollouts for you, but it helps if you add labels to see what’s what.**
+<center>图 9.5 Kubernetes manages rollouts for you, but it helps if you add labels to see what’s what.</center>
 
 Hands up if you ran that exercise and got confused when you saw the final output shown in figure 9.6 (this is the exciting part of the chapter). My hand is up, and I already knew what was going to happen. This is why you need a consistent release
 
 ![图9.6](.\images\Figure9.6.png)
-
-​													**Figure 9.6 Labels are a key management feature, but they’re set by humans so they’re fallible.**
+<center>图 9.6 Labels are a key management feature, but they’re set by humans so they’re fallible.</center>
 
 process, preferably one that is fully automated, because as soon as you start mixing approaches, you get confusing results. I rolled back to revision 2, and that should have reverted back to v1 of the app, judging by the labels on the ReplicaSets. But revision 2 was actually from the kubectl set image exercise in section 9.1, so the container image is v2, but the ReplicaSet label is v1.
 
@@ -238,14 +231,12 @@ curl $(cat url.txt)
 ```
 
 ![图9.7](.\images\Figure9.7.png)
-
-​													**Figure 9.7 Configuration updates might change app behavior but without recording a rollout.**
+<center>图 9.7 Configuration updates might change app behavior but without recording a rollout.</center>
 
 Figure 9.8 shows my output, where the config update is accompanied by a Deployment update, which preserves the rollout history and enables the rollback.
 
 ![图9.8](.\images\Figure9.8.png)
-
-​							**Figure 9.8 An immutable config preserves rollout history, but it means a rollout for every  configuration change.**
+<center>图 9.8 An immutable config preserves rollout history, but it means a rollout for every  configuration change.</center>
 
 Kubernetes doesn’t really care which approach you take, and your choice will partly depend on who owns the configuration in your organization. If the project team also owns deployment and configuration, then you might prefer mutable config objects to simplify the release process and the number of objects to manage. If a separate team owns the configuration, then the immutable approach will be better because they can deploy new config objects ahead of the release. The scale of your apps will affect the decision, too: at a high scale, you may prefer to reduce the number of app deployments and rely on mutable configuration.
 
@@ -294,8 +285,7 @@ kubectl describe deploy vweb
 As shown in Figure 9.9, this is a new deployment of the same old web app, using version 2 of the container image. There are three Pods, they’re all running, and the app works as expected—so far so good.
 
 ![图9.9](.\images\Figure9.9.png)
-
-​								**Figure 9.9	The Recreate update strategy doesn’t affect behavior until you release an update.**
+<center>图 9.9	The Recreate update strategy doesn’t affect behavior until you release an update.</center>
 
 This configuration is dangerous, though, and one you should use only if different versions of your app can’t coexist—something like a database schema update, where you need to be sure that only one version of your app connects to the database. Even in that case, you have better options, but if you have a scenario that definitely needs this approach, then you’d better be sure you test all your updates before you go live. If you deploy an update where the new Pods fail, you won’t know that until your old Pods have all been terminated, and your app will be completely unavailable.
 
@@ -321,8 +311,7 @@ curl $(cat url.txt)
 You’ll see in this exercise that Kubernetes happily takes your app offline, because that’s what you’ve requested. The Recreate strategy creates a new ReplicaSet with the updated Pod template, then scales down the previous ReplicaSet to zero and scales up the new ReplicaSet to three. The new image is broken, so the new Pods fail, and there’s nothing to respond to requests, as you see in figure 9.10.
 
 ![图9.10](.\images\Figure9.10.png)
-
-​													**Figure 9.10 The Recreate strategy happily takes down your app if the new Pod spec is broken.**
+<center>图 9.10 The Recreate strategy happily takes down your app if the new Pod spec is broken.</center>
 
 Now that you’ve seen it, you should probably try to forget about the Recreate strategy. In some scenarios, it might seem attractive, but when it does, you should still consider alternative options, even if it means looking again at your architecture. The wholesale takedown of your application is going to cause downtime, and probably more downtime than you plan for.
 
@@ -355,14 +344,12 @@ curl $(cat url.txt)
 ```
 
 ![图9.11](.\images\Figure9.11.png)
-
-​																**Figure 9.11 Deployment updates in progress, using different rollout options**
+<center>图 9.11 Deployment updates in progress, using different rollout options</center>
 
 In this exercise, the new Deployment spec changed the Pod image back to version 2, and it also changed the update strategy to a rolling update. You can see in figure 9.12 that the strategy change is made first, and then the Pod update is made in line with the new strategy, creating one new Pod at a time.
 
 ![图9.12](.\images\Figure9.12.png)
-
-​								**Figure 9.12 Deployment updates will use an existing ReplicaSet if the Pod template matches the new spec.**
+<center>图 9.12 Deployment updates will use an existing ReplicaSet if the Pod template matches the new spec.</center>
 
 You’ll need to work fast to see the rollout in progress in the previous exercise, because this simple app starts quickly, and as soon as one new Pod is running, the rollout continues with another new Pod. You can control the pace of the rollout with the following two fields in the Deployment spec:
 
@@ -399,8 +386,7 @@ When you run this exercise, you’ll see the update never completes, and the Dep
 ​	Deployments are the controllers you use the most, and it’s worth spending time working through the update strategy and timing settings to be sure you understand
 
 ![图9.13](.\images\Figure9.13.png)
-
-​															**Figure 9.13 Failed updates don’t automatically roll back or pause; they just keep trying.**
+<center>图 9.13 Failed updates don’t automatically roll back or pause; they just keep trying.</center>
 
 the impact for your apps. DaemonSets and StatefulSets also have rolling update functionality, and because they have different ways of managing their Pods, they have different approaches to rollouts, too.
 
@@ -431,8 +417,7 @@ kubectl get svc todo-proxy -o
 This is just setting us up for the updates. You should now have a working app where you can add items and see the list. My output is shown in figure 9.14.
 
 ![图9.14](.\images\Figure9.14.png)
-
-​																	Figure 9.14	Running the to-do app with a gratuitous variety of controllers
+<center>图 9.14	Running the to-do app with a gratuitous variety of controllers</center>
 
 The first update is for the DaemonSet, where we’ll be rolling out a new version of the Nginx proxy image. DaemonSets run a single Pod on all (or some) of the nodes in the cluster, and with a rolling update, you have no surge option. During the update, nodes will never run two Pods, so this is always a delete-then-remove strategy. You can add the maxUnavailable setting to control how many nodes are updated in parallel, but if you take down multiple Pods, you’ll be running at reduced capacity until the replacements are ready.
 
@@ -453,8 +438,7 @@ kubectl get po -l app=todo-proxy --watch
 The watch flag in kubectl is useful for monitoring changes—it keeps looking at an object and prints an update line whenever the state changes. In this exercise you’ll see that the old Pod is terminated before the new one is created, which means the app has downtime while the new Pod starts up. Figure 9.15 shows I had one second of downtime in my release.
 
 ![图9.15](.\images\Figure9.15.png)
-
-​										**Figure 9.15 DaemonSets update by removing the existing Pod before creating a replacement.**
+<center>图 9.15 DaemonSets update by removing the existing Pod before creating a replacement.</center>
 
 A multinode cluster wouldn’t have any downtime because the Service sends traffic only to Pods that are ready, and only one Pod at a time gets updated, so the other Pods are always available. You will have reduced capacity, though, and if you tune a faster rollout with a higher maxUnavailable setting, that means a greater reduction in capacity as more Pods are updated in parallel. That’s the only setting you have for DaemonSets, so it’s a simple choice between manually controlling the update by deleting Pods or having Kubernetes roll out the update by a specified number of Pods in parallel.
 
@@ -486,8 +470,7 @@ kubectl apply -f todo-list/web/update/todo-web-readonly.yaml
 This exercise is a partitioned update that rolls out a new version of the Postgres container image, but only to the secondary Pods, which is a single Pod in this case, as shown in figure 9.16. When you use the app in read-only mode, you’ll see that it connects to the updated secondary, which still contains the replicated data from the previous Pod.
 
 ![图9.16](.\images\Figure9.16.png)
-
-​								**Figure 9.16 Partitioned updates to StatefulSets let you update secondaries and leave the primary unchanged.**
+<center>图 9.16 Partitioned updates to StatefulSets let you update secondaries and leave the primary unchanged.</center>
 
 This rollout is complete, even though the Pods in the set are running from different specs. For a data-heavy application in a StatefulSet, you may have a suite of verification jobs that you need to run on each updated Pod before you’re happy to continue the rollout, and a partitioned update lets you do that. You can manually control the pace of the release by running successive updates with decreasing partition values, until you remove the partition altogether in the final update to finish the set.
 
@@ -513,8 +496,7 @@ kubectl get pods -l app=todo-db -o=custom-
 You can see my output in figure 9.17, where the full update has completed and the primary is using the same updated version of Postgres as the secondary. If you’ve done updates to replicated databases before, you’ll know that this is about as simple as it gets—unless you’re using a managed database service, of course.
 
 ![图9.17](.\images\Figure9.17.png)
-
-​													**Figure 9.17 Completing the StatefulSet rollout, with an update that is not partitioned**
+<center>图 9.17 Completing the StatefulSet rollout, with an update that is not partitioned</center>
 
 Rolling updates are the default for Deployments, DaemonSets, and StatefulSets, and they all work in broadly the same way: gradually replacing Pods running the previous application spec with Pods running the new spec. The actual details differ because the controllers work in different ways and have different goals, but they impose the same requirement on your app: it needs to work correctly when multiple versions are live. That’s not always possible, and there are alternative ways to deploy app updates in Kubernetes.
 
@@ -531,8 +513,7 @@ Take the example of a web application. A rolling update is great because it lets
 ​	You need to have the capacity in your cluster to run two complete copies of your app. If it’s a web or API component, then the new version should be using minimal
 
 ![图9.18](.\images\Figure9.18.png)
-
-​											**Figure 9.18 You run multiple versions of the app in a blue-green deployment, but only one is live.**
+<center>图 9.18 You run multiple versions of the app in a blue-green deployment, but only one is live.</center>
 
 memory and CPU because it’s not receiving any traffic. You switch between versions by updating the label selector for the Service, so the update is practically instant because all the Pods are running and ready to receive traffic. You can flip back and forth easily, so you can roll back a problem release without waiting for ReplicaSets to scale up and down.
 
