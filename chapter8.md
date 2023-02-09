@@ -1,4 +1,4 @@
-# 第八章 使用 StatfulSets 和 Jobs 运行数据量大的应用
+# 第八章 使用 StatefulSets 和 Jobs 运行数据量大的应用
 
 “数据量大” 不是一个很科学的术语，但本章是关于运行一个应用程序类，它不仅是有状态的，而且还要求它如何使用状态。数据库就是此类的一个例子。它们需要跨多个实例运行以实现高可用性，每个实例都需要一个本地数据存储以实现快速访问，而且这些独立的数据存储需要保持同步。数据有其自身的可用性要求，您需要定期运行备份以防止终端故障或损坏。其他数据密集型应用程序，如消息队列和分布式缓存，也有类似的需求。
 
@@ -112,7 +112,7 @@ initContainers:
 
 您可以通过在 spec 中标识服务来为 StatefulSet 中的各个 Pods 定义 DNS 名称，但它需要是 headless Service 的特殊配置。清单 8.3 显示了如何在没有 ClusterIP 地址的情况下配置数据库服务，并为 Pods 配置一个选择器。
 
-> 清单8.3 todo-db-service。yaml，一个 StatefulSet 的 headless Service
+> 清单8.3 todo-db-service.yaml，一个 StatefulSet 的 headless Service
 
 ```
 apiVersion: v1
@@ -202,7 +202,7 @@ kubectl logs todo-db-2 --tail 2
 
 您实际上希望每个 Pod 都有自己的 PVC, Kubernetes 在 Spec 中为 StatefulSets 提供了 volumeClaimTemplates 字段，它可以包括存储类以及容量和访问模式需求。当您部署带有 volume claim templates 的 StatefulSet 时，它为每个Pod 创建一个 PVC，并且它们是链接的，因此如果 Pod 0 被替换，新的 Pod 0 将附加到前一个Pod 0 使用的 PVC 上。
 
-> 清单8.4 sleep-with-pvc。yaml，一个带有 volume claim templates 的 StatefulSet
+> 清单8.4 sleep-with-pvc.yaml，一个带有 volume claim templates 的 StatefulSet
 
 ```
 spec:
@@ -340,7 +340,7 @@ Postgres 作为 SQL 数据库引擎存在于 1996 年，比 Kubernetes 早了将
 Jobs 不仅仅适用于有状态应用;它们是为任何批处理问题提供标准的好方法，您可以将所有调度、监视和重试逻辑移交给集群。你可以在 Pod 中为 Job 运行任何容器镜像，但它应该启动一个结束的进程;否则，您的作业将永远运行。清单 8.5 显示了以批处理模式运行 Pi 应用程序的 Job Spec。
 
 
-> 清单8.5 pi-job。yaml，一个简单的计算Pi 的 Job
+> 清单8.5 pi-job.yaml，一个简单的计算Pi 的 Job
 
 ```
 apiVersion: batch/v1
@@ -384,7 +384,6 @@ Jobs 将他们自己的标签添加到他们创建的 Pods 中。始终添加作
 
 本章最后一个圆周率的例子:一个并行运行多个 pod 的新 Job spec，每个 pod 都将圆周率计算到一个随机的小数点后数位。该 spec 使用 init 容器生成要使用的小数点后数位，应用程序容器使用共享 EmptyDir 挂载读取输入。这是一种很好的方法，因为应用程序容器不需要修改就可以在并行环境中工作。你可以用一个 init 容器来扩展它，从队列中获取一个工作项，这样应用程序本身就不需要知道队列。
 
-​	**TRY IT NOW	.**
 <b>现在就试试</b> 运行另一个使用并行性的 Pi Job，并显示来自相同 spec 的多个 pod 可以处理不同的工作负载
 
 ```
@@ -429,10 +428,6 @@ spec:
     spec:
       # job template...
 ```
-
-The full spec uses the Postgres Docker image, with a command to run the pg_dump backup tool. The Pod loads environment variables and passwords from the same ConfigMaps and Secrets that the StatefulSet uses, so there’s no duplication in the config file. It also uses its own PVC as the storage location to write the backup files.
-
-​	**TRY IT NOW	Create a CronJob from the spec in listing 8.6 to run a database backup Job every two minutes.**
 
 完整 spec 使用 Postgres Docker 镜像，并使用命令运行 pg_dump 备份工具。Pod 从 StatefulSet 使用的相同 configmap 和 Secrets 中加载环境变量和密码，因此在配置文件中没有重复。它还使用自己的 PVC 作为存储位置来写入备份文件。
 
