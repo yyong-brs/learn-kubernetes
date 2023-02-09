@@ -123,3 +123,17 @@
     - 8.5 [为有状态应用程序选择平台](./chapter8.md#85-为有状态应用程序选择平台)
 
     - 8.6 [实验室](./chapter8.md#86-实验室)
+
+  - 第九章 [通过 rollouts 和 rollbacks 管理应用发布](./chapter9.md)
+
+    - 9.1 [Kubernetes 如何管理 rollouts](./chapter9.md#91-kubernetes-如何管理-rollouts)
+
+    - 9.2 [使用 rollouts 和 rollbacks 更新 Deployments](./chapter9.md#92-使用-rollouts-和-rollbacks-更新-deployments)
+
+    - 9.3 [为 Deployments 配置滚动更新](./chapter9.md#93-为-deployments-配置滚动更新)
+
+    - 9.4 [DaemonSets 和 StatefulSets 中的滚动更新](./chapter9.md#94-daemonSets-和-statefulsets-中的滚动更新)
+
+    - 9.5 [理解发布策略](./chapter9.md#95-理解发布策略)
+
+    - 9.6 [实验室](./chapter9.md#96-实验室)
