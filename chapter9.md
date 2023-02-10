@@ -1,67 +1,69 @@
 # 第九章 通过 rollouts 和 rollbacks 管理应用发布
 
-You’ll update existing apps far more often than you’ll deploy something new. Containerized apps inherit multiple release cadences from the base images they use; official images on Docker Hub for operating systems, platform SDKs, and runtimes typically have a new release every month. You should have a process to rebuild your images and release updates whenever those dependencies get updated, because they could contain critical security patches. Key to that process is being able to roll out an update safely and give yourself options to pause and roll back the update if it goes wrong. Kubernetes has those scenarios covered for Deployments, DaemonSets, and StatefulSets.
+你会更频繁地更新现有应用，而不是部署新应用。容器化应用程序从它们使用的基本镜像继承多个发布节奏;Docker Hub上针对操作系统、平台sdk和运行时的官方镜像通常每个月都会发布一个新版本。您应该有一个重建镜像的过程，并在这些依赖项更新时发布更新，因为它们可能包含关键的安全补丁。这个过程的关键是能够安全地推出更新，并在出现错误时为自己提供暂停和回滚更新的选项。Kubernetes 为 Deployments、DaemonSets 和 StatefulSets 提供了这些场景。
 
-​	A single update approach doesn’t work for every type of application, so Kubernetes provides different update strategies for the controllers and options to tune how the strategies work. We’ll explore all those options in this chapter. If you’re thinking of skipping this one because you’re not excited by the thought of 6,000 words on application updates, I’d recommend sticking with it. Updates are the biggest cause of application downtime, but you can reduce the risk significantly if you understand the tools Kubernetes gives you. And I’ll try to inject a little excitement along the way.
+单一的更新方法并不适用于所有类型的应用程序，因此 Kubernetes 为控制器提供了不同的更新策略，并提供了调整策略工作方式的选项。我们将在本章探讨所有这些选项。如果你正在考虑跳过这一点，因为你对 6000 字的应用程序更新不感兴趣，我建议你坚持下去。更新是导致应用程序宕机的最大原因，但如果您了解 Kubernetes 提供的工具，就可以显著降低风险。我会试着在这个过程中注入一些有趣的内容。
 
 ## 9.1 Kubernetes 如何管理 rollouts
 
-We’ll start with Deployments—actually, you’ve already done plenty of Deployment updates. Every time we’ve applied a change to an existing Deployment (something we do 10 times a chapter), Kubernetes has implemented that with a rollout. In a rollout, the Deployment creates a new ReplicaSet and scales it up to the desired number of replicas, while scaling down the previous ReplicaSet to zero replicas. Figure 9.1 shows an update in progress.
+我们将从 Deployments 开始——实际上，您已经完成了大量的 Deployment 更新。每次我们对现有的 Deployment 进行更改(我们一章要做10次)，Kubernetes 都会进行一次 rollout。在展开过程中，Deployment 将创建一个新的 ReplicaSet，并将其扩展到所需的副本数量，同时将先前的 ReplicaSet 缩小到零副本。图 9.1 显示了正在进行的更新。
+
 
 ![图9.1](.\images\Figure9.1.png)
-
-<center>图 9.1 Deployments control multiple ReplicaSets so they can manage rolling updates</center>
+<center>图 9.1 Deployment 控制多个 replicaset，以便它们可以管理滚动更新</center>
 
 Rollouts aren’t triggered from every change to a Deployment, only from a change to the Pod spec. If you make a change that the Deployment can manage with the current ReplicaSet, like updating the number of replicas, that’s done without a rollout.
 
-​	**TRY IT NOW	Deploy a simple app with two replicas, then update it to increase scale, and see how the ReplicaSet is managed.**
+不是 Deployment 的每次更改都会触发 rollout 的，只有 Pod spec 的更改才会触发 rollout。如果您做了一个 Deployemt 可以使用当前 ReplicaSet 管理的更改，比如更新副本的数量，则无需 rollout 即可完成。
+
+<b>现在就试试</b> 部署一个简单的两个副本应用程序，然后更新它以增加规模，并查看如何管理 ReplicaSet
 
 ```
-# change to the exercise directory:
+# 切换到章节练习目录:
 cd ch09
 
-# deploy a simple web app:
+# 部署一个简单的 web app:
 kubectl apply -f vweb/
 
-# check the ReplicaSets:
+# 检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# now increase the scale:
+# 现在扩展规模:
 kubectl apply -f vweb/update/vweb-v1-scale.yaml
 
-# check the ReplicaSets:
+# 检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# check the deployment history:
+# 检查 deployment 历史:
 kubectl rollout history deploy/vweb
 ```
 
-The kubectl rollout command has options to view and manage rollouts. You can see from my output in figure 9.2 that there’s only one rollout in this exercise, which was the initial deployment that created the ReplicaSet. The scale update changed only the existing ReplicaSet, so there was no second rollout.
+kubectl rollout 命令提供了查看和管理 rollout 的选项。您可以从图9.2的输出中看到，本练习中只有一次rollout，即创建ReplicaSet的初始部署。规模更新只更改了现有的ReplicaSet，因此没有第二次 rollout。
 
 ![图9.2](.\images\Figure9.2.png)
-<center>图 9.2	Deployments manage changes through rollouts but only if the Pod spec changes.</center>
+<center>图 9.2 Deployment 通过 rollout 管理变更，但仅限 Pod spec 更改时</center>
 
-Your ongoing application updates will center on deploying new Pods running an updated version of your container image. You should manage that with an update to your YAML specs, but kubectl provides a quick alternative with the set command. Using this command is an imperative way to update an existing Deployment, and you should view it the same as the scale command—it’s a useful hack to get out of a sticky situation, but it needs to be followed up with an update to the YAML files.
+您正在进行的应用程序更新将集中于部署运行容器镜像的更新版本的新 Pods。您应该通过更新 YAML spec 来管理这个问题，但是 kubectl 使用 set 命令提供了一个快速的替代方案。使用此命令是更新现有部署的必要方法，您应该将其视为与scale 命令相同的方法—它是摆脱棘手情况的有用方法，但需要随后更新YAML文件。
 
-​	**TRY IT NOW	Use kubectl to update the image version for the Deployment. This is a change to the Pod spec, so it will trigger a new rollout.**
+<b>现在就试试</b> 使用 kubectl 更新部署的镜像版本。这是对Pod spec 的更改，因此它将触发一个新的 rollout
 
 ```
-# update the image for the web app:
+# 更新web应用程序的镜像:
 kubectl set image deployment/vweb web=kiamol/ch09-vweb:v2
 
-# check the ReplicaSets again:
+# 再次检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# check the rollouts:
+# 检查 rollouts:
 kubectl rollout history deploy/vweb
 ```
 
-The kubectl set command changes the spec of an existing object. You can use it to change the image or environment variables for a Pod or the selector for a Service. It’s a shortcut to applying a new YAML spec, but it is implemented in the same way. In this exercise, the change caused a rollout, with a new ReplicaSet created to run the new Pod spec and the old ReplicaSet scaled down to zero. You can see this in figure 9.3.
+kubectl set 命令改变一个现有对象的 spec 。您可以使用它来更改 Pod 的镜像或环境变量或 Service 的选择器。这是应用新的 YAML spec 的捷径，但它的实现方式是相同的。在这个练习中，更改导致了一个 rollout，创建了一个新的ReplicaSet 来运行新的 Pod spec，而旧的ReplicaSet缩小到零。在图9.3中可以看到这一点。
 
 ![图9.3](.\images\Figure9.3.png)
-<center>图 9.3 Imperative updates go through the same rollout process, but now your YAML is out of sync.</center>
+<center>图 9.3 必要的更新经过相同的 rollout 过程，但现在您的 YAML 和实际状态是不同步的</center>
 
-Kubernetes uses the same concept of rollouts for the other Pod controllers, DaemonSets and StatefulSets. They’re an odd part of the API because they don’t map directly to an object (you don’t create a resource with the kind “rollout”), but they’re an important management tool to work with your releases. You can use rollouts to track release history and to revert back to previous releases.
+Kubernetes 对其他 Pod 控制器(DaemonSets和StatefulSets)使用了相同的 rollout 概念。它们是API中一个奇怪的部分，因为它们不直接映射到对象(您不需要创建具有“rollout”类型的资源)，但是它们是用于您的版本的重要管理工具。您可以使用 rollout 来跟踪版本历史并恢复到以前的版本。
 
 ## 9.2 使用 rollouts 和 rollbacks 更新 Deployments
 
