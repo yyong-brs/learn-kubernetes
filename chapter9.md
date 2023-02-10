@@ -68,8 +68,7 @@ Kubernetes 对其他 Pod 控制器(DaemonSets和StatefulSets)使用了相同的 
 
 如果您再次查看图 9.3，您将看到 rollout 历史记录非常没有帮助。每次 rollout 都会记录一个修订号，但没有其他记录。目前还不清楚是什么原因导致了这个变化，也不清楚哪个 ReplicaSet 与哪个修订相关。最好包含一个版本号(或Git提交ID)作为 Pods 的标签，然后 Deployment 也将该标签添加到 ReplicaSet 中，这样可以更容易地跟踪更新。
 
-​	**TRY IT NOW	Apply an update to the Deployment, which uses the same Docker image but changes the version label for the Pod. That’s a change to the Pod spec, so it will create a new rollout.**
-**现在就尝试对部署应用更新，它使用相同的Docker映像，但更改Pod的版本标签。这是对Pod规格的更改，因此它将创建一个新的rollout。**
+<b>现在就试试</b> 对 Deployment 应用更新，它使用相同的 Docker 镜像，但更改 Pod 的版本标签。这是对 Pod spec 的更改，因此它将创建一个新的 rollout。**
 
 ```
 # apply the change using the record flag:
