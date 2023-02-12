@@ -499,37 +499,24 @@ kubectl apply -f todo-list/web/todo-web.yaml
 
 ## 9.5 理解发布策略
 
-Take the example of a web application. A rolling update is great because it lets each Pod close gracefully when all its client requests are dealt with, and the rollout can be as fast or as conservative as you like. The practical side of the rollout is simple, but you have to consider the user experience (UX) side, too.
-以一个web应用程序为例。滚动更新非常棒，因为它可以让每个Pod在处理完所有客户端请求后优雅地关闭，并且可以按照您的喜好快速或保守地推出。推出的实际方面很简单，但您也必须考虑用户体验(UX)方面。
+以一个 web 应用程序为例。滚动更新非常棒，因为它可以让每个Pod在处理完所有客户端请求后优雅地关闭，并且可以按照您的喜好快速或保守地 rollout。rollout 的实际方面很简单，但您也必须考虑用户体验(UX)方面。
 
-​	Application updates might well change the UX—with a different design, new features, or an updated workflow. Any changes like that will be pretty strange for the user if they see the new version during a rollout, then refresh and find themselves with the old version, because the requests have been served by Pods running different versions of the app.
 应用程序更新很可能会改变ux——使用不同的设计、新功能或更新的工作流。对于用户来说，如果他们在推出过程中看到新版本，然后刷新并发现自己使用了旧版本，那么任何这样的更改都会非常奇怪，因为这些请求是由运行不同版本应用程序的Pods提供的。
 
-​	The strategies to deal with that go beyond the RollingUpdate spec in your controllers. You can set cookies in your web app to link a client to a particular UX, and then use a more advanced traffic routing system to ensure users keep seeing the new version. When we cover that in chapter 15, you’ll see it introduces several more moving parts. For cases where that method is too complex or doesn’t solve the problem of dual running multiple versions, you can manage the release yourself with a blue-green deployment.
 处理这种情况的策略超出了控制器中的RollingUpdate规范。您可以在web应用程序中设置cookie，将客户端链接到特定的用户体验，然后使用更高级的流量路由系统，以确保用户一直看到新版本。当我们在第15章讲到它时，你会看到它引入了更多的活动部分。对于这种方法过于复杂或不能解决双运行多个版本的问题的情况，您可以使用蓝绿部署自己管理发布。
 
-​	Blue-green deployments are a simple concept: you have both the old and new versions of your app deployed at the same time, but only one version is active. You can flip a switch to choose which version is the active one. In Kubernetes, you can do that by updating the label selector in a Service to send traffic to the Pods in a different Deployment, as shown in figure 9.18.
 蓝绿部署是一个简单的概念:你同时部署了应用程序的新版本和旧版本，但只有一个版本是活动的。您可以通过拨动开关来选择激活的版本。在Kubernetes中，你可以通过更新Service中的标签选择器来将流量发送到不同部署中的Pods，如图9.18所示。
 
-​	You need to have the capacity in your cluster to run two complete copies of your app. If it’s a web or API component, then the new version should be using minimal
-你需要在你的集群中有能力运行两个完整的应用程序副本。如果它是一个web或API组件，那么新版本应该使用最小的.
-
-
 ![图9.18](.\images\Figure9.18.png)
-<center>图 9.18 在蓝绿部署中运行多个版本的应用程序，但只有一个是活的 You run multiple versions of the app in a blue-green deployment, but only one is live.</center>
+<center>图 9.18 在蓝绿部署中运行多个版本的应用程序，但只有一个是活的</center>
 
-memory and CPU because it’s not receiving any traffic. You switch between versions by updating the label selector for the Service, so the update is practically instant because all the Pods are running and ready to receive traffic. You can flip back and forth easily, so you can roll back a problem release without waiting for ReplicaSets to scale up and down.
-内存和CPU，因为它没有接收任何流量。您可以通过更新服务的标签选择器来切换版本，因此更新实际上是即时的，因为所有Pods都在运行并准备接收流量。您可以轻松地来回翻转，因此您可以回滚有问题的版本，而无需等待ReplicaSets的伸缩。
+你需要在你的集群中有能力运行两个完整的应用程序副本。如果它是一个web或API组件，那么新版本应该使用最小的内存和CPU，因为它没有接收任何流量。您可以通过更新服务的标签选择器来切换版本，因此更新实际上是即时的，因为所有Pods都在运行并准备接收流量。您可以轻松地来回翻转，因此您可以回滚有问题的版本，而无需等待ReplicaSets的伸缩。
 
-​	Blue-green deployments are less sophisticated than rolling updates, but they’re simpler because of that. They can be a better fit for organizations moving to Kubernetes who have a history of big-bang deployments, but they’re a compute-intensive approach that requires multiple steps and doesn’t preserve the rollout history of your app. You should look to rolling updates as your preferred deployment strategy, but blue-green deployments are a good stepping-stone to use while you gain confidence.
 蓝绿部署没有滚动更新那么复杂，但正因为如此，它们更简单。它们可能更适合那些迁移到Kubernetes的组织，这些组织有大规模部署的历史，但它们是一种计算密集型的方法，需要多个步骤，并且不能保存应用程序的推出历史。您应该将滚动更新作为首选的部署策略，但蓝绿部署是一个很好的跳板，可以在您获得信心的同时使用。
 
-
-​	That’s all on rolling updates for now, but we will return to the concepts when we cover topics in production readiness, network ingress, and monitoring. We just need to tidy up the cluster now before going on to the lab.
 以上是关于滚动更新的全部内容，但是当我们讨论生产准备、网络进入和监视等主题时，我们将回到这些概念。我们只需要在去实验室之前整理一下集群。
 
-​	**TRY IT NOW	Remove all the objects created for this chapter.**
-**现在就尝试删除为本章创建的所有对象
+<b>现在就试试</b> 删除为本章创建的所有对象
 
 ```
 kubectl delete all -l kiamol=ch09
@@ -539,16 +526,9 @@ kubectl delete pvc -l kiamol=ch09
 
 ## 9.6 实验室
 
-We learned the theory of blue-green deployments in the previous section, and now in the lab, you’re going to make it happen. Working through this lab will help make it clear how selectors relate Pods to other objects and give you experience working with the alternative to rolling updates.
 我们在前一节中学习了蓝绿部署的理论，现在在实验室中，您将实现它。通过本实验将有助于您清楚地了解选择器如何将Pods与其他对象关联起来，并为您提供使用滚动更新的替代方案的经验。
-
-- The starting point is version 1 of the web app, which you can deploy from the lab/v1 folder.
-- You need to create a blue-green deployment for version 2 of the app. The spec will be similar to the version 1 spec but using the :v2 container image.
-- When you deploy your update, you should be able to flip between the version 1 and version 2 release just by changing the Service and without any updates to Pods.
-
 - 起点是web应用程序的版本1，您可以从lab/v1文件夹部署。
 - 你需要为应用程序的版本2创建一个蓝绿色的部署。规范将类似于版本1的规范，但使用:v2容器镜像。
 - 当您部署更新时，您应该能够通过更改服务在版本1和版本2之间切换，而无需对Pods进行任何更新。
 
-This is good practice in copying YAML files and trying to work out which fields you need to change. You can find my solution on GitHub: https://github.com/sixeyed/kiamol/blob/master/ch09/lab/README.md.
-这是复制YAML文件并尝试确定需要更改哪些字段的良好实践。你可以在GitHub上找到我的解决方案:https://github.com/sixeyed/kiamol/blob/master/ch09/lab/README.md。
+这是复制YAML文件并尝试确定需要更改哪些字段的良好实践。你可以在GitHub上找到我的解决方案: https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch09/lab/README.md。
