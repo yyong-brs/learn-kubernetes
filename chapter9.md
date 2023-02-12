@@ -71,200 +71,178 @@ Kubernetes 对其他 Pod 控制器(DaemonSets和StatefulSets)使用了相同的 
 <b>现在就试试</b> 对 Deployment 应用更新，它使用相同的 Docker 镜像，但更改 Pod 的版本标签。这是对 Pod spec 的更改，因此它将创建一个新的 rollout。
 
 ```
-# apply the change using the record flag:
+# 通过 record 参数应用新的变更:
 kubectl apply -f vweb/update/vweb-v11.yaml --record
 
-# check the ReplicaSets and their labels:
+# 检查 ReplicaSets 以及它们的标签:
 kubectl get rs -l app=vweb --show-labels
 
-# check the current rollout status:
+# 检查当前 rollout 状态:
 kubectl rollout status deploy/vweb
 
-# check the rollout history:
+# 检查 rollout history:
 kubectl rollout history deploy/vweb
 
-# show the rollout revision for the ReplicaSets:
+# 根据 ReplicaSets 查看 rollout revision:
 kubectl get rs -l app=vweb -o=custom-columns=NAME:.metadata.name,
   REPLICAS:.status.replicas,REVISION:.metadata.annotations.deployment
   \.kubernetes\.io/revision
 ```
 
-My output appears in figure 9.4. Adding the record flag saves the kubectl command as a detail to the rollout, which can be helpful if your YAML files have identifying names. Often they won’t because you’ll be deploying a whole folder, so the version number label in the Pod spec is a useful addition. Then, however, you need some awkward JSONPath to find the link between a rollout revision and a ReplicaSet.
-我的输出如图9.4所示。添加记录标志将kubectl命令作为详细信息保存到滚出中，如果您的YAML文件具有标识名称，这将很有帮助。通常情况下，他们不会这样做，因为您将部署整个文件夹，所以Pod规范中的版本号标签是一个有用的补充。然后，您需要一些笨拙的JSONPath来查找推出修订和ReplicaSet之间的链接。
-
-​	As your Kubernetes maturity increases, you’ll want to have a standard set of labels that you include in all your object specs. Labels and selectors are a core feature, and you’ll use them all the time to find and manage objects. Application name, component name, and version are good labels to start with, but it’s important to distinguish between the labels you include for your convenience and the labels that Kubernetes uses to map object relationships.
-随着Kubernetes成熟度的提高，您将希望拥有一组包含在所有对象规范中的标准标签。标签和选择器是一个核心特性，您将一直使用它们来查找和管理对象。应用程序名称、组件名称和版本都是很好的标签，但是区分为方便而包含的标签和Kubernetes用于映射对象关系的标签是很重要的。
-
-
-​	Listing 9.1 shows the Pod labels and the selector for the Deployment in the previous exercise. The app label is used in the selector, which the Deployment uses to find  its Pods. The Pod also contains a version label for our convenience, but that’s not part of the selector. If it were, then the Deployment would be linked to one version, because you can’t change the selector once a Deployment is created.
-清单9.1显示了Pod标签和前面练习中Deployment的选择器。app标签在选择器中使用，Deployment使用该选择器来查找它的Pods。为了方便起见，Pod还包含一个版本标签，但那不是选择器的一部分。如果是，则Deployment将链接到一个版本，因为一旦创建了Deployment就不能更改选择器。
+我的输出如图 9.4 所示。添加 record 标志将 kubectl 命令保存为 rollout 详细信息，如果您的 YAML 文件具有标识名称，这将很有帮助。通常情况下，他们不会这样做，因为您将部署整个文件夹，所以Pod spec 中的版本号标签是一个有用的补充。然后，您需要一些笨拙的 JSONPath 来查找 rollout revision 和ReplicaSet之间的链接。
 
 ![图9.4](.\images\Figure9.4.png)
-<center>图 9.4 Kubernetes使用标签作为关键信息，额外的细节存储在注释中 Kubernetes uses labels for key information, and extra detail is stored in annotations.</center>
+<center>图 9.4 Kubernetes 使用标签作为关键信息，额外的细节存储在 annotations 中.</center>
 
-**Listing 9.1	vweb-v11.yaml, a Deployment with additional labels in the Pod spec**
-**清单9.1 vweb-v11。yaml，在Pod规范中有附加标签的部署**
+随着 Kubernetes 成熟度的提高，您将希望拥有一组包含在所有对象 spec 中的标准标签。标签和选择器是一个核心特性，您将一直使用它们来查找和管理对象。应用程序名称、组件名称和版本都是很好的标签，但是区分为方便而包含的标签和Kubernetes用于映射对象关系的标签是很重要的。
+
+清单 9.1 显示了 Pod 标签和前面练习中 Deployment 的选择器。app 标签在选择器中使用，Deployment 使用该选择器来查找它的Pods。为了方便起见，Pod 还包含一个版本标签，但那不是选择器的一部分。如果是，则Deployment将链接到一个版本，因为一旦创建了Deployment就不能更改选择器。
+
+> 清单9.1 vweb-v11。yaml，在 Pod spec 中有附加标签的 Deployment
 
 ```
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: vweb # The app name is used as the selector.
+      app: vweb # 用于选择器.
   template:
     metadata:
       labels:
         app: vweb
-        version: v1.1 # The Pod spec also includes a version label.
+        version: v1.1 # 多配置了一个 version 标签.
 ```
 
-You need to plan your selectors carefully up front, but you should add whatever labels you need to your Pod spec to make your updates manageable. Deployments retain multiple ReplicaSets (10 is the default), and the Pod template hash in the name makes them hard to work with directly, even after just a few updates. Let’s see what the app we’ve deployed actually does and then look at the ReplicaSets in another rollout.
-你需要事先仔细规划你的选择器，但你应该在Pod规范中添加任何你需要的标签，以使你的更新易于管理。部署会保留多个replicaset(10是默认值)，并且名称中的Pod模板散列使得它们很难直接使用，即使在进行了几次更新之后也是如此。让我们看看我们部署的应用程序实际做了什么，然后在另一个rollout中查看ReplicaSets。
+你需要事先仔细规划你的选择器，但你应该在 Pod spec 中添加任何你需要的标签，以使你的更新易于管理。Deployment 会保留多个replicaset(10是默认值)，并且名称中的 Pod 模板散列使得它们很难直接使用，即使在进行了几次更新之后也是如此。让我们看看我们部署的应用程序实际做了什么，然后在另一个 rollout 中查看ReplicaSets。
 
-​	**TRY IT NOW	Make an HTTP call to the web Service to see the response, then start another update and check the response again.**
-**立即尝试**向web服务发起HTTP调用以查看响应，然后启动另一次更新并再次检查响应
+<b>现在就试试</b> 向web服务发起HTTP调用以查看响应，然后启动另一次更新并再次检查响应
 
 ```
-# we’ll use the app URL a lot, so save it to a local file:
+# 因为将会使用 url 很多次，所以把它保存到本地文件中:
 kubectl get svc vweb -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8090/v.txt' >
   url.txt
   
-# then use the contents of the file to make an HTTP request:
+# 然后通过保存地址进行 HTTP 请求:
 curl $(cat url.txt)
 
-# deploy the v2 update:
+# 部署 v2 更新:
 kubectl apply -f vweb/update/vweb-v2.yaml --record
 
-# check the response again:
+# 再次检查响应:
 curl $(cat url.txt)
 
-# check the ReplicaSet details:
+# 检查 ReplicaSet 详细信息:
 kubectl get rs -l app=vweb --show-labels
 ```
 
-You’ll see in this exercise that ReplicaSets aren’t easy objects to manage, which is where standardized labels come in. It’s easy to see which version of the app is active by checking the labels for the ReplicaSet which has all the desired replicas—as you see in figure 9.5—but labels are just text fields, so you need process safeguards to make sure they’re reliable.
-在本练习中，您将看到replicaset并不是易于管理的对象，因此需要使用标准化标签。通过检查ReplicaSet的标签，可以很容易地看到应用程序的哪个版本处于活动状态(如图9.5所示)，但标签只是文本字段，因此需要流程保障以确保它们是可靠的。
+在本练习中，您将看到 replicaset 并不是易于管理的对象，因此需要使用标准化标签。通过检查 ReplicaSet 的标签，可以很容易地看到应用程序的哪个版本处于活动状态(如图9.5所示)，但标签只是文本字段，因此需要流程保障以确保它们是可靠的。
 
-​	Rollouts do help to abstract away the details of the ReplicaSets, but their main use is to manage releases. We’ve seen the rollout history from kubectl, and you can also run commands to pause an ongoing rollout or roll back a deployment to an earlier revision. A simple command will roll back to the previous deployment, but if you want to roll back to a specific version, you need some more JSONPath trickery to find the revision you want. We’ll see that now and use a very handy feature of kubectl that tells you what will happen when you run a command, without actually executing it.
-rollout确实有助于抽象ReplicaSets的细节，但它们的主要用途是管理发布。我们已经看到了kubectl的推出历史，您还可以运行命令暂停正在进行的推出或将部署回滚到较早的版本。一个简单的命令将回滚到以前的部署，但是如果您想回滚到特定的版本，则需要更多的JSONPath技巧来查找所需的版本。现在我们将看到这一点，并使用kubectl的一个非常方便的特性，该特性可以告诉您运行命令时会发生什么，而无需实际执行该命令。
+![图9.5](.\images\Figure9.5.png)
+<center>图 9.5 Kubernetes 为您管理 rollouts，但如果您添加标签，它会有所帮助.</center>
 
-​	**TRY IT NOW	Check the rollout history and try rolling back to v1 of the app.**
-**现在就试一下，检查应用的推出历史记录，并尝试回滚到应用的v1
+rollout 确实有助于抽象 ReplicaSets 的细节，但它们的主要用途是管理发布。我们已经看到了 kubectl 的 rollout 历史，您还可以运行命令暂停正在进行的 rollout 或将部署回滚到较早的版本。一个简单的命令将回滚到以前的部署，但是如果您想回滚到特定的版本，则需要更多的JSONPath技巧来查找所需的版本。现在我们将看到这一点，并使用kubectl的一个非常方便的特性，该特性可以告诉您运行命令时会发生什么，而无需实际执行该命令。
+
+<b>现在就试试</b> 检查应用的 rollout 历史记录，并尝试回滚到应用的v1
 
 ```
-# look at the revisions:
+# 查看 revisions:
 kubectl rollout history deploy/vweb
 
-# list ReplicaSets with their revisions:
+# 查看 ReplicaSets,带出 revisions 信息:
 kubectl get rs -l app=vweb -o=custom-
   columns=NAME:.metadata.name,REPLICAS:.status.replicas,VERSION:.meta
   data.labels.version,REVISION:.metadata.annotations.deployment\.kube
   rnetes\.io/revision
   
-# see what would happen with a rollback:
+# 看一下执行 rollout 会发生什么:
 kubectl rollout undo deploy/vweb --dry-run
 
-# then start a rollback to revision 2:
+# 然后运行一个 rollback 到 revision 2:
 kubectl rollout undo deploy/vweb --to-revision=2
 
-# check the app—this should surprise you:
+# 检查 app—可能会惊到你:
 curl $(cat url.txt)
 ```
 
-![图9.5](.\images\Figure9.5.png)
-<center>图 9.5 Kubernetes为您管理部署，但如果您添加标签，它会有所帮助 Kubernetes manages rollouts for you, but it helps if you add labels to see what’s what.</center>
-
-Hands up if you ran that exercise and got confused when you saw the final output shown in figure 9.6 (this is the exciting part of the chapter). My hand is up, and I already knew what was going to happen. This is why you need a consistent release
-如果您在运行该练习时看到图9.6所示的最终输出时感到困惑(这是本章令人兴奋的部分)，请举手。我举起手来，我已经知道会发生什么。这就是为什么你需要持续的释放
+如果您在运行该练习时看到图9.6所示的最终输出时感到困惑(这是本章令人兴奋的部分)，请举手。我举起手来，我已经知道会发生什么。这就是为什么你需要持续的发布。
 
 ![图9.6](.\images\Figure9.6.png)
-<center>图 9.6 标签是一个关键的管理特性，但它们是由人类设置的，所以它们很容易出错 Labels are a key management feature, but they’re set by humans so they’re fallible.</center>
+<center>图 9.6 标签是一个关键的管理特性，但它们是由人类设置的，所以它们很容易出错</center>
 
-process, preferably one that is fully automated, because as soon as you start mixing approaches, you get confusing results. I rolled back to revision 2, and that should have reverted back to v1 of the app, judging by the labels on the ReplicaSets. But revision 2 was actually from the kubectl set image exercise in section 9.1, so the container image is v2, but the ReplicaSet label is v1.
-过程，最好是完全自动化的过程，因为一旦开始混合方法，就会得到令人困惑的结果。我回滚到版本2，从ReplicaSets上的标签判断，应该已经恢复到应用程序的v1。但是修订2实际上来自9.1节中的kubectl集合图像练习，因此容器图像是v2，但ReplicaSet标签是v1。
+过程，最好是完全自动化的过程，因为一旦开始混合方法，就会得到令人困惑的结果。我回滚到版本2，从ReplicaSets上的标签判断，应该已经恢复到应用程序的v1。但是修订2实际上来自9.1节中的kubectl集合镜像练习，因此容器镜像是v2，但ReplicaSet标签是v1。
 
-​	You see that the moving parts of the release process are fairly simple: Deployments create and reuse ReplicaSets, scaling them up and down as required, and changes to ReplicaSets are recorded as rollouts. Kubernetes gives you control of the key factors in the rollout strategy, but before we move on to that, we’re going to look at releases which also involve a configuration change, because that adds another complicating factor.
+
 您可以看到，发布过程的移动部分相当简单:部署创建和重用ReplicaSets，根据需要扩大和缩小它们，对ReplicaSets的更改被记录为rollout。Kubernetes让您可以控制部署策略中的关键因素，但在我们继续讨论之前，我们将看看还涉及配置更改的版本，因为这增加了另一个复杂因素。
 
+在第4章中，我讨论了更新Config-Maps和Secrets内容的不同方法，您所做的选择会影响您干净地回滚的能力。第一种方法是说配置是可变的，因此发布可能包括ConfigMap更改，这是对现有ConfigMap对象的更新。但是，如果您的发布只是一个配置更改，那么您就没有作为rollout的记录，也没有回滚的选项。
 
-​	In chapter 4, I talked about different approaches to updating the content of Config-Maps and Secrets, and the choice you make impacts your ability to roll back cleanly. The first approach is to say that configuration is mutable, so a release might include a ConfigMap change, which is an update to an existing ConfigMap object. But if your release is only a configuration change, then you have no record of that as a rollout and no option to roll back.
-在第4章中，我讨论了更新Config-Maps和Secrets内容的不同方法，您所做的选择会影响您干净地回滚的能力。第一种方法是说配置是可变的，因此发布可能包括ConfigMap更改，这是对现有ConfigMap对象的更新。但是，如果您的发布只是一个配置更改，那么您就没有作为推出的记录，也没有回滚的选项。
-
-​	**TRY IT NOW	Remove the existing Deployment so we have a clean history, then deploy a new version that uses a ConfigMap, and see what happens when you update the same ConfigMap.**
-**现在就尝试删除现有的部署，这样我们就有了一个干净的历史记录，然后部署一个使用ConfigMap的新版本，看看当你更新相同的ConfigMap时会发生什么
+<b>现在就试试</b>删除现有的部署，这样我们就有了一个干净的历史记录，然后部署一个使用ConfigMap的新版本，看看当你更新相同的ConfigMap时会发生什么
 
 ```
-# remove the existing app:
+# 删除 app:
 kubectl delete deploy vweb
 
-# deploy a new version that stores content in config:
+# 部署一个用到 configmap 的新应用:
 kubectl apply -f vweb/update/vweb-v3-with-configMap.yaml --record
 
-# check the response:
+# 检查响应:
 curl $(cat url.txt)
 
-# update the ConfigMap, and wait for the change to propagate:
+# 更新 ConfigMap, 等待一段时间成功:
 kubectl apply -f vweb/update/vweb-configMap-v31.yaml --record
 sleep 120
 
-# check the app again:
+# 检查 app :
 curl $(cat url.txt)
 
-# check the rollout history:
+# 检查 rollout history:
 kubectl rollout history deploy/vweb
 ```
 
-As you see in figure 9.7, the update to the ConfigMap changes the behavior of the app, but it’s not a change to the Deployment, so there is no revision to roll back to if the configuration change causes an issue.
 如图9.7所示，对ConfigMap的更新改变了应用程序的行为，但它不是对Deployment的更改，因此如果配置更改导致问题，也没有回滚的修订。
 
+![图9.7](.\images\Figure9.7.png)
+<center>图 9.7 配置更新可能会改变应用程序的行为，但不会记录 rollout.</center>
 
-​	This is the hot reload approach, which works nicely if your apps support it, precisely because a configuration-only change doesn’t require a rollout. The existing Pods and containers keep running, so there’s no risk of service interruption. The cost is the loss of the rollback option, and you’ll have to decide whether that’s more important than a hot reload.
 这就是热重载方法，如果您的应用程序支持它，那么它工作得很好，因为仅配置的更改不需要rollout。现有的pod和容器保持运行，因此不存在服务中断的风险。代价是失去回滚选项，您必须决定这是否比热重载更重要。
 
-​	Your alternative is to consider all ConfigMaps and Secrets as immutable, so you include some versioning scheme in the object name and never update a config object once it’s created. Instead you create a new config object with a new name and release it along with an update to your Deployment, which references the new config object.
 您的替代方案是将所有configmap和Secrets视为不可变的，因此在对象名称中包含一些版本控制方案，并且在配置对象创建后永远不要更新它。相反，您可以创建一个具有新名称的新配置对象，并将其与对Deployment的更新一起发布，后者引用了新的配置对象。
 
-​	**TRY IT NOW	Deploy a new version of the app with an immutable config, so you can compare the release process.**
-**现在就尝试使用不可更改的配置部署应用的新版本，这样你就可以比较发布过程
+<b>现在就试试</b> 使用不可更改的配置部署应用的新版本，这样你就可以比较发布过程
 
 ```
-# remove the old Deployment:
+# 删除 old Deployment:
 kubectl delete deploy vweb
 
-# create a new Deployment using an immutable config:
+# 使用不可变配置创建一个新的部署:
 kubectl apply -f vweb/update/vweb-v4-with-configMap.yaml --record
 
-# check the output:
+# 检查输出:
 curl $(cat url.txt)
 
-# release a new ConfigMap and updated Deployment:
+# 发布一个新的 ConfigMap 并更新 Deployment:
 kubectl apply -f vweb/update/vweb-v41-with-configMap.yaml --record
 
-# check the output again:
+# 检查输出:
 curl $(cat url.txt)
 
-# the update is a full rollout:
+# 更新将产生完整的 rollout:
 kubectl rollout history deploy/vweb
 
-# so you can rollback:
+# 因此可以执行回滚:
 kubectl rollout undo deploy/vweb
 curl $(cat url.txt)
 ```
 
-![图9.7](.\images\Figure9.7.png)
-<center>图 9.7 配置更新可能会改变应用程序的行为，但不会记录滚出 Configuration updates might change app behavior but without recording a rollout.</center>
-
-Figure 9.8 shows my output, where the config update is accompanied by a Deployment update, which preserves the rollout history and enables the rollback.
-图9.8显示了我的输出，其中配置更新伴随着Deployment更新，后者保留了滚出历史并启用了回滚。
+图9.8显示了我的输出，其中配置更新伴随着Deployment更新，后者保留了 rollout 历史并启用了回滚。
 
 ![图9.8](.\images\Figure9.8.png)
-<center>图 9.8 不可变配置保留了滚出历史，但它意味着每次配置更改都要滚出 An immutable config preserves rollout history, but it means a rollout for every  configuration change.</center>
+<center>图 9.8 不可变配置保留了滚出历史，但它意味着每次配置更改都要 rollout.</center>
 
-Kubernetes doesn’t really care which approach you take, and your choice will partly depend on who owns the configuration in your organization. If the project team also owns deployment and configuration, then you might prefer mutable config objects to simplify the release process and the number of objects to manage. If a separate team owns the configuration, then the immutable approach will be better because they can deploy new config objects ahead of the release. The scale of your apps will affect the decision, too: at a high scale, you may prefer to reduce the number of app deployments and rely on mutable configuration.
-Kubernetes并不真正关心您采用哪种方法，您的选择在一定程度上取决于组织中谁拥有配置。如果项目团队还拥有部署和配置，那么您可能更喜欢可变配置对象，以简化发布过程和要管理的对象数量。如果一个单独的团队拥有配置，那么不可变的方法会更好，因为他们可以在发布之前部署新的配置对象。应用程序的规模也会影响决策:在规模大的情况下，你可能更倾向于减少应用程序部署的数量，并依赖可变配置。
 
-​	There’s a cultural impact to this decision, because it frames how application releases are perceived—as everyday events that are no big deal, or as something slightly scary that is to be avoided as much as possible. In the container world, releases should be trivial events that you’re happy to do with minimal ceremony as soon as they’re needed. Testing and tweaking your release strategy will go a long way to giving you that confidence.
+Kubernetes 并不真正关心您采用哪种方法，您的选择在一定程度上取决于组织中谁拥有配置。如果项目团队还拥有部署和配置，那么您可能更喜欢可变配置对象，以简化发布过程和要管理的对象数量。如果一个单独的团队拥有配置，那么不可变的方法会更好，因为他们可以在发布之前部署新的配置对象。应用程序的规模也会影响决策:在规模大的情况下，你可能更倾向于减少应用程序部署的数量，并依赖可变配置。
+
 这个决定有文化上的影响，因为它框定了应用程序发布是如何被感知的——把它看作是没什么大不了的日常事件，或者看作是要尽可能避免的有点可怕的事情。在容器世界中，发布应该是一些微不足道的事件，只要需要，您就会乐于以最小的仪式来完成。测试和调整你的发行策略会给你带来很大的信心。
 
 ## 9.3 为 Deployments 配置滚动更新
