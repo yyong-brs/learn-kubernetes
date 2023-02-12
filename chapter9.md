@@ -399,118 +399,103 @@ DaemonSets 和 StatefulSets 有两个可用的更新策略。默认的是Rolling
 <b>现在就试试</b> 待办事项应用程序可以在6个pod中运行，所以首先清理现有的应用程序以腾出空间。然后部署应用程序，并测试它是否正常工作
 
 ```
-# remove all of this chapter’s apps:
+# 删除所有本章节应用:
 kubectl delete all -l kiamol=ch09
 
-# deploy the to-do app, database, and proxy:
+# 部署 to-do app, database, and proxy:
 kubectl apply -f todo-list/db/ -f todo-list/web/ -f todo-list/proxy/
 
-# get the app URL:
+# 获取应用访问url:
 kubectl get svc todo-proxy -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8091'
 
-# browse to the app, add an item, and check that it’s in the list
+#  浏览应用, 添加条目
 ```
 
-This is just setting us up for the updates. You should now have a working app where you can add items and see the list. My output is shown in figure 9.14.
 这只是为更新做准备。你现在应该有一个工作的应用程序，你可以添加项目，并看到列表。我的输出如图9.14所示。
 
 ![图9.14](.\images\Figure9.14.png)
-<center>图 9.14 运行带有各种免费控制器的to-do应用程序	Running the to-do app with a gratuitous variety of controllers</center>
+<center>图 9.14 运行带有各种免费控制器的to-do应用程序	</center>
 
-The first update is for the DaemonSet, where we’ll be rolling out a new version of the Nginx proxy image. DaemonSets run a single Pod on all (or some) of the nodes in the cluster, and with a rolling update, you have no surge option. During the update, nodes will never run two Pods, so this is always a delete-then-remove strategy. You can add the maxUnavailable setting to control how many nodes are updated in parallel, but if you take down multiple Pods, you’ll be running at reduced capacity until the replacements are ready.
-第一个更新是DaemonSet，在那里我们将推出一个新版本的Nginx代理映像。DaemonSets在集群中的所有(或部分)节点上运行一个Pod，通过滚动更新，您没有激增选项。在更新期间，节点永远不会运行两个pod，因此这始终是一种先删除再删除的策略。您可以添加maxUnavailable设置来控制并行更新的节点数量，但是如果您关闭多个pod，您将以较低的容量运行，直到替换准备就绪。
+第一个更新是 DaemonSet，在那里我们将退出一个新版本的Nginx代理镜像。DaemonSets在集群中的所有(或部分)节点上运行一个Pod，通过滚动更新，您没有激增选项。在更新期间，节点永远不会运行两个pod，因此这始终是一种先删除再删除的策略。您可以添加 maxUnavailable 设置来控制并行更新的节点数量，但是如果您关闭多个pod，您将以较低的容量运行，直到替换准备就绪。
 
-​	We’ll update the proxy using a maxUnavailable setting of 1, and a minReadySeconds setting of 90. On a single-node lab cluster, the delay won’t have any effect— there’s only one Pod on one node to replace. On a larger cluster, it would mean replacing one Pod at a time and waiting 90 seconds for the Pod to prove it’s stable before moving on to the next.
-我们将使用maxUnavailable设置为1和minReadySeconds设置为90来更新代理。在单节点实验室集群上，延迟不会产生任何影响——一个节点上只有一个Pod需要替换。在更大的集群中，这意味着一次更换一个Pod，并等待90秒，让Pod证明它是稳定的，然后再转移到下一个Pod。
+我们将使用 maxUnavailable 设置为1和 minReadySeconds 设置为90来更新代理。在单节点实验室集群上，延迟不会产生任何影响——一个节点上只有一个Pod需要替换。在更大的集群中，这意味着一次更换一个Pod，并等待90秒，让Pod证明它是稳定的，然后再转移到下一个Pod。
 
-​	**TRY IT NOW	Start the rolling update of the DaemonSet. On a single-node cluster, a short outage will occur while the replacement Pod starts.**
-**TRY IT now启动DaemonSet的滚动更新。在单节点集群中，更换Pod启动时会出现短暂停机
+<b>现在就试试</b> 启动DaemonSet的滚动更新。在单节点集群中，更换Pod启动时会出现短暂停机
 
 ```
-# deploy the DaemonSet update:
+# 部署更新后的 DaemonSet :
 kubectl apply -f todo-list/proxy/update/nginx-rollingUpdate.yaml
 
-# watch the Pod update:
+# watch Pod 更新:
 kubectl get po -l app=todo-proxy --watch
 
-# Press ctrl-c when the update completes
 ```
 
-The watch flag in kubectl is useful for monitoring changes—it keeps looking at an object and prints an update line whenever the state changes. In this exercise you’ll see that the old Pod is terminated before the new one is created, which means the app has downtime while the new Pod starts up. Figure 9.15 shows I had one second of downtime in my release.
-kubectl中的watch标志对于监视更改非常有用——它会一直查看对象，并在状态更改时打印更新行。在本练习中，您将看到旧的Pod在创建新Pod之前被终止，这意味着新Pod启动时应用程序有停机时间。图9.15显示了我在发布中有1秒的停机时间。
+kubectl 中的 watch 标志对于监视更改非常有用——它会一直查看对象，并在状态更改时打印更新行。在本练习中，您将看到旧的 Pod 在创建新Pod之前被终止，这意味着新Pod启动时应用程序有停机时间。图9.15显示了我在发布中有1秒的停机时间。
 
 ![图9.15](.\images\Figure9.15.png)
-<center>图 9.15 DaemonSets更新通过删除现有Pod之前创建一个替换 DaemonSets update by removing the existing Pod before creating a replacement.</center>
+<center>图 9.15 DaemonSets 更新通过删除现有Pod之前创建一个替换</center>
 
-A multinode cluster wouldn’t have any downtime because the Service sends traffic only to Pods that are ready, and only one Pod at a time gets updated, so the other Pods are always available. You will have reduced capacity, though, and if you tune a faster rollout with a higher maxUnavailable setting, that means a greater reduction in capacity as more Pods are updated in parallel. That’s the only setting you have for DaemonSets, so it’s a simple choice between manually controlling the update by deleting Pods or having Kubernetes roll out the update by a specified number of Pods in parallel.
 多节点集群不会有任何停机时间，因为服务只向准备就绪的Pod发送流量，并且一次只更新一个Pod，因此其他Pod始终可用。但是，您的容量将会减少，如果您使用更高的maxUnavailable设置来优化更快的推出，这意味着随着更多pod并行更新，容量将会减少更多。这是你对DaemonSets的唯一设置，所以这是一个简单的选择，通过删除pod手动控制更新或让Kubernetes通过指定数量的pod并行推出更新。
 
-​	StatefulSets are more interesting, although they have only one option to configure the rollout. Pods are managed in order by the StatefulSet, which also applies to updates—the rollout proceeds backward from the last Pod in the set down to the first. That’s especially useful for clustered applications where Pod 0 is the primary, because it validates the update on the secondaries first.
-statefulset更有趣，尽管它们只有一个选项来配置rollout。Pod由StatefulSet按顺序管理，这也适用于更新——从集合中的最后一个Pod向后推出到第一个Pod。这对于Pod 0是主节点的集群应用程序特别有用，因为它首先验证从节点上的更新。
+statefulset 更有趣，尽管它们只有一个选项来配置rollout。Pod由StatefulSet按顺序管理，这也适用于更新——从集合中的最后一个Pod向后推出到第一个Pod。这对于Pod 0是主节点的集群应用程序特别有用，因为它首先验证从节点上的更新。
 
-​	There is no maxSurge or maxUnavailable setting for StatefulSets. The update is always by one Pod at a time. Your configuration option is to define how many Pods should be updated in total, using the partition setting. This setting defines the cutoff point where the rollout stops, and it’s useful for performing a staged rollout of a stateful app. If you have five replicas in your set and your spec includes partition=3, then only Pod 4 and Pod 3 will be updated; Pods 0, 1, and 2 are left running the previous spec.
-StatefulSets没有maxSurge或maxUnavailable设置。更新总是由一个Pod在一个时间。您的配置选项是使用分区设置定义总共应该更新多少pod。这个设置定义了滚出停止的截止点，它对于执行有状态应用的分阶段滚出非常有用。如果你的set中有五个副本，并且spec中包含partition=3，那么只有Pod 4和Pod 3将被更新;pod 0、1和2仍然运行前一个规范。
+StatefulSets 没有maxSurge或maxUnavailable设置。更新总是由一个Pod在一个时间。您的配置选项是使用分区设置定义总共应该更新多少pod。这个设置定义了滚出停止的截止点，它对于执行有状态应用的分阶段滚出非常有用。如果你的set中有五个副本，并且spec中包含partition=3，那么只有Pod 4和Pod 3将被更新;pod 0、1和2仍然运行前一个规范。
 
-​	**TRY IT NOW	Deploy a partitioned update to the database image in the StatefulSet, which stops after Pod 1, so Pod 0 doesn’t get updated.**
-**TRY IT now在StatefulSet中部署一个分区更新到数据库映像，它在Pod 1之后停止，所以Pod 0不会被更新
+<b>现在就试试</b> 在StatefulSet中部署一个分区更新到数据库镜像，它在Pod 1之后停止，所以Pod 0不会被更新
 
 ```
-# deploy the update:
+# 部署更新:
 kubectl apply -f todo-list/db/update/todo-db-rollingUpdate-
   partition.yaml
 
-# check the rollout status:
+# 检查 rollout status:
 kubectl rollout status statefulset/todo-db
 
-# list the Pods, showing the image name and start time:
+# 查看 Pods, 显示镜像及启动时间:
 kubectl get pods -l app=todo-db -o=custom-columns=NAME:.metadata.name,
   IMAGE:.spec.containers[0].image,START_TIME:.status.startTime
 
-# switch the web app to read-only mode, so it uses the secondary
-# database:
+# 切换 web app 到只读模式, 所以它会使用副本数据库:
 kubectl apply -f todo-list/web/update/todo-web-readonly.yaml
 
-# test the app—the data is there, but now it’s read-only
+# 测试 app—只不过是只读的
 ```
 
-This exercise is a partitioned update that rolls out a new version of the Postgres container image, but only to the secondary Pods, which is a single Pod in this case, as shown in figure 9.16. When you use the app in read-only mode, you’ll see that it connects to the updated secondary, which still contains the replicated data from the previous Pod.
-这个练习是一个分区更新，它推出了Postgres容器映像的新版本，但只对次要Pod进行更新，在本例中是单个Pod，如图9.16所示。当你在只读模式下使用应用程序时，你会看到它连接到更新后的备用程序，备用程序仍然包含从上一个Pod复制的数据。
+这个练习是一个分区更新，它推出了Postgres容器镜像的新版本，但只对次要Pod进行更新，在本例中是单个Pod，如图9.16所示。当你在只读模式下使用应用程序时，你会看到它连接到更新后的备用程序，备用程序仍然包含从上一个Pod复制的数据。
 
 ![图9.16](.\images\Figure9.16.png)
-<center>图 9.16 对StatefulSets的分区更新允许您更新次要文件，而保持主文件不变 Partitioned updates to StatefulSets let you update secondaries and leave the primary unchanged.</center>
+<center>图 9.16 对StatefulSets的分区更新允许您更新次要文件，而保持主文件不变 </center>
 
-This rollout is complete, even though the Pods in the set are running from different specs. For a data-heavy application in a StatefulSet, you may have a suite of verification jobs that you need to run on each updated Pod before you’re happy to continue the rollout, and a partitioned update lets you do that. You can manually control the pace of the release by running successive updates with decreasing partition values, until you remove the partition altogether in the final update to finish the set.
 这是完整的展示，即使在一组pod运行不同的规格。对于StatefulSet中的数据量大的应用程序，您可能需要在每个更新的Pod上运行一组验证作业，然后才愿意继续推出，而分区更新可以让您做到这一点。您可以通过运行分区值递减的连续更新来手动控制发布的节奏，直到在最后的更新中完全删除分区以完成集合。
 
-​	**TRY IT NOW	Deploy the update to the database primary. This spec is the same as the previous exercise but with the partition setting removed.**
-**现在就尝试将更新部署到数据库主数据库。此规范与前面的练习相同，但删除了分区设置
+<b>现在就试试</b>将更新部署到数据库主数据库。此规范与前面的练习相同，但删除了分区设置
 
 ```
-# apply the update:
+# 应用更新:
 kubectl apply -f todo-list/db/update/todo-db-rollingUpdate.yaml
 
-# check its progress:
+# 检查 progress:
 kubectl rollout status statefulset/todo-db
 
-# Pods should now all have the same spec:
+# Pods 现在拥有相同的配置:
 kubectl get pods -l app=todo-db -o=custom-
   columns=NAME:.metadata.name,IMAGE:.spec.containers[0].image,START
   _TIME:.status.startTime
-  # reset the web app back to read-write mode:
-  kubectl apply -f todo-list/web/todo-web.yaml
+
+# 重置 web app 回到读写模式:
+kubectl apply -f todo-list/web/todo-web.yaml
   
-  # test that the app works and is connected to the updated primary Pod
+# 测试应用程序是否工作，并连接到更新后的主Pod
 ```
 
-You can see my output in figure 9.17, where the full update has completed and the primary is using the same updated version of Postgres as the secondary. If you’ve done updates to replicated databases before, you’ll know that this is about as simple as it gets—unless you’re using a managed database service, of course.
 你可以在图9.17中看到我的输出，其中完整的更新已经完成，主服务器使用与备用服务器相同的更新版本的Postgres。如果您以前对复制的数据库进行过更新，您就会知道这非常简单——当然，除非您使用的是托管数据库服务。
 
 ![图9.17](.\images\Figure9.17.png)
-<center>图 9.17 使用未分区的更新完成StatefulSet滚出 Completing the StatefulSet rollout, with an update that is not partitioned</center>
+<center>图 9.17 使用未分区的更新完成StatefulSet rollout</center>
 
-Rolling updates are the default for Deployments, DaemonSets, and StatefulSets, and they all work in broadly the same way: gradually replacing Pods running the previous application spec with Pods running the new spec. The actual details differ because the controllers work in different ways and have different goals, but they impose the same requirement on your app: it needs to work correctly when multiple versions are live. That’s not always possible, and there are alternative ways to deploy app updates in Kubernetes.
-滚动更新是部署、DaemonSets和StatefulSets的默认设置，它们的工作方式大致相同:逐渐用运行新规范的Pods取代运行前一个应用程序规范的Pods。实际的细节不同，因为控制器的工作方式不同，目标也不同，但它们对应用程序的要求是相同的:当多个版本处于活动状态时，它需要正确工作。这并不总是可行的，还有其他方法可以在Kubernetes中部署应用程序更新。
+滚动更新是 Deployment 、DaemonSets和StatefulSets的默认设置，它们的工作方式大致相同:逐渐用运行新规范的Pods取代运行前一个应用程序规范的Pods。实际的细节不同，因为控制器的工作方式不同，目标也不同，但它们对应用程序的要求是相同的:当多个版本处于活动状态时，它需要正确工作。这并不总是可行的，还有其他方法可以在Kubernetes中部署应用程序更新。
 
 ## 9.5 理解发布策略
 
