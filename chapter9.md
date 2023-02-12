@@ -247,11 +247,9 @@ Kubernetes 并不真正关心您采用哪种方法，您的选择在一定程度
 
 ## 9.3 为 Deployments 配置滚动更新
 
-Deployments support two update strategies: RollingUpdate is the default and the one we’ve used so far, and the other is Recreate. You know how rolling updates work—by scaling down the old ReplicaSet while scaling up the new ReplicaSet, which provides service continuity and the ability to stagger the update over a longer period. The Recreate strategy gives you neither of those. It still uses ReplicaSets to implement changes, but it scales down the previous set to zero before scaling up the replacement. Listing 9.2 shows the Recreate strategy in a Deployment spec. It’s just one setting, but it has a significant impact.
-部署支持两种更新策略:RollingUpdate是默认的，也是我们目前使用的一种，另一种是rebuild。您知道滚动更新是如何工作的——通过缩小旧的ReplicaSet，同时扩大新的ReplicaSet，这提供了服务连续性和在较长时间内错开更新的能力。而rebuild策略则不提供这两种情况。它仍然使用ReplicaSets来实现更改，但是在扩展替换之前，它将先前的设置缩小到零。清单9.2显示了部署规范中的rebuild策略。这只是一个设置，但它具有重大影响。
+Deployment 支持两种更新策略:RollingUpdate 是默认的，也是我们目前使用的一种，另一种是 Recreate。您知道 rollout 更新是如何工作的——通过缩小旧的ReplicaSet，同时扩大新的ReplicaSet，这提供了服务连续性和在较长时间内错开更新的能力。而 Recreate 策略则不提供这两种情况。它仍然使用 ReplicaSets 来实现更改，但是在扩展替换之前，它将先前的设置缩小到零。清单9.2显示了部署 spec 中的recreate策略。这只是一个设置，但它具有重大影响。
 
-**Listing 9.2	vweb-recreate-v2.yaml, a Deployment using the recreate update strategy**
-**清单9.2 vweb-recreate-v2。yaml，一个使用重建更新策略**的部署
+> 清单9.2 vweb-recreate-v2.yaml，一个使用重建更新策略的部署
 
 ```
 apiVersion: apps/v1
@@ -260,182 +258,145 @@ metadata:
   name: vweb
 spec:
   replicas: 3
-  strategy:                                # This is the update strategy.
-    type: Recreate                         # Recreate is the alternative to the
-                                           # default strategy, RollingUpdate.
+  strategy:                                # 更新策略.
+    type: Recreate                         
   # selector & Pod spec follow
 ```
 
-When you deploy this, you’ll see it’s just a normal app with a Deployment, a ReplicaSet, and some Pods. If you look at the details of the Deployment, you’ll see it uses the Recreate update strategy, but that has an effect only when the Deployment is updated.
-当你部署这个时，你会看到它只是一个普通的应用程序，有一个Deployment，一个ReplicaSet和一些Pods。如果查看Deployment的详细信息，您将看到它使用了rebuild更新策略，但这仅在更新Deployment时才会起作用。
+当你部署这个时，你会看到它只是一个普通的应用程序，有一个Deployment，一个ReplicaSet和一些Pods。如果查看Deployment的详细信息，您将看到它使用了 Recreate 更新策略，但这仅在更新 Deployment 时才会起作用。
 
-​	**TRY IT NOW	Deploy the app from listing 9.2, and explore the objects. This is just like a normal Deployment.**
-**TRY IT now部署清单9.2中的应用程序，并浏览对象。这就像一个正常的部署
+<b>现在就试试</b> 部署清单9.2中的应用程序，并浏览对象。这就像一个正常的部署
 
 ```
-# delete the existing app:
+# 删除 app:
 kubectl delete deploy vweb
 
-# deploy with the Recreate strategy:
+# 部署 Recreate 策略的应用:
 kubectl apply -f vweb-strategies/vweb-recreate-v2.yaml
 
-# check the ReplicaSets:
+# 检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# test the app:
+# 测试 app:
 curl $(cat url.txt)
 
-# look at the details of the Deployment:
+# 查看 Deployment 详细:
 kubectl describe deploy vweb
 ```
 
-As shown in Figure 9.9, this is a new deployment of the same old web app, using version 2 of the container image. There are three Pods, they’re all running, and the app works as expected—so far so good.
-如图9.9所示，这是同一个旧web应用程序的新部署，使用容器映像的版本2。有三个pod，它们都在运行，应用程序按预期运行——到目前为止还不错
+如图 9.9 所示，这是同一个旧web应用程序的新部署，使用容器镜像的版本2。有三个pod，它们都在运行，应用程序按预期运行——到目前为止还不错
 
 ![图9.9](.\images\Figure9.9.png)
-<center>图 9.9 在你发布更新之前，重新创建更新策略不会影响行为	The Recreate update strategy doesn’t affect behavior until you release an update.</center>
+<center>图 9.9 在你发布更新之前，重新创建更新策略不会影响行为</center>
 
-This configuration is dangerous, though, and one you should use only if different versions of your app can’t coexist—something like a database schema update, where you need to be sure that only one version of your app connects to the database. Even in that case, you have better options, but if you have a scenario that definitely needs this approach, then you’d better be sure you test all your updates before you go live. If you deploy an update where the new Pods fail, you won’t know that until your old Pods have all been terminated, and your app will be completely unavailable.
 不过，这种配置很危险，只有在应用程序的不同版本不能共存时才应该使用这种配置——就像数据库模式更新一样，需要确保只有一个版本的应用程序连接到数据库。即使在这种情况下，您也有更好的选择，但如果您的场景确实需要这种方法，那么您最好确保在发布之前测试所有更新。如果你部署了一个更新，而新Pods失败了，你会直到旧Pods全部被终止才知道，你的应用将完全不可用。
 
-​	**TRY IT NOW	Version 3 of the web app is ready to deploy. It’s broken, as you’ll see when the app goes offline because no Pods are running.**
-**尝试它现在版本3的web应用程序已经准备好部署。当应用程序离线时，你会看到它坏了，因为没有Pods在运行
+<b>现在就试试</b>版本3的web应用程序已经准备好部署。当应用程序离线时，你会看到它坏了，因为没有Pods在运行
 
 ```
-# deploy the updated Pod spec:
+# 部署 v3:
 kubectl apply -f vweb-strategies/vweb-recreate-v3.yaml
 
-# check the status, with a time limit for updates:
+# 检查状态，有更新的时间限制:
 kubectl rollout status deploy/vweb --timeout=2s
 
-# check the ReplicaSets:
+# 检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# check the Pods:
+# 检查 Pods:
 kubectl get pods -l app=vweb
 
-# test the app–this will fail:
+# 测试 app–将会失败:
 curl $(cat url.txt)
 ```
 
-You’ll see in this exercise that Kubernetes happily takes your app offline, because that’s what you’ve requested. The Recreate strategy creates a new ReplicaSet with the updated Pod template, then scales down the previous ReplicaSet to zero and scales up the new ReplicaSet to three. The new image is broken, so the new Pods fail, and there’s nothing to respond to requests, as you see in figure 9.10.
-在这个练习中，你会看到Kubernetes很乐意让你的应用脱机，因为这是你所请求的。再造策略使用更新后的Pod模板创建一个新的ReplicaSet，然后将先前的ReplicaSet缩小到0，并将新的ReplicaSet扩大到3。新的映像被破坏了，所以新的Pods失败了，没有任何东西可以响应请求，如图9.10所示。
+在这个练习中，你会看到Kubernetes很乐意让你的应用脱机，因为这是你所请求的。Recreate 策略使用更新后的Pod模板创建一个新的ReplicaSet，然后将先前的ReplicaSet缩小到0，并将新的ReplicaSet扩大到3。新的镜像被破坏了，所以新的Pods失败了，没有任何东西可以响应请求，如图9.10所示。
 
 ![图9.10](.\images\Figure9.10.png)
-<center>图 9.10 如果新的Pod规格被打破，rebuild策略会愉快地关闭你的应用 The Recreate strategy happily takes down your app if the new Pod spec is broken.</center>
+<center>图 9.10 如果新的Pod规格被打破，Recreate 策略会愉快地关闭你的应用 </center>
 
-Now that you’ve seen it, you should probably try to forget about the Recreate strategy. In some scenarios, it might seem attractive, but when it does, you should still consider alternative options, even if it means looking again at your architecture. The wholesale takedown of your application is going to cause downtime, and probably more downtime than you plan for.
-现在您已经看到了它，您可能应该尝试忘记再造策略。在某些情况下，它可能看起来很有吸引力，但当它出现时，您仍然应该考虑替代选项，即使这意味着重新查看您的体系结构。应用程序的大规模关闭将导致停机，而且停机时间可能比您计划的要长。
+现在您已经看到了它，您可能应该尝试忘记 Recreate 策略。在某些情况下，它可能看起来很有吸引力，但当它出现时，您仍然应该考虑替代选项，即使这意味着重新查看您的体系结构。应用程序的大规模关闭将导致停机，而且停机时间可能比您计划的要长。
 
-​	Rolling updates are the default because they guard against downtime, but even then, the default behavior is quite aggressive. For a production release, you’ll want to tune a few settings that set the speed of the release and how it gets monitored. As part of the rolling update spec, you can add options that control how quickly the new ReplicaSet is scaled up and how quickly the old ReplicaSet is scaled down, using the following two values:
-现在您已经看到了它，您可能应该尝试忘记再造策略。在某些情况下，它可能看起来很有吸引力，但当它出现时，您仍然应该考虑替代选项，即使这意味着重新查看您的体系结构。应用程序的大规模关闭将导致停机，而且停机时间可能比您计划的要长。
+RollingUpdate 是默认的，因为它们可以防止停机，但即使这样，默认行为也是相当激进的。对于产品版本，您需要调优一些设置，以设置发布的速度以及如何监控它。作为rollout 更新规范的一部分，您可以使用以下两个值添加控制新ReplicaSet的扩展速度和旧ReplicaSet的缩小速度的选项:
+- maxUnavailable 是用于缩小旧 ReplicaSet 的加速器。它定义了在更新期间，相对于所需的Pod计数，可以有多少Pod不可用。您可以把它看作是在旧的ReplicaSet中终止pod的批处理大小。在10个pod的部署中，将此设置为30%意味着将立即终止3个pod。
+- maxSurge 是扩展新ReplicaSet的加速器。它定义了在期望的副本计数上可以存在多少额外的pod，就像在新的ReplicaSet中创建pod的批处理大小一样。在10个部署中，将此设置为40%将创建4个新pod。
 
-- maxUnavailable is the accelerator for scaling down the old ReplicaSet. It defines how many Pods can be unavailable during the update, relative to the desired Pod count. You can think of it as the batch size for terminating Pods in the old ReplicaSet. In a Deployment of 10 Pods, setting this to 30%  means three Pods will be terminated immediately.
-- maxSurge is the accelerator for scaling up the new ReplicaSet. It defines how many extra Pods can exist, over the desired replica count, like the batch size for creating Pods in the new ReplicaSet. In a Deployment of 10, setting this to 40% will create four new Pods.
-
-- maxUnavailable是用于缩小旧ReplicaSet的加速器。它定义了在更新期间，相对于所需的Pod计数，可以有多少Pod不可用。您可以把它看作是在旧的ReplicaSet中终止pod的批处理大小。在10个pod的部署中，将此设置为30%意味着将立即终止3个pod。
-- maxSurge是扩展新ReplicaSet的加速器。它定义了在期望的副本计数上可以存在多少额外的pod，就像在新的ReplicaSet中创建pod的批处理大小一样。在10个部署中，将此设置为40%将创建4个新pod。
-
-Nice and simple, except both settings are used during a rollout, so you have a seesaw effect. The new ReplicaSet is scaled up until the Pod count is the desired replica count plus the maxSurge value, and then the Deployment waits for old Pods to be removed. The old ReplicaSet is scaled down to the desired count minus the maxUnavailable count, then the Deployment waits for new Pods to reach the ready state. You can’t set both values to zero because that means nothing will change. Figure 9.11 shows how you can combine the settings to prefer a create-then-remove, or a remove-then-create, or a remove-and-create approach to new releases.
-很好，很简单，除了这两种设置都是在推出时使用的，所以你有一个跷跷板的效果。新的ReplicaSet被放大，直到Pod计数是所需的副本计数加上maxSurge值，然后部署等待旧的Pod被删除。旧的ReplicaSet被缩小到所需的计数减去maxUnavailable计数，然后Deployment等待新Pods达到就绪状态。你不能把两个值都设为0，因为这意味着什么都不会改变。图9.11显示了如何组合这些设置，以便对新版本使用先创建再删除、先删除再创建或先删除再创建的方法。
-
-​	You can tweak these settings for a faster rollout if you have spare compute power in your cluster. You can also create additional Pods over your scale setting, but that’s riskier if you have a problem with the new release. A slower rollout is more conservative: it uses less compute and gives you more opportunity to discover any issues, but it reduces the overall capacity of your app during the release. Let’s see how these look, first by fixing our broken app with a conservative rollout.
-如果您的集群中有空闲的计算能力，您可以调整这些设置以更快地推出。您还可以在您的比例设置上创建额外的pod，但如果您对新版本有问题，那么这样做的风险更大。缓慢的发布更保守:它使用更少的计算，给你更多的机会发现任何问题，但它在发布期间降低了应用程序的整体容量。让我们来看看这些是什么样子，首先通过保守的推出来修复我们的坏应用程序。
-
-
-​	**TRY IT NOW	Revert back to the working version 2 image, using maxSurge=1 and maxUnavailable=0 in the RollingUpdate strategy.**
-**尝试现在恢复到工作版本2的映像，使用maxSurge=1和maxUnavailable=0在RollingUpdate策略
-
-
-```
-# update the Deployment to use rolling updates and the v2 image:
-kubectl apply -f vweb-strategies/vweb-rollingUpdate-v2.yaml
-
-# check the Pods for the app:
-kubectl get po -l app=vweb
-
-# check the rollout status:
-kubectl rollout status deploy/vweb
-
-# check the ReplicaSets:
-kubectl get rs -l app=vweb
-
-# test the app:
-curl $(cat url.txt)
-```
+很好，很简单，除了这两种设置都是在 rollout 时使用的，所以你有一个跷跷板的效果。新的ReplicaSet被放大，直到Pod计数是所需的副本计数加上maxSurge值，然后部署等待旧的Pod被删除。旧的ReplicaSet被缩小到所需的计数减去maxUnavailable计数，然后Deployment等待新Pods达到就绪状态。你不能把两个值都设为0，因为这意味着什么都不会改变。图9.11显示了如何组合这些设置，以便对新版本使用先创建再删除、先删除再创建或先删除再创建的方法。
 
 ![图9.11](.\images\Figure9.11.png)
-<center>图 9.11 正在进行部署更新，使用不同的推出选项 Deployment updates in progress, using different rollout options</center>
+<center>图 9.11 正在进行部署更新，使用不同的 rollout 选项</center>
 
-In this exercise, the new Deployment spec changed the Pod image back to version 2, and it also changed the update strategy to a rolling update. You can see in figure 9.12 that the strategy change is made first, and then the Pod update is made in line with the new strategy, creating one new Pod at a time.
-在本练习中，新的部署规范将Pod映像更改回版本2，并将更新策略更改为滚动更新。你可以在图9.12中看到，首先进行了策略更改，然后根据新策略进行Pod更新，一次创建一个新的Pod。
+如果您的集群中有空闲的计算能力，您可以调整这些设置以更快地 rollout。您还可以在您的比例设置上创建额外的pod，但如果您对新版本有问题，那么这样做的风险更大。缓慢的发布更保守:它使用更少的计算，给你更多的机会发现任何问题，但它在发布期间降低了应用程序的整体容量。让我们来看看这些是什么样子，首先通过保守的 rollout 来修复我们的坏应用程序。
 
-![图9.12](.\images\Figure9.12.png)
-<center>图 9.12 如果Pod模板匹配新规范，部署更新将使用现有的ReplicaSet Deployment updates will use an existing ReplicaSet if the Pod template matches the new spec.</center>
-
-You’ll need to work fast to see the rollout in progress in the previous exercise, because this simple app starts quickly, and as soon as one new Pod is running, the rollout continues with another new Pod. You can control the pace of the rollout with the following two fields in the Deployment spec:
-在前面的练习中，您需要快速工作以查看推出的进度，因为这个简单的应用程序很快启动，只要一个新的Pod正在运行，就会继续使用另一个新Pod进行推出。在部署规范中，您可以通过以下两个字段来控制部署的速度:
-
-- minReadySeconds adds a delay where the Deployment waits to make sure new Pods are stable. It specifies the number of seconds the Pod should be up with no containers crashing before it’s considered to be successful. The default is zero, which is why new Pods are created quickly during rollouts.
-- progressDeadlineSeconds specifies the amount of time a Deployment update can run before it’s considered as failing to progress. The default is 600 seconds, so if an update is not completed within 10 minutes, it’s flagged as not progressing.
-- minReadySeconds增加了一个延迟，即部署等待以确保新pod稳定。它指定了Pod在没有容器崩溃之前应该启动的秒数。默认值为0，这就是为什么在推出过程中会快速创建新pod的原因。
-- progressdeadlinesecseconds指定部署更新在被视为进展失败之前可以运行的时间。默认值是600秒，因此如果更新没有在10分钟内完成，它将被标记为未进行。
-
-
-Monitoring how long the release takes sounds useful, but as of Kubernetes 1.19, exceeding the deadline doesn’t actually affect the rollout—it just sets a flag on the Deployment. Kubernetes doesn’t have an automatic rollback feature for failed rollouts, but when that feature does come, it will be triggered by this flag. Waiting and checking a Pod for failed containers is a fairly blunt tool, but it’s better than having no checks at all, and you should consider having minReadySeconds specified in all your Deployments.
-监视发布需要多长时间听起来很有用，但从Kubernetes 1.19开始，超过最后期限实际上并不会影响部署—它只是在部署上设置了一个标志。Kubernetes没有自动回滚功能，但是当该功能出现时，它将由这个标志触发。等待和检查Pod中失败的容器是一个相当生硬的工具，但这比根本不检查要好，您应该考虑在所有部署中指定minReadySeconds。
-
-​	These safety measures are useful to add to your Deployment, but they don’t really help with our web app because the new Pods always fail. We can make this Deployment safe and keep the app online using a rolling update. The next version 3 update sets both maxUnavailable and maxSurge to 1. Doing so has the same effect as the default values (each 25%), but it’s clearer to use exact values in the spec, and Pod counts are easier to work with than percentages in small deployments.
-这些安全措施可以添加到你的部署中，但它们对我们的web应用没有真正的帮助，因为新的Pods总是失败。我们可以使此部署安全，并使用滚动更新保持应用程序在线。下一个版本3更新将maxUnavailable和maxSurge设置为1。这样做与默认值(每个25%)具有相同的效果，但在规范中使用确切的值更清楚，并且在小型部署中Pod计数比百分比更容易处理。
-
-​	**TRY IT NOW	Deploy the version 3 update again. It will still fail, but by using a RollingUpdate strategy, it doesn’t take the app offline.**
-**现在就尝试再次部署版本3更新。它仍然会失败，但通过使用RollingUpdate策略，它不会让应用程序离线
+<b>现在就试试</b>恢复到工作版本2的镜像，使用 maxSurge=1 和 maxUnavailable=0 在RollingUpdate策略
 
 ```
-# update to the failing container image:
-kubectl apply -f vweb-strategies/vweb-rollingUpdate-v3.yaml
+# 更新 Deployment 使用 rolling updates 以及 v2 image:
+kubectl apply -f vweb-strategies/vweb-rollingUpdate-v2.yaml
 
-# check the Pods:
+# 检查 Pods:
 kubectl get po -l app=vweb
 
-# check the rollout:
+# 检查 rollout status:
 kubectl rollout status deploy/vweb
 
-# see the scale in the ReplicaSets:
+# 检查 ReplicaSets:
 kubectl get rs -l app=vweb
 
-# test the app:
+# 测试 app:
 curl $(cat url.txt)
 ```
 
-When you run this exercise, you’ll see the update never completes, and the Deployment is stuck with two ReplicaSets having a desired Pod count of two, as shown in figure 9.13. The old ReplicaSet won’t scale down any further because the Deployment has maxUnavailable set to 1; it has already been scaled down by 1 and no new Pods will become ready to continue the rollout. The new ReplicaSet won’t scale up anymore because maxSurge is set to 1, and the total Pod count for the Deployment has been reached.
+在本练习中，新的部署规范将Pod镜像更改回版本2，并将更新策略更改为滚动更新。你可以在图9.12中看到，首先进行了策略更改，然后根据新策略进行Pod更新，一次创建一个新的Pod。
+
+![图9.12](.\images\Figure9.12.png)
+<center>图 9.12 如果Pod模板匹配新规范，部署更新将使用现有的ReplicaSet</center>
+
+在前面的练习中，您需要快速工作以查看 rollout 的进度，因为这个简单的应用程序很快启动，只要一个新的Pod正在运行，就会继续使用另一个新Pod进行 rollout。在部署规范中，您可以通过以下两个字段来控制部署的速度:
+- minReadySeconds 增加了一个延迟，即部署等待以确保新pod稳定。它指定了Pod在没有容器崩溃之前应该启动的秒数。默认值为0，这就是为什么在 rollout 过程中会快速创建新pod的原因。
+- progressDeadlineSeconds 指定部署更新在被视为进展失败之前可以运行的时间。默认值是600秒，因此如果更新没有在10分钟内完成，它将被标记为未进行。
+
+监视发布需要多长时间听起来很有用，但从Kubernetes 1.19开始，超过最后期限实际上并不会影响部署—它只是在部署上设置了一个标志。Kubernetes没有自动回滚功能，但是当该功能出现时，它将由这个标志触发。等待和检查Pod中失败的容器是一个相当生硬的工具，但这比根本不检查要好，您应该考虑在所有部署中指定minReadySeconds。
+
+这些安全措施可以添加到你的部署中，但它们对我们的web应用没有真正的帮助，因为新的Pods总是失败。我们可以使此部署安全，并使用滚动更新保持应用程序在线。下一个版本3更新将maxUnavailable和maxSurge设置为1。这样做与默认值(每个25%)具有相同的效果，但在规范中使用确切的值更清楚，并且在小型部署中Pod计数比百分比更容易处理。
+
+<b>现在就试试</b>再次部署版本3更新。它仍然会失败，但通过使用RollingUpdate策略，它不会让应用程序离线
+
+```
+# 更新失败的容器镜像:
+kubectl apply -f vweb-strategies/vweb-rollingUpdate-v3.yaml
+
+# 检查 Pods:
+kubectl get po -l app=vweb
+
+# 检查 rollout:
+kubectl rollout status deploy/vweb
+
+# 查看  ReplicaSets:
+kubectl get rs -l app=vweb
+
+# 测试 app:
+curl $(cat url.txt)
+```
+
 当您运行这个练习时，您将看到更新永远不会完成，并且部署卡住了两个ReplicaSets，其Pod数为2，如图9.13所示。旧的ReplicaSet将不会进一步缩小，因为部署已经将maxUnavailable设置为1;它的规模已经缩小了1，不会有新的pod准备继续推出。新的ReplicaSet将不再扩展，因为maxSurge被设置为1，并且已经达到了部署的总Pod数。
 
-​	If you check back on the new Pods in a few minutes, you’ll see they’re in the state CrashLoopBackoff. Kubernetes keeps restarting failed Pods by creating replacement containers, but it adds a pause between each restart so it doesn’t choke the CPU on the node. That pause is the backoff time, and it increases exponentially—10 seconds for the first restart, then 20 seconds, and then 40 seconds, up to a maximum of 5 minutes. These version 3 Pods will never restart successfully, but Kubernetes will keep trying.
+![图9.13](.\images\Figure9.13.png)
+<center>图 9.13 失败的更新不会自动回滚或暂停;他们只是一直在努力</center>
+
 如果您在几分钟后检查新pod，您将看到它们处于CrashLoopBackoff状态。Kubernetes通过创建替换容器来重新启动失败的Pods，但它在每次重新启动之间添加了暂停，这样就不会阻塞节点上的CPU。这个暂停就是后退时间，它呈指数级增加——第一次重新启动时为10秒，然后是20秒，然后是40秒，最多5分钟。这些第三版pod将永远无法成功重启，但Kubernetes将继续尝试。
 
-​	Deployments are the controllers you use the most, and it’s worth spending time working through the update strategy and timing settings to be sure you understand
-部署是您使用最多的控制器，值得花时间研究更新策略和定时设置，以确保您理解
+Deployments 是您使用最多的控制器，值得花时间研究更新策略和定时设置，以确保您理解.对你的应用的影响。DaemonSets和StatefulSets也有滚动更新功能，因为它们有不同的管理pod的方式，所以它们也有不同的 rollout 方法。
 
-![图9.13](.\images\Figure9.13.png)
-<center>图 9.13 失败的更新不会自动回滚或暂停;他们只是一直在努力 Failed updates don’t automatically roll back or pause; they just keep trying.</center>
-
-the impact for your apps. DaemonSets and StatefulSets also have rolling update functionality, and because they have different ways of managing their Pods, they have different approaches to rollouts, too.
-对你的应用的影响。DaemonSets和StatefulSets也有滚动更新功能，因为它们有不同的管理pod的方式，所以它们也有不同的推出方法。
 ## 9.4 DaemonSets 和 StatefulSets 中的滚动更新
 
-DaemonSets and StatefulSets have two update strategies available. The default is RollingUpdate, which we’ll explore in this section. The alternative is OnDelete, which is for situations when you need close control over when each Pod is updated. You deploy the update, and the controller watches Pods, but it doesn’t terminate any existing Pods. It waits until they are deleted by another process, and then it replaces them with Pods from the new spec.
-DaemonSets和StatefulSets有两个可用的更新策略。默认的是RollingUpdate，我们将在本节中探讨它。另一种方法是OnDelete，它用于需要密切控制每个Pod何时更新的情况。你部署更新，控制器会监视pod，但它不会终止任何现有的pod。它会一直等待，直到它们被另一个进程删除，然后用新规范中的pod替换它们。
+DaemonSets 和 StatefulSets 有两个可用的更新策略。默认的是RollingUpdate，我们将在本节中探讨它。另一种方法是OnDelete，它用于需要密切控制每个Pod何时更新的情况。你部署更新，控制器会监视pod，但它不会终止任何现有的pod。它会一直等待，直到它们被另一个进程删除，然后用新规范中的pod替换它们。
 
-​	This isn’t quite as pointless as it sounds, when you think about the use cases for these controllers. You may have a StatefulSet where each Pod needs to have flushed data to disk before it’s removed, and you can have an automated process to do that. You may have a DaemonSet where each Pod needs to be disconnected from a hardware component, so it’s free for the next Pod to use. These are rare cases, but the OnDelete strategy lets you take ownership of when Pods are deleted and still have Kubernetes automatically create replacements.
-DaemonSets和StatefulSets有两个可用的更新策略。默认的是RollingUpdate，我们将在本节中探讨它。另一种方法是OnDelete，它用于需要密切控制每个Pod何时更新的情况。你部署更新，控制器会监视pod，但它不会终止任何现有的pod。它会一直等待，直到它们被另一个进程删除，然后用新规范中的pod替换它们。
+当您考虑这些控制器的用例时，这并不像听起来那么毫无意义。您可能有一个StatefulSet，其中每个Pod在删除之前都需要将数据刷新到磁盘，您可以有一个自动化的过程来完成这一点。您可能有一个DaemonSet，其中每个Pod都需要从硬件组件断开连接，以便下一个Pod可以使用它。这种情况很少见，但是OnDelete策略可以让你在删除Pods时拥有所有权，并且仍然可以让Kubernetes自动创建替换。
 
-​	We’ll focus on rolling updates in this section, and for that we’ll deploy a version of the to-do list app, which runs the database in a StatefulSet, the web app in a Deployment, and a reverse proxy for the web app in a DaemonSet.
-在本节中，我们将重点关注滚动更新，为此，我们将部署一个版本的待办事项列表应用程序，它在StatefulSet中运行数据库，在Deployment中运行web应用程序，在DaemonSet中运行web应用程序的反向代理。
+在本节中，我们将重点关注 rollingupdate，为此，我们将部署一个版本的待办事项列表应用程序，它在StatefulSet中运行数据库，在Deployment中运行web应用程序，在DaemonSet中运行web应用程序的反向代理。
 
-​	**TRY IT NOW	The to-do app runs across six Pods, so start by clearing the existing apps to make room. Then deploy the app, and test that it works correctly.**
-**现在就试一试，待办事项应用程序可以在6个pod中运行，所以首先清理现有的应用程序以腾出空间。然后部署应用程序，并测试它是否正常工作
-
+<b>现在就试试</b> 待办事项应用程序可以在6个pod中运行，所以首先清理现有的应用程序以腾出空间。然后部署应用程序，并测试它是否正常工作
 
 ```
 # remove all of this chapter’s apps:
