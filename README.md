@@ -137,3 +137,17 @@
     - 9.5 [理解发布策略](./chapter9.md#95-理解发布策略)
 
     - 9.6 [实验室](./chapter9.md#96-实验室)
+
+  - 第十章 [通过 Helm 打包并管理应用](./chapter10.md)
+
+    - 10.1 [Helm 给 Kubernetes 带来了什么](./chapter10.md#101-helm-给-Kubernetes-带来了什么)
+
+    - 10.2 [使用 Helm 打包你自己的应用](./chapter10.md#102-使用-helm-打包你自己的应用)
+
+    - 10.3 [charts 中的模块依赖](./chapter10.md#103-charts-中的模块依赖)
+
+    - 10.4 [升级及回滚 Helm releases](./chapter10.md#104-升级及回滚-helm-releases)
+
+    - 10.5 [理解 Helm 定位](./chapter10.md#105-理解-helm-定位)
+
+    - 10.6 [实验室](./chapter10.md#106-实验室)
