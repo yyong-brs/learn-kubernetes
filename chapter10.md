@@ -112,61 +112,56 @@ kubectl get svc ch10-vweb -o
 
 ## 10.2	使用 Helm 打包你自己的应用
 
-Helm charts are folders or zipped archives that contain Kubernetes manifests. You create your own charts by taking your application manifests, identifying any values you want to be parameterized, and replacing the actual value with a templated variable.
+Helm charts 是包含 Kubernetes 清单的文件夹或压缩档案。您可以使用应用程序清单创建自己的 Chart，确定想要参数化的任何值，并用模板化变量替换实际值。
 
+清单 10.1 显示了模板化部署规范的开头部分，其中包括了使用 Helm 为资源名和标签值设置的值。
 
-Listing 10.1 shows the beginning of a templated Deployment spec, which uses values set by Helm for the resource name and the label value.
-
-**Listing 10.1	web-ping-deployment.yaml, a templated Kubernetes manifest**
+> 清单10.1 web-ping-deployment.yaml，一个模板化的 Kubernetes manifest
 
 ```
 apiVersion: apps/v1
-kind: Deployment            # This much is standard Kubernetes YAML.
+kind: Deployment            # 这些都是标准的 Kubernetes YAML.
 
 metadata:
-  name: {{ .Release.Name }}             # Contains the name of the release
+  name: {{ .Release.Name }}             # 使用 release 名称
   labels:
-    kiamol: {{ .Values.kiamolChapter }} # Contains the “kiamolChapter”
-                                        # value
+    kiamol: {{ .Values.kiamolChapter }} # 使用 变量 “kiamolChapter” 值
+                                        
 ```
 
-The double-brace syntax is for templated values—everything from the opening {{ to the closing }} is replaced at install time, and Helm sends the processed YAML to Kubernetes. Multiple sources can be used as the input to replace templated values. The snippet in listing 10.1 uses the Release object to get the name of the release and the Values object to get a parameter value called kiamolChapter. The Release object is populated with information from the install or upgrade command, and the Values object is populated from defaults in the chart and any settings the user has overridden. Templates can also access static details about the chart and runtime details about the capabilities of the Kubernetes cluster.
+双大括号语法用于模板化值——从开头 {{ 到结束 }} 的所有内容都在安装时被替换，Helm 将处理后的 YAML 发送到 Kubernetes。可以使用多个源作为输入来替换模板化的值。清单 10.1 中的代码片段使用 Release 对象获取发布的名称，使用 Values 对象获取名为 kiamolChapter 的参数值。Release 对象使用来自安装或升级命令的信息填充，Values 对象使用 Chart 中的默认值和用户已覆盖的任何设置填充。模板还可以访问关于 chart 的静态细节和关于 Kubernetes 集群功能的运行时细节。
 
-​	Helm is very particular about the file structure in a chart. You can use the helm create command to generate the boilerplate structure for a new chart. The top level is a folder whose name has to match the chart name you want to use, and that folder must have at least the following three items:
-
-- A Chart.yaml file that specifies the chart metadata, including the name and version
-- A values.yaml file that sets the default values for parameters
-- A templates folder that contains the templated Kubernetes manifests
+Helm 对 Chart 中的文件结构非常讲究。您可以使用 helm create 命令为新图表生成样板结构。顶层是一个文件夹，其名称必须与您想要使用的 Chart 名称相匹配，并且该文件夹必须至少具有以下三个项目:
+- Chart.yaml 文件，指定 Chart 元数据，包括名称和版本
+- values.yaml 文件，为参数设置默认值
+- 存放 Kubernetes 清单模板的 templates 文件夹
 
 Listing 10.1 is from a file called web-ping-deployment.yaml in the web-ping/templates folder in this chapter’s source. The web-ping folder contains all the files needed for a valid chart, and Helm can validate the chart contents and install a release from the chart folder.
+清单 10.1 来自一个名为 web-ping-deployment 的文件。Yaml 在本章源代码的 web-ping/templates 文件夹中。web-ping 文件夹包含有效 chart 所需的所有文件，Helm 可以验证 chart 内容并从 chart 文件夹中安装一个 release。
 
-​	<b>现在就试试</b>	When you’re developing charts, you don’t need to package them in zip archives; you can work with the chart folder.**
-
+​	<b>现在就试试</b>	当你在开发 chart 时，你不需要将它们打包在 zip 档案中;您可以使用 chart 文件夹。
 ```
-# switch to this chapter’s source:
+# 切换到本章源码目录:
 cd ch10
 
-# validate the chart contents:
+# 校验 chart 内容:
 helm lint web-ping
 
-# install a release from the chart folder:
+# 基于 chart 目录安装一个 release:
 helm install wp1 web-ping/
 
-# check the installed releases:
+# 检查已安装的 releases:
 helm ls
 ```
 
-The lint command is only for working with local charts, but the install command is the same for local charts and for charts stored in a repository. Local charts can be folders or zipped archives, and you’ll see in this exercise that installing a release from a local chart is the same experience as installing from a repository. My output in figure 10.6 shows I now have two releases installed: one from the vweb chart and one from the web-ping chart.
-
-​	The web-ping application is a basic utility that checks whether a website is up by making HTTP requests to a domain name on a regular schedule. Right now, you have
+lint 命令仅用于处理本地 chart，但是 install 命令对于本地 chart 和 存储在存储库中的 chart 是相同的。本地 chart 可以是文件夹或压缩档案，在本练习中，您将看到从本地 chart 安装版本与从存储库安装版本的经验相同。图 10.6 中的输出显示我现在安装了两个 releases:一个来自vweb chart，另一个来自web-ping chart。
 
 ![图10.6](.\images\Figure10.6.png)
+<center>图 10.6 从本地文件夹安装和升级可以让您快速迭代 chart 开发</center>
 
-​									<center>图 10.6 Installing and upgrading from a local folder lets you iterate quickly on chart development</center>
+web-ping 应用程序是一个基本的实用程序，通过定期向域名发出HTTP请求来检查网站是否正常运行。现在，你有一个Pod在运行，它每 30 秒就会向我的博客发送请求。我的博客运行在Kubernetes上，所以我相信它能够处理这个问题。应用程序使用环境变量来配置要使用的URL和调度间隔，这些都在Helm的清单中模板化。清单10.2显示了带有模板化变量的Pod spec。
 
-a Pod running, which is sending requests to my blog every 30 seconds. My blog runs on Kubernetes, so I’m sure it will be able to handle that. The app uses environment variables to configure the URL to use and the schedule interval, and those are templated in the manifest for Helm. Listing 10.2 shows the Pod spec with the templated variables.
-
-**Listing 10.2	web-ping-deployment.yaml, templated container environment**
+> 清单10.2 web-ping-deployment.yaml，模板容器环境
 
 ```
 spec:
@@ -180,132 +175,126 @@ spec:
           value: {{ .Values.pingIntervalMilliseconds | quote }}
 ```
 
-Helm has a rich set of templating functions you can use to manipulate the values that get set in the YAML. The quote function in listing 10.2 wraps the provided value in quotation marks, if it doesn’t already have them. You can include looping and branching logic in your templates, calculate strings and numbers, and even query the Kubernetes API to find details from other objects. We won’t get into that much detail, but it’s important to remember that Helm lets you generate sophisticated templates that can do pretty much anything.
+Helm 有一组丰富的模板函数，您可以使用它来操作在 YAML 中设置的值。清单10.2 中的 quote 函数将提供的值包装在引号中，如果它还没有引号的话。您可以在模板中包含循环和分支逻辑，计算字符串和数字，甚至可以查询 Kubernetes API 以从其他对象中查找详细信息。我们不会讨论那么多细节，但重要的是要记住 Helm 可以让您生成复杂的模板，可以做几乎任何事情。
 
-​	You need to think carefully about the parts of your spec that need to be templated. One of the big benefits of Helm over standard manifest deployments is that you can run multiple instances of the same app from a single chart. You can’t do that with kubectl because the manifests contain resource names that need to be unique. If you deploy the same set of YAML multiple times, Kubernetes will just update the same resources. If you template all the unique parts of the spec—like resource names and label selectors—then you can run many copies of the same app with Helm.
+您需要仔细考虑 spec 中需要被模板化的部分。Helm 相对于标准清单部署的最大好处之一是，您可以从一个 chart 运行同一个应用程序的多个实例。kubectl 不能这样做，因为清单包含的资源名必须是唯一的。如果多次部署同一组 YAML, Kubernetes 只会更新相同的资源。如果你模板化了 spec 中所有独特的部分，比如资源名和标签选择器，那么你就可以用 Helm 运行同一个应用的多个副本。
 
-​	<b>现在就试试</b>	Deploy a second release of the web-ping app, using the samechart folder but specifying a different URL to ping.**
+​<b>现在就试试</b>	部署 web-ping 应用程序的第二个版本，使用相同的 chart 文件夹，但指定不同的URL来ping.
 
 ```
-# check the available settings for the chart:
+# 检查 chart 可用变量:
 helm show values web-ping/
 
-# install a new release named wp2, using a different target:
+# 安装一个新的名为 wp2 的 release :
 helm install --set targetUrl=kiamol.net wp2 web-ping/
 
-# wait a minute or so for the pings to fire, then check the logs:
+# 等待然后检查日志:
 kubectl logs -l app=web-ping --tail 1
 ```
 
-You’ll see in this exercise that I need to do some optimization on my blog—it returns in around 500 ms whereas the Kiamol website returns in 100 ms. More important, you can see two instances of the app running: two Deployments managing two sets of Pods with different container specs. My output is shown in figure 10.7.
-
-​	It should be clear now that the Helm workflow for installing and managing apps is different from the kubectl workflow, but you also need to understand that the two are incompatible. You can’t deploy the app by running kubectl apply in the templates folder for the chart, because the templated variables are not valid YAML, and the command will fail. If you adopt Helm, you need to choose between using Helm for every environment, which is likely to slow down the developer workflow, or using plain Kubernetes manifests for development and Helm for other environments, which means you’ll have multiple copies of your YAML.
-
-​	Remember that Helm is about distribution and discovery as much as it’s about installation. The additional friction that Helm brings is the price of being able to simplify complex applications down to a few variables and share them on a repository. A repository is really just an index file with a list of chart versions that can be stored on any web server (the Kiamol repository uses GitHub pages, and you can see the whole contents at https://kiamol.net/index.yaml).
+在这个练习中，您将看到我需要对我的博客做一些优化——它在500毫秒左右返回，而Kiamol网站在100毫秒返回。更重要的是，您可以看到应用程序正在运行的两个实例:两个deployment管理两组具有不同容器规格的pod。我的输出如图10.7所示。
 
 ![图10.7](.\images\Figure10.7.png)
+<center>图 10.7 你不能用纯清单安装一个应用程序的多个实例，但你可以用Helm</center>
 
-​									<center>图 10.7 You can’t install multiple instances of an app with plain manifests, but you can with Helm</center>
+现在应该清楚了，用于安装和管理应用程序的 Helm 工作流与 kubectl 工作流是不同的，但您还需要了解两者是不兼容的。不能通过在 chart 的模板文件夹中运行kubectl apply 来部署应用程序，因为模板化的变量不是有效的YAML，并且该命令将失败。如果您采用 Helm，那么您需要在以下两种情况中做出选择:在每个环境中使用 Helm，这可能会降低开发人员的工作流程;或者在其他环境中使用纯 Kubernetes 清单进行开发，而在其他环境中使用 Helm，这意味着您将拥有YAML的多个副本。
 
-You can use any server technology to host your repository, but for the rest of this section, we’ll use a dedicated repository server called ChartMuseum, which is a popular open source option. You can run ChartMuseum as a private Helm repository in your own organization, and it’s easy to set up because you can install it with a Helm chart.
+请记住，Helm 的作用不仅仅是安装，它更是关于分发和发现。Helm 带来的额外摩擦是为了能够将复杂的应用程序简化为几个变量，并在存储库上共享它们。存储库实际上只是一个索引文件，其中包含可以存储在任何 Web 服务器上的一系列 chart 版本（Kiamol 存储库使用 GitHub 页面，并且您可以在 https://kiamol.net/index.yaml 上查看其全部内容）。
 
-​	<b>现在就试试</b>	The ChartMuseum chart is on the official Helm repository, conventionally called “stable.” Add that repository, and you can install a release to run your own repository locally.**
+您可以使用任何服务器技术来托管存储库，但在本节的其余部分中，我们将使用名为 ChartMuseum 的专用存储库服务器，这是一种流行的开源选项。您可以在自己的组织中运行 ChartMuseum 作为私有 Helm 存储库，而且它很容易设置，因为您可以使用 Helm Chart 安装它。
 
+​	<b>现在就试试</b>	ChartMuseum 的图表位于官方的 Helm 存储库中，通常被称为“稳定版”。添加该存储库后，您可以安装一个发行版在本地运行自己的存储库
 ```
-# add the official Helm repository:
+# 添加官方 Helm 仓库:
 helm repo add stable https://kubernetes-charts.storage.googleapis.com
 
-# install ChartMuseum—the repo flag fetches details from
-# the repository so you don’t need to update your local cache:
+# 安装 ChartMuseum— repo 参数指定了直接从远程仓库获取信息，所以你不需要更新本地缓存:
 
 helm install --set service.type=LoadBalancer --set
   service.externalPort=8008 --set env.open.DISABLE_API=false repo
   stable/chartmuseum --version 2.13.0 --wait
 
-# get the URL for your local ChartMuseum app:
+# 获取访问 url:
 kubectl get svc repo-chartmuseum -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8008'
 
-# add it as a repository called local:
+# 将其添加到本地，名为 local:
 helm repo add local $(kubectl get svc repo-chartmuseum -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8008')
 ```
 
-Now you have three repositories registered with Helm: the Kiamol repository, the stable Kubernetes repository (which is a curated set of charts, similar to the official images in Docker Hub), and your own local repository. You can see my output in figure 10.8, which is abridged to reduce the output from the Helm install command.
+现在您已经有三个存储库在 Helm 上注册了: Kiamol存储库、稳定的Kubernetes存储库(它是一组精心策划的 chart，类似于Docker Hub中的官方镜像)，以及您自己的本地存储库。您可以在图10.8中看到我的输出，为了减少Helm安装命令的输出，对其进行了删减。
 
 ![图10.8](.\images\Figure10.8.png)
+<center>图 10.8 运行自己的Helm存储库就像从Helm repository 安装 chart一样简单</center>
 
-​								<center>图 10.8 Running your own Helm repository is as simple as installing a chart from a Helmrepository</center>
+在将 chart 发布到存储库之前，需要对 chart 进行打包，发布通常分为三个阶段:将chart 打包到zip归档文件中，将归档文件上传到服务器，并更新存储库索引以添加新 chart。ChartMuseum 为您完成了最后一步，因此您只需要打包并上传 chart，以便自动更新存储库索引。
 
-Charts need to be packaged before they can be published to a repository, and publishing is usually a three-stage process: package the chart into a zip archive, upload the archive to a server, and update the repository index to add the new chart. ChartMuseum takes care of the last step for you, so you just need to package and upload the chart for the repository index to be automatically updated.
-
-​	<b>现在就试试</b>	Use Helm to create the zip archive for the chart, and use curl to upload it to your ChartMuseum repository. Check the repository—you’ll see your chart has been indexed.**
+​<b>现在就试试</b> 使用Helm为 chart 创建zip存档，并使用curl将其上传到您的 ChartMuseum 存储库。检查存储库—您将看到您的 chart 已被索引
 
 ```
-# package the local chart:
+# 打包本地 chart:
 helm package web-ping
 
-# *on Windows 10* remove the PowerShell alias to use the real curl:
+# 在 win10 需要，删除 Powershell 别名以直接使用 curl:
 Remove-Item Alias:curl -ErrorAction Ignore
 
-# upload the chart zip archive to ChartMuseum:
+# 上传 chart 压缩档到 ChartMuseum:
 curl --data-binary "@web-ping-0.1.0.tgz" $(kubectl get svc repo-
   chartmuseum -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8008/api/chart
   s')
 
-# check that ChartMuseum has updated its index:
+# 检查 ChartMuseum 已经更新索引:
 curl $(kubectl get svc repo-chartmuseum -o jsonpath='http://{.status
   .loadBalancer.ingress[0].*}:8008/index.yaml')
 ```
 
-Helm uses compressed archives to make charts easy to distribute, and the files are tiny—they contain the Kubernetes manifests and the metadata and values, but they don’t contain any large binaries. Pod specs in the chart specify container images to use, but the images themselves are not part of the chart—they’re pulled from Docker Hub or your own image registry when you install a release. You can see in figure 10.9 that ChartMusem generates the repository index when you upload a chart and adds the new chart details.
+Helm 使用压缩档案使 chart 易于分发，而且文件很小——它们包含Kubernetes清单、元数据和 values，但不包含任何大的二进制文件。chart 中的Pod spec 指定了要使用的容器镜像，但镜像本身不是 chart 的一部分——它们是在安装版本时从 Docker Hub 或您自己的镜像注册表中提取的。在图10.9中可以看到，当您上传 chart 并添加新的 chart 细节时，ChartMusem 生成存储库索引。
 
-​	You can use ChartMuseum or another repository server in your organization to share internal applications or to push charts as part of your continuous integration process before making release candidates available on your public repository. The local repository you have is running only in your lab environment, but it’s published using a LoadBalancer Service, so anyone with network access can install the web-ping app from it.
+![图10.9](.\images\Figure10.9.png)
+<center>图 10.9 您可以将ChartMuseum作为私有存储库来轻松地在团队之间共享 Chart</center>
 
-​	<b>现在就试试</b>	Install yet another version of the web-ping app, this time using the chart from your local repository and providing a values file instead of specifying each setting in the install command.**
+您可以使用 ChartMuseum 或组织中的另一个存储库服务器来共享内部应用程序或将 chart 作为持续集成过程的一部分，然后在公共存储库上发布候选版本。您拥有的本地存储库只在您的实验室环境中运行，但它是使用 LoadBalancer Service发布的，因此任何有网络访问权限的人都可以从中安装web-ping应用程序。
+
+​<b>现在就试试</b> 安装另一个版本的web-ping应用程序，这次使用本地存储库中的 chart，并提供一个 value 文件，而不是在安装命令中指定每个设置
 
 ```
-# update your repository cache:
+# 更新仓库缓存:
 helm repo update
 
-# verify that Helm can find your chart:
+# 验证 helm 可以发现你的 chart :
 helm search repo web-ping
 
-# check the local values file:
+# 检查本地的 values 文件:
 cat web-ping-values.yaml
 
-# install from the repository using the values file:
+# 从仓库安装并使用本地 values 文件:
 helm install -f web-ping-values.yaml wp3 local/web-ping
 
-# list all the Pods running the web-ping apps:
+# 查看 Pods:
 kubectl get pod -l app=web-ping -o custom-
   columns='NAME:.metadata.name,ENV:.spec.containers[0].env[*].value'
 ```
 
-![图10.9](.\images\Figure10.9.png)
-
-​									<center>图 10.9 You can run ChartMuseum as a private repository to easily share charts between teams</center>
-
-In this exercise, you saw another way to install a Helm release with custom settings—using a local values file. That’s a good practice, because you can store the settings for different environments in different files, and you mitigate the risk that an update reverts back to a default value when a setting isn’t provided. My output is shown in figure 10.10.
-
-​	You also saw in the previous exercise that you can install a chart from a repository without specifying a version. That’s not such a good practice, because it installs the latest version, which is a moving target. It’s better to always explicitly state the chart version. Helm requires you to use semantic versioning so chart consumers
+在本练习中，您看到了使用自定义设置安装 Helm release 的另一种方法—使用本地 values 文件。这是一个很好的实践，因为您可以将不同环境的设置存储在不同的文件中，并且可以降低在没有提供设置时更新恢复到默认值的风险。我的输出如图10.10所示。
 
 ![图10.10](.\images\Figure10.10.png)
+<center>图 10.10 从本地存储库安装 chart 与从任何远程存储库安装相同</center>
 
-​										<center>图 10.10 Installing charts from your local repository is the same as installing from any remote repository</center>
+在前面的练习中，您还看到可以在不指定版本的情况下从存储库安装 chart。这不是一个很好的做法，因为它安装的是最新版本，这是一个移动的目标。最好总是明确地说明 chart 版本。Helm要求您使用语义版本控制，以便 chart 消费者了解他们即将升级的包是否是beta版本，或者它是否有突破性的变化。
 
-know whether the package they’re about to upgrade is a beta release or if it has breaking changes.
-
-​	You can do far more with charts than I’m going to cover here. They can include tests, which are Kubernetes Job specs that run after installation to verify the deployment; they can have hooks, which let you run Jobs at specific points in the installation workflow; and they can be signed and shipped with a signature for provenance. In the next section, I’m going to cover one more feature you use in authoring templates, and it’s an important one—building charts that are dependent on other charts.
-
+使用 chart 的功能不止我在这里要介绍的这些。它们可以包含测试，即 Kubernetes Job 规范，在安装后运行以验证部署；它们可以有钩子，在安装工作流程的特定点运行 Jobs；它们可以被签名并附带来源的签名进行传输。在下一部分中，我将介绍另一项您在编写模板中使用的重要功能，即构建依赖于其他 chart 的 chart。
 ## 10.3	charts 中的模块依赖
 
 Helm lets you design your app so it works in different environments, and that raises an interesting problem for dependencies. A dependency might be required in some environments but not in others. Maybe you have a web app that really needs a caching reverse proxy to improve performance. In some environments, you’ll want to deploy the proxy along with the app, and in others, you’ll already have a shared proxy so you just want to deploy the web app itself. Helm supports these with conditional dependencies.
+Helm允许你设计应用程序，使其在不同的环境中工作，这就产生了一个有趣的依赖关系问题。在某些环境中可能需要依赖项，但在其他环境中则不需要。也许你有一个web应用真的需要缓存反向代理来提高性能。在某些环境中，你会想要将代理与应用一起部署，而在其他环境中，你已经有了一个共享的代理，所以你只想部署web应用本身。Helm通过条件依赖性来支持这些。
 
 ​	Listing 10.3 shows a chart manifest for the Pi web application we’ve been using since chapter 5. It has two dependencies—one from the Kiamol repository, and one from the local filesystem—and they are separate charts.
+清单10.3显示了我们从第5章开始使用的Pi web应用程序的图表清单。它有两个依赖项——一个来自Kiamol存储库，另一个来自本地文件系统——它们是独立的图表。
 
 **Listing 10.3	chart.yaml, a chart that includes optional dependencies**
+**清单10.3图表。Yaml，一个包含可选依赖项的图表
 
 ```
 apiVersion: v2 # The version of the Helm spec
@@ -323,10 +312,13 @@ dependencies: # Other charts this chart is dependent on
 ```
 
 You need to keep your charts flexible when you model dependencies. The parent chart (the Pi app, in this case) may require the subchart (the proxy and vweb charts), but subcharts themselves need to be standalone. You should template the Kubernetes manifests in a subchart to make it generically useful. If it’s something that is useful in only one application, then it should be part of that application chart and not a subchart.
+在建模依赖项时，需要保持图表的灵活性。父图表(在本例中是Pi应用程序)可能需要子图表(代理和vweb图表)，但子图表本身需要是独立的。您应该在子图表中模板Kubernetes清单，以使其具有一般的用处。如果它只在一个应用程序中有用，那么它应该是应用程序图表的一部分，而不是子图表。
 
 My proxy is generically useful; it’s just a caching reverse proxy, which can use any HTTP server as the content source. The chart uses a templated value for the name of the server to proxy, so although it’s primarily intended for the Pi app, it can be used to proxy any Kubernetes Service. We can verify that by installing a release that proxies an existing app in the cluster.
+我的代理通常是有用的;它只是一个缓存反向代理，可以使用任何HTTP服务器作为内容源。该图表使用一个模板值作为服务器的名称来代理，所以尽管它主要用于Pi应用程序，但它可以用于代理任何Kubernetes服务。我们可以通过安装一个代理集群中现有应用程序的发布来验证这一点。
 
 ​	<b>现在就试试</b>	Install the proxy chart on its own, using it as a reverse proxy for the vweb app we installed earlier in the chapter.**
+<b>现在就试试</b>单独安装代理图表，使用它作为我们在本章前面安装的vweb应用程序的反向代理
 
 ```
 # install a release from the local chart folder:
@@ -340,14 +332,17 @@ kubectl get svc vweb-proxy-proxy -o
 ```
 
 The proxy chart in that exercise is completely independent of the Pi app; it’s being used to proxy the web app I deployed with Helm from the Kiamol repository. You can see in figure 10.11 that it works as a caching proxy for any HTTP server.
+练习中的代理图表完全独立于Pi应用程序;它被用来代理我和Helm从Kiamol存储库部署的web应用程序。在图10.11中可以看到，它可以作为任何HTTP服务器的缓存代理。
 
 ![图10.11](.\images\Figure10.11.png)
 
-​										<center>图 10.11 The proxy subchart is built to be useful as a chart in its own right—it can proxy any app</center>
+​										<center>图 10.11 代理子图被构建成一个有用的图表，它可以代理任何应用The proxy subchart is built to be useful as a chart in its own right—it can proxy any app</center>
 
 To use the proxy as a dependency, you need to add it in the dependency list in a parent chart, so it becomes a subchart. Then you can specify values for the subchart settings in the parent chart, by prefixing the setting name with the dependency name— the setting upstreamToProxy in the proxy chart is referenced as proxy.upstreamToProxy in the Pi chart. Listing 10.4 shows the default values file for the Pi app, which includes settings for the app itself and for the proxy dependency.
+要将代理作为依赖项使用，需要将其添加到父图表中的依赖项列表中，这样它就成为子图表。然后，通过在设置名称前加上依赖项名称，可以为父图中的子图设置指定值——代理图中的设置upstreamToProxy被引用为代理。在Pi图表中的upstreamToProxy。清单10.4显示了Pi应用程序的默认值文件，其中包括应用程序本身和代理依赖项的设置。
 
 **Listing 10.4	values.yaml, the default settings for the Pi chart**
+**清单10.4值。yaml，默认设置为圆周率图**
 
 ```
 replicaCount: 2 # Number of app Pods to run
@@ -361,8 +356,10 @@ proxy: # Settings for the reverse proxy
 ```
 
 These values deploy the app itself without the proxy, using a LoadBalancer Service for the Pi Pods. The setting proxy.enabled is specified as the condition for the proxy dependency in the Pi chart, so the entire subchart is skipped unless the install settings override the default. The full values file also sets the vweb.enabled value to false— that dependency is there only to demonstrate that subcharts can be sourced from repositories, so the default is not to deploy that chart, either.
+这些值在没有代理的情况下部署应用程序本身，使用Pi Pods的LoadBalancer Service。设置代理。enabled被指定为Pi图中代理依赖关系的条件，因此整个子图将被跳过，除非安装设置覆盖默认值。完整的值文件还设置vweb. xml文件。Enabled值为false——该依赖项只是为了证明子图表可以从存储库中获得，因此默认情况下也不部署该图表。
 
 ​	There’s one extra detail to call out here. The name of the Service for the Pi app is templated in the chart, using the release name. That’s important to enable multiple installs of the same chart, but it adds complexity to the default values for the proxy subchart. The name of the server to proxy needs to match the Pi Service name, so the values file uses the same templated value as the Service name, and that links the proxy to the Service in the same release.
+这里有一个额外的细节需要调用。Pi应用程序的服务名称在图表中模板化，使用发布名称。启用同一图表的多个安装是很重要的，但这会增加代理子图表的默认值的复杂性。代理服务器的名称需要与Pi服务名称相匹配，因此值文件使用与服务名称相同的模板值，并将代理链接到同一版本中的服务。
 
 ​	Charts need to have their dependencies available before you can install or package them, and you use the Helm command line to do that. Building dependencies will populate them into the chart’s charts folder, either by downloading the archive from a repository or packaging a local folder into an archive.
 
