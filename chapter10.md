@@ -287,131 +287,114 @@ kubectl get pod -l app=web-ping -o custom-
 使用 chart 的功能不止我在这里要介绍的这些。它们可以包含测试，即 Kubernetes Job 规范，在安装后运行以验证部署；它们可以有钩子，在安装工作流程的特定点运行 Jobs；它们可以被签名并附带来源的签名进行传输。在下一部分中，我将介绍另一项您在编写模板中使用的重要功能，即构建依赖于其他 chart 的 chart。
 ## 10.3	charts 中的模块依赖
 
-Helm lets you design your app so it works in different environments, and that raises an interesting problem for dependencies. A dependency might be required in some environments but not in others. Maybe you have a web app that really needs a caching reverse proxy to improve performance. In some environments, you’ll want to deploy the proxy along with the app, and in others, you’ll already have a shared proxy so you just want to deploy the web app itself. Helm supports these with conditional dependencies.
-Helm允许你设计应用程序，使其在不同的环境中工作，这就产生了一个有趣的依赖关系问题。在某些环境中可能需要依赖项，但在其他环境中则不需要。也许你有一个web应用真的需要缓存反向代理来提高性能。在某些环境中，你会想要将代理与应用一起部署，而在其他环境中，你已经有了一个共享的代理，所以你只想部署web应用本身。Helm通过条件依赖性来支持这些。
+Helm 允许你设计应用程序，使其在不同的环境中工作，这就产生了一个有趣的依赖关系问题。在某些环境中可能需要依赖项，但在其他环境中则不需要。也许你有一个web 应用真的需要缓存反向代理来提高性能。在某些环境中，你会想要将代理与应用一起部署，而在其他环境中，你已经有了一个共享的代理，所以你只想部署web应用本身。Helm 通过条件依赖性来支持这些。
 
-​	Listing 10.3 shows a chart manifest for the Pi web application we’ve been using since chapter 5. It has two dependencies—one from the Kiamol repository, and one from the local filesystem—and they are separate charts.
-清单10.3显示了我们从第5章开始使用的Pi web应用程序的图表清单。它有两个依赖项——一个来自Kiamol存储库，另一个来自本地文件系统——它们是独立的图表。
+清单10.3显示了我们从第5章开始使用的 Pi web应用程序的 chart 清单。它有两个依赖项——一个来自Kiamol存储库，另一个来自本地文件系统——它们是独立的chart。
 
-**Listing 10.3	chart.yaml, a chart that includes optional dependencies**
-**清单10.3图表。Yaml，一个包含可选依赖项的图表
+> 清单10.3 chart.yaml，一个包含可选依赖项的 chart
 
 ```
-apiVersion: v2 # The version of the Helm spec
+apiVersion: v2 # Helm 配置版本
 name: pi # Chart name
 version: 0.1.0 # Chart version
-dependencies: # Other charts this chart is dependent on
+dependencies: # 其他依赖 chart
   - name: vweb
     version: 2.0.0
-    repository: https://kiamol.net # A dependency from a repository
-    condition: vweb.enabled # Installed only if required
+    repository: https://kiamol.net # 其他仓库的依赖
+    condition: vweb.enabled # 按需安装
   - name: proxy
     version: 0.1.0
-    repository: file://../proxy # A dependency from a local folder
-    condition: proxy.enabled # Installed only if required
+    repository: file://../proxy # 本地目录的依赖
+    condition: proxy.enabled # 按需安装
 ```
 
-You need to keep your charts flexible when you model dependencies. The parent chart (the Pi app, in this case) may require the subchart (the proxy and vweb charts), but subcharts themselves need to be standalone. You should template the Kubernetes manifests in a subchart to make it generically useful. If it’s something that is useful in only one application, then it should be part of that application chart and not a subchart.
-在建模依赖项时，需要保持图表的灵活性。父图表(在本例中是Pi应用程序)可能需要子图表(代理和vweb图表)，但子图表本身需要是独立的。您应该在子图表中模板Kubernetes清单，以使其具有一般的用处。如果它只在一个应用程序中有用，那么它应该是应用程序图表的一部分，而不是子图表。
+在建模依赖项时，需要保持 chart 的灵活性。父 chart (在本例中是Pi应用程序)可能需要子chart(proxy和vweb chart)，但子 chart 本身需要是独立的。您应该在子 chart 中模板化 Kubernetes清单，以使其具有一般的用处。如果它只在一个应用程序中有用，那么它应该是应用程序 chart 的一部分，而不是子 chart。
 
-My proxy is generically useful; it’s just a caching reverse proxy, which can use any HTTP server as the content source. The chart uses a templated value for the name of the server to proxy, so although it’s primarily intended for the Pi app, it can be used to proxy any Kubernetes Service. We can verify that by installing a release that proxies an existing app in the cluster.
-我的代理通常是有用的;它只是一个缓存反向代理，可以使用任何HTTP服务器作为内容源。该图表使用一个模板值作为服务器的名称来代理，所以尽管它主要用于Pi应用程序，但它可以用于代理任何Kubernetes服务。我们可以通过安装一个代理集群中现有应用程序的发布来验证这一点。
+我的代理通常是有用的;它只是一个缓存反向代理，可以使用任何 HTTP 服务器作为内容源。该 chart 使用一个模板值作为服务器的名称来代理，所以尽管它主要用于Pi应用程序，但它可以用于代理任何 Kubernetes 服务。我们可以通过安装一个代理集群中现有应用程序的 release 来验证这一点。
 
-​	<b>现在就试试</b>	Install the proxy chart on its own, using it as a reverse proxy for the vweb app we installed earlier in the chapter.**
-<b>现在就试试</b>单独安装代理图表，使用它作为我们在本章前面安装的vweb应用程序的反向代理
+<b>现在就试试</b> 单独安装 proxy chart，使用它作为我们在本章前面安装的 vweb 应用程序的反向代理
 
 ```
-# install a release from the local chart folder:
+# 从本地目录安装 release:
 helm install --set upstreamToProxy=ch10-vweb:8010 vweb-proxy proxy/
 
-# get the URL for the new proxy service:
+# 从新的 proxy service 获取访问 url:
 kubectl get svc vweb-proxy-proxy -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080'
   
-# browse to the URL
+# 浏览 url
 ```
 
-The proxy chart in that exercise is completely independent of the Pi app; it’s being used to proxy the web app I deployed with Helm from the Kiamol repository. You can see in figure 10.11 that it works as a caching proxy for any HTTP server.
-练习中的代理图表完全独立于Pi应用程序;它被用来代理我和Helm从Kiamol存储库部署的web应用程序。在图10.11中可以看到，它可以作为任何HTTP服务器的缓存代理。
+练习中的 proxy chart 完全独立于Pi应用程序;它被用来代理我和Helm从Kiamol存储库部署的web应用程序。在图10.11中可以看到，它可以作为任何HTTP服务器的缓存代理。
 
 ![图10.11](.\images\Figure10.11.png)
+<center>图 10.11 代理子 chart 被构建成一个有用的chart，它可以代理任何应用</center>
 
-​										<center>图 10.11 代理子图被构建成一个有用的图表，它可以代理任何应用The proxy subchart is built to be useful as a chart in its own right—it can proxy any app</center>
+要将代理作为依赖项使用，需要将其添加到父 chart 中的依赖项列表中，这样它就成为子 chart。然后，通过在设置名称前加上依赖项名称，可以为父 chart 中的子chart 设置指定值——代理 chart 中的设置upstreamToProxy被引用为代理。在Pi图表中的upstreamToProxy。清单10.4显示了Pi应用程序的默认 values 文件，其中包括应用程序本身和代理依赖项的设置。
 
-To use the proxy as a dependency, you need to add it in the dependency list in a parent chart, so it becomes a subchart. Then you can specify values for the subchart settings in the parent chart, by prefixing the setting name with the dependency name— the setting upstreamToProxy in the proxy chart is referenced as proxy.upstreamToProxy in the Pi chart. Listing 10.4 shows the default values file for the Pi app, which includes settings for the app itself and for the proxy dependency.
-要将代理作为依赖项使用，需要将其添加到父图表中的依赖项列表中，这样它就成为子图表。然后，通过在设置名称前加上依赖项名称，可以为父图中的子图设置指定值——代理图中的设置upstreamToProxy被引用为代理。在Pi图表中的upstreamToProxy。清单10.4显示了Pi应用程序的默认值文件，其中包括应用程序本身和代理依赖项的设置。
-
-**Listing 10.4	values.yaml, the default settings for the Pi chart**
-**清单10.4值。yaml，默认设置为圆周率图**
+> 清单10.4 values.yaml，Pi chart 的默认设置
 
 ```
-replicaCount: 2 # Number of app Pods to run
-serviceType: LoadBalancer # Type of the Pi Service
+replicaCount: 2 # Pods 副本数
+serviceType: LoadBalancer #  Pi Service 类型
 
-proxy: # Settings for the reverse proxy
-  enabled: false # Whether to deploy the proxy
-  upstreamToProxy: "{{ .Release.Name }}-web" # Server to proxy
-  servicePort: 8030 # Port of the proxy Service
-  replicaCount: 2 # Number of proxy Pods to run
+proxy: # 反向代理设置
+  enabled: false # 是否部署 proxy
+  upstreamToProxy: "{{ .Release.Name }}-web" # 代理的 server
+  servicePort: 8030 #  proxy Service 的端口
+  replicaCount: 2 # proxy pod 副本数
 ```
 
-These values deploy the app itself without the proxy, using a LoadBalancer Service for the Pi Pods. The setting proxy.enabled is specified as the condition for the proxy dependency in the Pi chart, so the entire subchart is skipped unless the install settings override the default. The full values file also sets the vweb.enabled value to false— that dependency is there only to demonstrate that subcharts can be sourced from repositories, so the default is not to deploy that chart, either.
-这些值在没有代理的情况下部署应用程序本身，使用Pi Pods的LoadBalancer Service。设置代理。enabled被指定为Pi图中代理依赖关系的条件，因此整个子图将被跳过，除非安装设置覆盖默认值。完整的值文件还设置vweb. xml文件。Enabled值为false——该依赖项只是为了证明子图表可以从存储库中获得，因此默认情况下也不部署该图表。
+这些值在没有代理的情况下部署应用程序本身，使用Pi Pods的LoadBalancer Service。设置 proxy.enabled 被指定为Pi图中代理依赖关系的条件，因此整个子 chart 将被跳过，除非安装设置覆盖默认值。完整的 values 文件还设置vweb.enabled值为false——该依赖项只是为了证明子 chart 可以从存储库中获得，因此默认情况下也不部署该 chart。
 
-​	There’s one extra detail to call out here. The name of the Service for the Pi app is templated in the chart, using the release name. That’s important to enable multiple installs of the same chart, but it adds complexity to the default values for the proxy subchart. The name of the server to proxy needs to match the Pi Service name, so the values file uses the same templated value as the Service name, and that links the proxy to the Service in the same release.
-这里有一个额外的细节需要调用。Pi应用程序的服务名称在图表中模板化，使用发布名称。启用同一图表的多个安装是很重要的，但这会增加代理子图表的默认值的复杂性。代理服务器的名称需要与Pi服务名称相匹配，因此值文件使用与服务名称相同的模板值，并将代理链接到同一版本中的服务。
+这里有一个额外的细节需要调用。Pi 应用程序的 Service 名称在 chart 中模板化，使用 release 名称。启用同一 chart 的多个安装是很重要的，但这会增加代理子 chart 的默认值的复杂性。代理服务器的名称需要与Pi服务名称相匹配，因此 values 文件使用与 servie 名称相同的模板值，并将代理链接到同一版本中的服务。
 
-​	Charts need to have their dependencies available before you can install or package them, and you use the Helm command line to do that. Building dependencies will populate them into the chart’s charts folder, either by downloading the archive from a repository or packaging a local folder into an archive.
+在安装或打包 chart 之前，chart 需要有它们的依赖项，可以使用 Helm 命令行来完成这一点。构建依赖项将把它们填充到 chart 的charts文件夹中，方法是从存储库下载存档或将本地文件夹打包到存档中。
 
-​	<b>现在就试试</b>	Build the dependencies for the Pi chart, which downloads the remote chart, packages the local chart, and adds them to the chart folder.**
+<b>现在就试试</b> 构建Pi chart 的依赖项，下载远程 chart，打包本地 chart，并将其添加到 chart 文件夹中
 
 ```
-# build dependencies:
+# 构建 dependencies:
 helm dependency build pi
 
-# check that the dependencies have been downloaded:
+# 检查依赖已下载:
 ls ./pi/charts
 ```
 
-Figure 10.12 shows why versioning is so important for Helm charts. Chart packages are versioned using the version number in the chart metadata. Parent charts are packaged with their dependencies, at the specified version. If I update the proxy chart without updating the version number, my Pi chart will be out of sync because version 0.1.0 of the proxy chart in the Pi package is different from the latest version 0.1.0. You should consider Helm charts to be immutable and always publish changes by publishing a new package version.
-
-​	This principle of conditional dependencies is how you could manage a much more complex application like the to-do app from chapter 8. The Postgres database deployment would be a subchart, which users could skip altogether for environments where they want to use an external database. Or you could even have multiple conditional dependencies, allowing users to deploy a simple Postgres Deployment for dev environments, use a highly available StatefulSet for test environments, and plug into a managed Postgres service in production.
-
-​	The Pi app is simpler than that, and we can choose whether to deploy it on its own or with a proxy. This chart uses a templated value for the type of the Pi Service, but that could be computed in the template instead by setting it to LoadBalancer if the proxy is not deployed and ClusterIP if the proxy is deployed.
+图10.12显示了版本控制对 Helm chart 如此重要的原因。chart 包使用 chart 元数据中的版本号进行版本控制。父chart 在指定的版本中与其依赖项一起打包。如果我更新 proxy chart 而不更新版本号，我的Pi chart 将不同步，因为Pi包中的 proxy chart 的版本0.1.0与最新版本0.1.0不同。你应该认为 Helm chart 是不可变的，并且总是通过发布一个新的包版本来发布变更。
 
 ![图10.12](.\images\Figure10.12.png)
+<center>图 10.12 Helm 将依赖包捆绑到父 chart 中，并且它们作为一个包分发</center>
 
-​										<center>图 10.12 Helm bundles dependencies into the parent chart, and they are distributed as one package</center>
+条件依赖的原则是你如何管理一个更复杂的应用程序，比如第8章中的待办事项应用程序。Postgres数据库部署将是一个子 chart，对于希望使用外部数据库的环境，用户可以完全跳过该子 chart。或者您甚至可以有多个条件依赖项，允许用户为开发环境部署简单的Postgres Deployment，为测试环境使用高可用的StatefulSet，并在生产环境中插入托管的Postgres服务。
 
-​	<b>现在就试试</b>	Deploy the Pi app with the proxy subchart enabled. Use Helm’s dry-run feature to check the default deployment, and then use custom settings for the actual install.**
+Pi 应用程序比这更简单，我们可以选择是单独部署它还是通过代理部署它。这个 chart 使用了Pi Service类型的模板值，但是如果没有部署代理，可以将其设置为LoadBalancer，如果部署了代理，则可以将其设置为ClusterIP，从而在模板中计算该值。
+
+<b>现在就试试</b>部署启用代理子 chart 的Pi app。使用Helm 's dry-run特性检查默认部署，然后使用自定义设置进行实际安装。
 
 ```
-# print the YAML Helm would deploy with default values:
+# 打印 helm 使用默认值部署的 yaml:
 helm install pi1 ./pi --dry-run
 
-# install with custom settings to add the proxy:
+# 使用自定义setting ，开启 proxy 安装:
 helm install --set serviceType=ClusterIP --set proxy.enabled=true pi2
 ./pi
 
-# get the URL for the proxied app:
+# 获取 proxied 应用 url:
 kubectl get svc pi2-proxy -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8030'
   
-# browse to it
+# 访问 url
 ```
 
-You’ll see in this exercise that the dry-run flag is quite useful: it applies values to the templates and writes out all the YAML for the resources it would install, without deploying anything. Then in the actual installation, setting a couple of flags deploys an additional chart that is integrated with the main chart, so the application works as a single unit. My Pi calculation appears in figure 10.13.
-
- 
+在本练习中您将看到，dry-run 标志非常有用:它将值应用到模板，并为它将要安装的资源写出所有YAML，而不需要部署任何东西。然后在实际安装中，设置几个标志将部署一个与主 chart 集成的附加 chart，因此应用程序可以作为单个单元工作。我的圆周率计算如图10.13所示。
 
 ![图10.13](.\images\Figure10.13.png)
+<center>图 10.13 通过覆盖默认设置，安装带有可选子 chart 的 chart</center>
 
-​													<center>图 10.13 Installing a chart with an optional subchart by overriding default settings</center>
+在这一章中，我没有给 Helm 留出足够的空间，因为只有当你在 Helm 上下了很大的赌注并计划广泛使用它时，你才需要深入了解它的复杂性。如果那是你，你会发现 helm 有能力保护你。举个例子:您可以从ConfigMap模板的内容生成一个散列，并将其用作部署模板中的标签，因此每次配置更改时，部署标签也会更改，并且升级您的配置会触发 Pod rollout。
 
-There’s a whole lot of Helm that I haven’t made room for in this chapter, because there’s a level of complexity you need to dive into only if you bet big on Helm and plan to use it extensively. If that’s you, you’ll find Helm has the power to cover you. How’s this for an example: you can generate a hash from the contents of a ConfigMap template and use that as a label in a Deployment template, so every time the configuration changes, the Deployment label changes too, and upgrading your configuration triggers a Pod rollout.
-
-​	That’s neat, but it’s not for everybody, so in the next section, we’ll return to a simple demo app and look at how Helm smooths the upgrade and rollback process.
-
+这很简洁，但并不适用于所有人，所以在下一节中，我们将回到一个简单的演示应用程序，看看Helm如何平滑升级和回滚过程。
 ## 10.4	升级及回滚 Helm releases
 
 Upgrading an app with Helm doesn’t do anything special; it just sends the updated specs to Kubernetes, which rolls out changes in the usual way. If you want to configure the specifics of the rollout, you still do that in the YAML files in the chart, using the settings we explored in chapter 9. What Helm brings to upgrades is a consistent approach for all types of resources and the ability to easily roll back to previous versions.
