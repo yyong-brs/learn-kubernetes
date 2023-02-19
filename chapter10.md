@@ -397,122 +397,112 @@ kubectl get svc pi2-proxy -o
 这很简洁，但并不适用于所有人，所以在下一节中，我们将回到一个简单的演示应用程序，看看Helm如何平滑升级和回滚过程。
 ## 10.4	升级及回滚 Helm releases
 
-Upgrading an app with Helm doesn’t do anything special; it just sends the updated specs to Kubernetes, which rolls out changes in the usual way. If you want to configure the specifics of the rollout, you still do that in the YAML files in the chart, using the settings we explored in chapter 9. What Helm brings to upgrades is a consistent approach for all types of resources and the ability to easily roll back to previous versions.
+使用 Helm 升级应用并没有什么特别之处;它只是将更新后的 spec 发送给 Kubernetes, Kubernetes以通常的方式推出更改。如果您想配置 rollout 的细节，您仍然可以在 chart 中的YAML文件中使用我们在第9章中探索的设置进行配置。Helm 为升级带来的是对所有类型资源的一致方法，以及轻松回滚到以前版本的能力。
 
-​	One other advantage you get with Helm is the ability to safely try out a new version by deploying an additional instance to your cluster. I started this chapter by deploying version 1.0.0 of the vweb app in my cluster, and it’s still running happily. Version 2.0.0 is available now, but before I upgrade the running app, I can use Helm to install a separate release and test the new functionality.
 
-​	<b>现在就试试</b>	Check that the original vweb release is still there, and then install a version 2 release alongside, specifying settings to keep the app private.**
+使用 Helm 的另一个好处是，可以通过在集群中部署额外的实例来安全地尝试新版本。本章开始时，我在我的集群中部署了 vweb 应用的1.0.0版本，它仍然运行良好。2.0.0版本现已可用，但在升级运行中的应用程序之前，我可以使用 Helm 安装一个单独的版本并测试新功能。
+
+<b>现在就试试</b> 检查原来的vweb版本仍然在那里，然后安装一个版本2的版本，并指定设置以保持应用程序私有
 
 ```
-# list all releases:
+# 列出所有的 releases:
 helm ls -q
 
-# check the values for the new chart version:
+# 检查新 chart 版本的 values:
 helm show values kiamol/vweb --version 2.0.0
 
-# deploy a new release using an internal Service type:
+# 使用内部 service 类型部署新的 release:
 helm install --set servicePort=8020 --set replicaCount=1 --set
   serviceType=ClusterIP ch10-vweb-v2 kiamol/vweb --version 2.0.0
 
-# use a port-forward so you can test the app:
+# 通过 port-forward 访问:
 kubectl port-forward svc/ch10-vweb-v2 8020:8020
 
-# browse to localhost:8020, then exit the port-forward with Ctrl-C or
-# Cmd-C
+# 浏览 localhost:8020
 ```
 
-This exercise uses the parameters the chart supports to install the app without making it publicly available, using a ClusterIP Service type and a port-forward so the app is accessible only to the current user. The original app is unchanged, and I have a chance to smoke-test the new Deployment in the target cluster. Figure 10.14 shows the new version running.
+本练习使用 chart 支持的参数来安装应用程序，但不使其公开可用，使用 ClusterIP 服务类型和端口转发，因此应用程序只能由当前用户访问。原来的应用程序没有变化，我有机会在目标集群中对新的Deployment进行烟雾测试。图10.14显示了新版本的运行情况。
 
-​	Now I’m happy that the 2.0.0 version is good, I can use the Helm upgrade command to upgrade my actual release. I want to make sure I deploy with the same values I set in the previous release, and Helm has features to show the current values and to reuse custom values in the upgrade.
+![图10.14](.\images\Figure10.14.png)
+<center>图 10.14 部署服务的 chart 通常允许您设置类型，因此您可以保持它们为私有</center>
 
-​	<b>现在就试试</b>	Remove the temporary version 2 release, and upgrade the ver- sion 1 release to the version 2 chart reusing the same values set on the current release.**
+现在我很高兴 2.0.0 版本很好，我可以使用 Helm 升级命令来升级我的实际版本。我想确保我部署的值与我在上一个版本中设置的值相同，Helm具有显示当前值和在升级中重用自定义值的功能。
+
+<b>现在就试试</b> 删除临时版本2版本，并使用当前版本设置的相同值将版本1版本升级到版本2 chart
 
 ```
-# remove the test release:
+# 删除 test release:
 helm uninstall ch10-vweb-v2
 
-# check the values used in the current version 1 release:
+# 检查当前 v1 版本使用的 values:
 helm get values ch10-vweb
 
-# upgrade to version 2 using the same values—this will fail:
+# 使用相同的values 更新到 version 2 —将会失败:
 helm upgrade --reuse-values --atomic ch10-vweb kiamol/vweb --version
 2.0.0
 ```
 
-![图10.14](.\images\Figure10.14.png)
-
-​												<center>图 10.14 Charts that deploy Services typically let you set the type, so you can keep them private</center>
-
-Oh dear. This is a particularly nasty issue that will take some tracking down to understand. The reuse-values flag tells Helm to reuse all the values set for the current release on the new release, but the version 2.0.0 chart includes another value, the type of the Service, which wasn’t set in the current release because it didn’t exist. The net result is that the Service type is blank, which defaults to ClusterIP in Kubernetes, and the update fails because that clashes with the existing Service spec. You can see this hinted at in the output in figure 10.15.
+哦亲爱的。这是一个特别棘手的问题，需要一些追踪才能理解。重用值标志告诉 Helm 在新版本上重用为当前版本设置的所有值，但是2.0.0版本 chart 包括另一个值，即服务的类型，该值在当前版本中没有设置，因为它不存在。最终结果是服务类型为空白，在Kubernetes中默认为ClusterIP，并且更新失败，因为它与现有的服务 spec 冲突。您可以在图10.15的输出中看到这一点。
 
 ![图10.15](./images/Figure10.15.png)
+<center>图 10.15 无效升级失败，Helm可自动回退到上一版本</center>
 
-​											<center>图 10.15 An invalid upgrade fails, and Helm can automatically roll back to the previous release</center>
-
-This sort of problem is where Helm’s abstraction layer really helps. You can get the same issue with a standard kubectl deployment, but if one resource update fails, you need to check through all the other resources and manually roll them back. Helm does that automatically with the atomic flag. It waits for all the resource updates to complete, and if any of them fails, it rolls back every other resource to the previous state. Check the history of the release, and you can see that Helm has automatically rolled back to version 1.0.0.
+这类问题正是 Helm 的抽象层真正有用的地方。在标准kubectl部署中也会遇到同样的问题，但是如果一个资源更新失败，则需要检查所有其他资源并手动回滚它们。helm 用原子 flag 自动做到了。它等待所有资源更新完成，如果其中任何一个更新失败，它将所有其他资源回滚到前一个状态。检查发布的历史记录，您可以看到Helm已经自动回滚到版本1.0.0。
 
 ​	<b>现在就试试</b>	Recall from chapter 9 that Kubernetes doesn’t give you much information on the history of a rollout—compare that to the detail you get from Helm.**
-
+<b>现在就试试</b>回想第9章，Kubernetes没有给你太多关于rollout历史的信息，与Helm的细节相比
 ```
-# show the history of the vweb release:
+# 显示 vweb release 的历史信息:
 helm history ch10-vweb
 ```
 
-That command gets an exercise all to itself, because there’s a wealth of information that you just don’t get in the history for a standard Kubernetes rollout. Figure 10.16 shows all four revisions of the release: the first install, a successful upgrade, a failed upgrade, and an automatic rollback.
+这个命令本身就是一个练习，因为在标准的Kubernetes推出的历史中，您无法获得大量的信息。图10.16显示了该版本的所有四个版本:第一次安装、一次成功升级、一次失败升级和一次自动回滚。
 
 ![图10.16](.\images\Figure10.16.png)
+<center>图 10.16 发布历史清楚地将应用程序和 chart 版本链接到修订</center>
 
-​													<center>图 10.16 The release history clearly links application and chart versions to revisions</center>
+要修复失败的更新，我可以手动设置升级命令中的所有值，或者使用具有当前部署的相同设置的值文件。我没有那个值文件，但我可以将 get values 命令的输出保存到一个文件中，并在升级中使用它，这将为我提供所有以前的设置以及chart中任何新设置的默认值。
 
-To fix the failed update, I can manually set all the values in the upgrade command or use a values file with the same settings that are currently deployed. I don’t have that values file, but I can save the output of the get values command to a file and use that in the upgrade, which gives me all my previous settings plus the defaults in the chart for any new settings.
-
-​	<b>现在就试试</b>	Upgrade to version 2 again, this time saving the current version 1 values to a file and using that in the upgrade command.**
+<b>现在就试试</b>再次升级到版本2，这次将当前版本1的值保存到一个文件中，并在升级命令中使用该文件
 
 ```
-# save the values of the current release to a YAML file:
+# 保存当前 release 到 yaml 文件:
 helm get values ch10-vweb -o yaml > vweb-values.yaml
 
-# upgrade to version 2 using the values file and the atomic flag:
+# 更新到 version 2 使用 values 文件并添加 atomic 参数:
 helm upgrade -f vweb-values.yaml --atomic ch10-vweb kiamol/vweb
   --version 2.0.0
   
-# check the Service and ReplicaSet configuration:
+# 检查 svc replicaset 配置:
 kubectl get svc,rs -l app.kubernetes.io/instance=ch10-vweb
 ```
 
-This upgrade succeeds, so the atomic rollback doesn’t kick in. The upgrade is actually effected by the Deployment, which scales up the replacement ReplicaSet and scales down the current ReplicaSet in the usual way. Figure 10.17 shows that the configuration values set in the previous release have been retained, the Service is listening on port 8010, and three Pods are running.
-
-​	All that’s left is to try out a rollback, which is syntactically similar to a rollback in kubectl, but Helm makes it much easier to track down the revision you want to use. You’ve already seen the meaningful release history in figure 10.16, and you can also use Helm to check the values set for a particular revision. If I want to roll back the web
+这次升级成功了，所以原子回滚没有生效。升级实际上是由部署完成的，部署会按照通常的方式扩大替换的ReplicaSet并缩小当前的ReplicaSet。图10.17显示了在上一个版本中设置的配置值被保留，Service正在监听端口8010，并且有三个pod正在运行。
 
 ![图10.17](.\images\Figure10.17.png)
+<center>图 10.17 将发布设置导出到文件并再次使用，升级成功</center>
 
-​										<center>图 10.17 The upgrade succeeds by exporting the release settings to a file and using them again</center>
+剩下的就是尝试回滚，它在语法上类似于kubectl中的回滚，但是 Helm 使查找想要使用的修订更加容易。您已经在图10.16中看到了有意义的发布历史，您还可以使用Helm检查为特定修订设置的值。如果我想将web应用程序回滚到版本1.0.0，但保留我在版本2中设置的值，我可以先检查这些值。
 
-application to version 1.0.0 but preserve the values I set in revision 2, I can check those values first.
-
-​	<b>现在就试试</b>	Roll back to the second revision, which was version 1.0.0 of the app upgraded to use three replicas.**
+<b>现在就试试</b>回滚到第二次修订，即应用程序的1.0.0版本升级为使用三个副本
 
 ```
-# confirm the values used in revision 2:
+# 确认 revision 2 中使用的 values:
 helm get values ch10-vweb --revision 2
 
-# roll back to that revision:
+# 回滚到 revision 2:
 helm rollback ch10-vweb 2
 
-# check the latest two revisions:
+# 检查最新的两个 revisions:
 helm history ch10-vweb --max 2 -o yaml
 ```
 
-You can see my output in figure 10.18, where the rollback is successful and the history shows that the latest revision is 6, which is actually a rollback to revision 2.
-
-​	The simplicity of this example is good for focusing on the upgrade and rollback workflow, and highlighting some of the quirks, but it hides the power of Helm for major upgrades. A Helm release is an abstraction of an application, and different
+您可以在图10.18中看到我的输出，其中回滚成功，历史记录显示最新的版本是6，这实际上是回滚到版本2。
 
 ![图10.18](.\images\Figure10.18.png)
+<center>图 10.18 Helm可以很容易地检查回滚到的内容</center>
 
-​																	<center>图 10.18 Helm makes it easy to check exactly what you’re rolling back to</center>
-
-versions of the application might be modeled in different ways. A chart might use a ReplicationController in an early release, then change to a ReplicaSet and then a Deployment; as long as the user-facing parts remain the same, the internal workings become an implementation detail.
-
+这个示例的简单性有利于关注升级和回滚工作流，并突出显示一些怪癖，但它隐藏了Helm用于重大升级的强大功能。Helm release 是应用程序的抽象，并且是不同的应用程序的版本可能以不同的方式建模。chart 可能在早期版本中使用ReplicationController，然后更改为ReplicaSet，然后更改为Deployment;只要面向用户的部分保持不变，内部工作就成为实现细节。
 ## 10.5	理解 Helm 定位
 
 Helm adds a lot of value to Kubernetes, but it’s invasive—once you template your manifests, there’s no going back. Everyone on the team has to switch to Helm, or you have to commit to having multiple sets of manifests: pure Kubernetes for the development team and Helm for every other environment. You really don’t want two sets of manifests getting out of sync, but equally, Kubernetes itself is plenty to learn without adding Helm on top.
