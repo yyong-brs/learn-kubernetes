@@ -505,18 +505,18 @@ helm history ch10-vweb --max 2 -o yaml
 这个示例的简单性有利于关注升级和回滚工作流，并突出显示一些怪癖，但它隐藏了Helm用于重大升级的强大功能。Helm release 是应用程序的抽象，并且是不同的应用程序的版本可能以不同的方式建模。chart 可能在早期版本中使用ReplicationController，然后更改为ReplicaSet，然后更改为Deployment;只要面向用户的部分保持不变，内部工作就成为实现细节。
 ## 10.5	理解 Helm 定位
 
-Helm adds a lot of value to Kubernetes, but it’s invasive—once you template your manifests, there’s no going back. Everyone on the team has to switch to Helm, or you have to commit to having multiple sets of manifests: pure Kubernetes for the development team and Helm for every other environment. You really don’t want two sets of manifests getting out of sync, but equally, Kubernetes itself is plenty to learn without adding Helm on top.
+Helm 为 Kubernetes 增加了很多价值，但它是侵入性的——一旦你将清单模板化，就没有回头路了。团队中的每个人都必须切换到 Helm，或者您必须承诺拥有多套清单:开发团队使用纯 Kubernetes，其他环境使用 Helm。你真的不希望两组清单不同步，但同样地，Kubernetes本身也有很多值得学习的地方，即使不添加Helm。
 
-​	Whether Helm fits in for you depends very much on the type of applications you’re packaging and the way your teams work. If your app is composed of 50+ microservices, then development teams might work on only a subset of the full app, running it natively or with Docker and Docker Compose, and a separate team owns the full Kubernetes deployment. In that environment, a move to Helm will reduce friction rather than increasing it, centralizing hundreds of YAML files into manageable charts.
+Helm 是否适合你很大程度上取决于你包装的应用程序类型和你的团队工作方式。如果你的应用由 50 多个微服务组成，那么开发团队可能只在整个应用的一个子集上工作，本机运行或使用 Docker 和 Docker Compose 运行，而一个独立的团队拥有完整的Kubernetes部署。在这种环境下，迁移到Helm将减少而不是增加摩擦，将数百个YAML文件集中到可管理的 chart 中。
 
-​	A couple of other indicators that Helm is a good fit include a fully automated continuous deployment process—which can be easier to build with Helm—running test environments from the same chart version with custom values files, and running verification jobs as part of the deployment. When you find yourself needing to template your Kubernetes manifests—which you will sooner or later—Helm gives you a standard approach, which is better than writing and maintaining your own tools.
+Helm 非常适合的其他几个指标包括完全自动化的持续部署过程——使用Helm可以更容易地构建这个过程——从具有自定义 values 文件的相同 chart 版本运行测试环境，并将验证作业作为部署的一部分运行。当您发现自己需要为Kubernetes清单制作模板时(您迟早会这样做)，helm为您提供了一种标准的方法，这比编写和维护自己的工具更好。
 
-​	That’s all for Helm in this chapter, so it’s time to tidy up the cluster before moving on to the lab.
+以上就是本章 Helm 的全部内容，在进入实验室之前，是时候整理集群了。
 
-​	<b>现在就试试</b>	Everything in this chapter was deployed with Helm, so we can use Helm to uninstall it all.**
+<b>现在就试试</b>本章中的所有内容都是与Helm一起部署的，所以我们可以使用Helm来卸载所有内容
 
 ```
-# uninstall all the releases:
+# 卸载所有 releases :
 helm uninstall $(helm ls -q)
 ```
 
