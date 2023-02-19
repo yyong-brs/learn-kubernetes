@@ -522,15 +522,15 @@ helm uninstall $(helm ls -q)
 
 ## 10.6	实验室
 
-It’s back to the to-do app again for the lab. You’re going to take a working set of Kubernetes manifests and package them into a Helm chart. Don’t worry—it’s not the full-on app from chapter 8 with StatefulSets and backup Jobs; it’s a much simpler version. Here are the goals:
+这又回到了实验室的待办事项应用程序。您将使用一组Kubernetes清单，并将它们打包到 Helm chart 中。别担心——它不是第8章中有StatefulSets和备份作业的完整应用;这是一个更简单的版本。目标如下:
 
-- Use the manifests in the lab/todo-list folder as the starting point (there are hints in the YAML for what needs templating).
-- Create the Helm chart structure.
-- Template the resource names and any other values that need to be templated so the app can run as multiple releases.
-- Add parameters for configuration settings to support running the app as different environments.
-- Your chart should run as the Test configuration when installed with default values.
-- Your chart should run as the Dev configuration when installed using the lab/dev-values.yaml values file.
+- 使用实验室/待办事项列表文件夹中的清单作为起点(在YAML中有需要模板的提示)。
+- 创建 Helm chart 结构。
+- 模板化资源名和任何其他需要模板化的值，这样应用程序可以作为多个版本运行。
+- 增加配置设置参数，以支持应用程序在不同环境下运行。
+- 在使用默认值安装时，chart 应作为测试配置运行。
+- 使用 lab/dev-values.yaml 安装时，chart 应该作为 Dev 配置运行。
 
-If you’re planning on making use of Helm, you should really find time for this lab, because it contains the exact set of tasks you’ll need to do when you package apps in Helm. My solution is on GitHub for you to check in the usual place: https://github.com/sixeyed/kiamol/blob/master/ch10/lab/README.md.
+如果你打算使用 Helm，你真的应该为这个实验室腾出时间，因为它包含了你在Helm中打包应用程序时需要执行的确切任务集。我的解决方案在GitHub上，你可以在通常的地方检查: https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch10/lab/README.md。
 
-​	Happy Helming!
+Happy Helming!
