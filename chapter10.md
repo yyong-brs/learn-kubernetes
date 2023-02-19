@@ -1,123 +1,119 @@
 # 第十章 通过 Helm 打包并管理应用
 
-As vast as Kubernetes is, it doesn’t solve every problem by itself; a large ecosystem exists to fill the gaps. One of these gaps is packaging and distributing apps, and the solution is Helm. You can use Helm to group a set of Kubernetes YAML files into one artifact and share that on a public or private repository. Anyone with access to the repository can install the app with a single Helm command. That command might deploy a whole set of related Kubernetes resources including ConfigMaps, Deployments, and Services, and you can customize the configuration as part of the installation.
+尽管 Kubernetes 规模庞大，但它本身并不能解决所有问题;一个庞大的生态系统填补了这些空白。其中一个差距就是应用的包装和分发，而 Helm 就是解决方案。您可以使用 Helm 将一组 Kubernetes YAML 文件分组到一个工件中，并在公共或私有存储库中共享该工件。任何可以访问存储库的人都可以通过一个 Helm 命令安装应用程序。该命令可能部署一整套相关的 Kubernetes 资源，包括 ConfigMaps、Deployments 和 Services，您可以自定义配置作为安装的一部分。
 
-​	People use Helm in different ways. Some teams use Helm only to install and manage third-party apps from public repositories. Other teams use Helm for their own applications, packaging and publishing them to private repositories. In this chapter, you’ll learn how to do both, and you’ll leave with your own idea of how Helm might fit in your organization. You don’t need to learn Helm to be effective with Kubernetes, but it’s widely used so it’s something you should be familiar with. The project is governed by the Cloud Native Computing Foundation (CNCF)—the same foundation that stewards Kubernetes—which a reliable indicator of maturity and longevity.
+人们使用 Helm 的方式各不相同。有些团队只使用 Helm 来安装和管理来自公共存储库的第三方应用程序。其他团队将 Helm 用于他们自己的应用程序，打包并发布到私有存储库。在本章中，您将学习如何做到这两点，并且您将带着自己的想法离开，了解 Helm 如何适合您的组织。你不需要学习 Helm 来有效地使用 Kubernetes，但它被广泛使用，所以你应该熟悉它。该项目由云原生计算基金会(CNCF)管理，与管理 kubernetes 的基金会相同，这是成熟度和寿命的可靠指标。
 
 ## 10.1	Helm 给 Kubernetes 带来了什么
 
-Kubernetes apps are modeled in a sprawl of YAML files at design time and managed using sets of labels at run time. There’s no native concept of an “application” in Kubernetes, which clearly groups together a set of related resources, and that’s one of the problems Helm solves. It’s a command-line tool that interacts with repository servers to find and download application packages and, with your Kubernetes cluster, to install and manage applications.
+Kubernetes 应用程序在设计时是在 YAML 文件的扩展中建模的，在运行时使用一组标签进行管理。Kubernetes 中没有原生的“应用程序”概念，这显然是将一组相关资源组合在一起的，这是 Helm 解决的问题之一。它是一个命令行工具，用于与存储库服务器交互，以查找和下载应用程序包，并与 Kubernetes 集群一起安装和管理应用程序。
 
-​	Helm is another layer of abstraction, this time at the application level. When you install an application with Helm, it creates a set of resources in your Kubernetes cluster—and they’re standard Kubernetes resources. The Helm packaging format extends Kubernetes YAML files, so a Helm package is really just a set of Kubernetes manifests stored along with some metadata. We’ll start by using Helm to deploy one of the sample apps from previous chapters, but first we need to install Helm.
+Helm 是另一个抽象层，这次是在应用程序级别。当您安装带有 Helm 的应用程序时，它会在 Kubernetes 集群中创建一组资源——它们是标准的 Kubernetes 资源。Helm 打包格式扩展了 Kubernetes YAML文件，因此 Helm 包实际上只是一组 Kubernetes 清单和一些元数据。我们将首先使用 Helm 部署前面章节中的一个示例应用程序，但首先我们需要安装 Helm。
 
-​	**TRY IT NOW	Helm is a cross-platform tool that runs on Windows, macOS, and Linux. You can find the latest installation instructions here: https://helm.sh/docs/intro/install. This exercise assumes you already have a package manager like Homebrew or Chocolatey installed. If not, you’ll need to refer to the Helm site for the full installation instructions.**
+​<b>现在就试试</b>	helm 是一个跨平台的工具，可以在Windows、macOS和Linux上运行。您可以在这里找到最新的安装说明:https://helm.sh/docs/intro/install。本练习假设您已经安装了 Homebrew 或 Chocolatey 这样的包管理器。如果没有，你需要参考Helm网站的完整安装说明。
 
 ```
-# on Windows, using Chocolatey:
+# 在 Windows, 使用 Chocolatey:
 choco install -y kubernetes-helm
 
-# on Mac, using Homebrew:
+# 在 Mac, 使用 Homebrew:
 brew install helm
 
-# on Linux, using the Helm install script:
+# 在 Linux, 使用 Helm install script:
 curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-
   helm-3 | bash
   
-# check that Helm is working:
+# 检查成功安装:
 helm version
 ```
 
-The installation steps in this exercise may not work on your system, in which case, you’ll need to stop here and head to the Helm installation docs. We can’t go much further until you have Helm installed and you see successful output from the version command, like that shown in figure 10.1.
+本练习中的安装步骤可能在您的系统上不起作用，在这种情况下，您需要在这里停下来，转向 Helm 安装文档。在安装 Helm 并看到 version 命令成功输出(如图10.1所示)之前，我们不能继续深入。
 
-​	Helm is a client-side tool. Previous versions of Helm required a server component to be deployed in your Kubernetes cluster, but that was changed in the major update to Helm 3. The Helm CLI uses the same connection information that kubectl uses to connect to your Kubernetes cluster, so you don’t need any extra configuration to install an app. You do need to configure a package repository, however. Helm repositories are similar to container image registries like Docker Hub, but the server publishes an index of all available packages; Helm caches a local copy of your repository indexes, which you can use to search packages.
+![图10.1](.\images\Figure10.1.png)
+<center>图 10.1 有很多安装 Helm 的选项;使用包管理器是最简单的</center>
 
-​	**TRY IT NOW	Add the Helm repository for the book, sync it, and search for an app.**
+Helm 是一个客户端工具。以前版本的 Helm 需要在 Kubernetes 集群中部署服务器组件，但在 Helm 3 的主要更新中发生了变化。Helm CLI 使用与 kubectl 连接到 Kubernetes 集群相同的连接信息，因此安装应用程序不需要任何额外配置。然而，您需要配置一个包存储库。Helm 存储库类似于 Docker Hub 这样的容器镜像仓库，但服务器发布所有可用包的索引;Helm 缓存存储库索引的本地副本，您可以使用它来搜索包。
+
+​	<b>现在就试试</b>	添加Helm存储库，同步它，并搜索一个应用程序。
 
 ```
-# add a repository, using a local name to refer to a remote server:
+# 添加一个仓库, 使用本地名称代替远程服务:
 helm repo add kiamol https://kiamol.net
 
-# update the local repository cache:
+# 更新本地仓库缓存:
 helm repo update
 
-# search for an app in the repo cache:
+# 在仓库缓存中搜索应用:
 helm search repo vweb --versions
 ```
 
-![图10.1](.\images\Figure10.1.png)
-
-​													**Figure 10.1 There are lots of options to install Helm; using a package manager is easiest.**
-
-The Kiamol repository is a public server, and you can see in this exercise that there are two versions of the package called vweb. My output appears in figure 10.2.
+Kiamol 存储库是一个公共服务器，在本练习中您可以看到这个名为 vweb 的包有两个版本。我的输出如图10.2所示。
 
 ![图10.2](.\images\Figure10.2.png)
+<center>图 10.2 同步Kiamol Helm存储库的本地副本并搜索包</center>
 
-​													**Figure 10.2 Syncing a local copy of the Kiamol Helm repository and searching for packages**
+你对 helm 有了一些了解，但现在是时候介绍一些理论了这样我们就可以在进一步讨论之前使用正确的概念和名称。Helm 的应用程序包被称为 chart;可以在本地开发和部署 chart，也可以将 chart 发布到存储库。当你安装一个 chart 时，这被称为发布;每个版本都有一个名称，您可以在集群中安装同一 chart 的多个实例作为独立的、命名的版本,被称作 release。
 
-You’re getting a feel for Helm, but it’s time for some theory so we can use the correct concepts and their correct names before we go any further. An application package in Helm is called a chart; charts can be developed and deployed locally or published to a repository. When you install a chart, that’s called a release; every release has a name, and you can install multiple instances of the same chart in your cluster as separate, named releases.
-
-​	Charts contain Kubernetes YAML manifests, and the manifests typically contain parameterized values so users can install the same chart with different configuration settings—the number of replicas to run or the application logging level could be parameter values. Each chart also contains a default set of values, and they can be inspected using the command line. Figure 10.3 shows the file structure of a Helm chart.
+Charts 包含 Kubernetes YAML 清单，清单通常包含参数化值，因此用户可以使用不同的配置设置安装相同的 Chart——要运行的副本数量或应用程序日志级别可以是参数值。每个 Chart 还包含一组默认值，可以使用命令行检查这些值。图10.3显示了 Helm Chart 的文件结构。
 
 ![图10.3](.\images\Figure10.3.png)
+<center>图 10.3 Helm Chart 包含应用程序的所有 Kubernetes YAML，加上一些元数据</center>
 
-​													**Figure 10.3 Helm charts contain all the Kubernetes YAML for the app, plus some metadata.**
+vweb charts 包包含了我们在第9章中用来演示更新和回滚的简单 web 应用程序。每个 Chart 都包含一个 Service 和 Deployment 的 spec，以及一些参数化值和默认设置。您可以在安装 Chart 之前使用 Helm 命令行检查所有可用值，然后在安装版本时使用自定义值覆盖默认值。
 
-The vweb charts package contains the simple web app we used to demonstrate updates and rollbacks in chapter 9. Each chart contains a spec for a Service and a Deployment, with some parameterized values and default settings. You can use the Helm command line to inspect all the available values before installing the chart and then override the defaults with custom values when you install a release.
-
-​	**TRY IT NOW	Check the values available in version 1 of the vweb chart, and then install a release using custom values.**
+​	<b>现在就试试</b> 检查 vweb Chart 版本 1 中可用的值，然后使用自定义值安装一个 release
 
 ```
-# inspect the default values stored in the chart:
+# 查看 chart 中默认参数信息:
 helm show values kiamol/vweb --version 1.0.0
 
-# install the chart, overriding the default values:
+# 安装 chart, 覆盖默认参数值:
 helm install --set servicePort=8010 --set replicaCount=1 ch10-vweb
   kiamol/vweb --version 1.0.0
 
-# check the releases you have installed:
+# 检查你安装的 release:
 helm ls
 ```
 
-In this exercise, you can see that the chart has default values for the Service port and the number of replicas in the Deployment. My output is shown in figure 10.4. You use the set argument with helm install to specify your own values, and when the install completes, you have an app running in Kubernetes without using kubectl and without any direct use of YAML manifests.
+在本练习中，您可以看到 Chart 中 Service 端口和 Deployment 中的副本数量具有默认值。我的输出如图10.4所示。你使用 helm install 的 set 参数来指定你自己的值，当安装完成时，你有一个应用程序在 Kubernetes 中运行，不使用kubectl，也不直接使用 YAML 清单。
 
 ![图10.4](.\images\Figure10.4.png)
+<center>图 10.4 使用helm安装应用程序-这将创建Kubernetes资源，而不使用kubectl</center>
 
-​										**Figure 10.4 Installing an app with Helm—this creates Kubernetes resources, without using kubectl.**
+Helm 提供了一组用于使用存储库和 Chart 以及安装、更新和回滚版本的特性，但它不适用于应用程序的持续管理。Helm 命令行并不是 kubectl 的替代品—您可以同时使用它们。现在已经安装了 release，您可以以通常的方式使用 Kubernetes 资源，如果需要修改设置，还可以返回 Helm 操作。
 
-Helm has a set of features for working with repositories and charts and for installing, updating, and rolling back releases, but it’s not intended for ongoing management of applications. The Helm command line isn’t a replacement for kubectl—you use them together. Now that the release is installed, you can work with the Kubernetes resources in the usual way, and you can also return to Helm if you need to modify settings.
-
-​	**TRY IT NOW	Check the resources Helm has deployed using kubectl, and then return to Helm to scale up the Deployment and check that the app is working correctly.**
+​	<b>现在就试试</b> 使用 kubectl 检查 Helm 部署的资源，然后返回Helm 扩容部署并检查应用程序是否正常工作
 
 ```
-# show the details of the Deployment:
+# 查看 Deployment:
 kubectl get deploy -l app.kubernetes.io/instance=ch10-vweb --show-
   labels
   
-# update the release to increase the replica count:
+# 更新 release 增加副本数量:
 helm upgrade --set servicePort=8010 --set replicaCount=3 ch10-vweb
   kiamol/vweb --version 1.0.0
 
-# check the ReplicaSet:
+# 检查 ReplicaSet:
 kubectl get rs -l app.kubernetes.io/instance=ch10-vweb
 
-# get the URL for the app:
+# 获取访问 url:
 kubectl get svc ch10-vweb -o
   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8010'
 
-# browse to the app URL
+# 浏览器访问 url
 ```
 
-Let’s look at a couple of things from that exercise. The first is that the labels are a lot more verbose than the standard “app” and “version” labels you’ve seen so far. That’s because this is a public chart on a public repository, so I’m using the recommended label names from the Kubernetes Configuration Best Practices guide—that’s my choice, not a requirement of Helm. The second is that the Helm upgrade command specifies the Service port again, although it’s only the replica count I want to modify. This is because Helm uses the default values unless you specify them, so if the port isn’t included in the upgrade command, it would be changed to the default value. You can see my output in figure 10.5.
+让我们从这个练习中看看一些东西。首先，标签比标准的 “app” 和“version” 标签要冗长得多。这是因为这是一个公共存储库上的公共 Chart ，所以我使用Kubernetes 配置最佳实践指南中推荐的标签名称——这是我的选择，而不是 Helm 的要求。其次，Helm 升级命令再次指定了Service端口，尽管我想修改的只是副本计数。这是因为 Helm 使用默认值，除非您指定它们，所以如果端口没有包含在升级命令中，它将被更改为默认值。可以在图10.5中看到我的输出。
 
-​	This is the consumer side of the Helm workflow. You can search repositories for applications, discover the configuration values available for an app, and then install and upgrade the application, all from the Helm command line. It’s package management for apps built to run in Kubernetes. In the next section you’ll learn how to package and publish your own apps, which is the producer side of the workflow.
+![图10.5](.\images\Figure10.5.png)
+<center>图 10.5 你不使用 Helm 来管理应用程序，但你可以用它来更新配置</center>
+
+这是 Helm 工作流的消费者端。您可以从 Helm 命令行搜索应用程序的存储库，发现应用程序可用的配置值，然后安装和升级应用程序。它是在Kubernetes中运行的应用程序的包管理。在下一节中，您将学习如何打包和发布您自己的应用程序，这是工作流的生产者方面。
 
 ## 10.2	使用 Helm 打包你自己的应用
 
 Helm charts are folders or zipped archives that contain Kubernetes manifests. You create your own charts by taking your application manifests, identifying any values you want to be parameterized, and replacing the actual value with a templated variable.
 
-![图10.5](.\images\Figure10.5.png)
-
-​												**Figure 10.5 You don’t use Helm to manage apps, but you can use it to update the configuration.**
 
 Listing 10.1 shows the beginning of a templated Deployment spec, which uses values set by Helm for the resource name and the label value.
 
@@ -144,7 +140,7 @@ The double-brace syntax is for templated values—everything from the opening {{
 
 Listing 10.1 is from a file called web-ping-deployment.yaml in the web-ping/templates folder in this chapter’s source. The web-ping folder contains all the files needed for a valid chart, and Helm can validate the chart contents and install a release from the chart folder.
 
-​	**TRY IT NOW	When you’re developing charts, you don’t need to package them in zip archives; you can work with the chart folder.**
+​	<b>现在就试试</b>	When you’re developing charts, you don’t need to package them in zip archives; you can work with the chart folder.**
 
 ```
 # switch to this chapter’s source:
@@ -166,7 +162,7 @@ The lint command is only for working with local charts, but the install command 
 
 ![图10.6](.\images\Figure10.6.png)
 
-​									**Figure 10.6 Installing and upgrading from a local folder lets you iterate quickly on chart development.**
+​									<center>图 10.6 Installing and upgrading from a local folder lets you iterate quickly on chart development</center>
 
 a Pod running, which is sending requests to my blog every 30 seconds. My blog runs on Kubernetes, so I’m sure it will be able to handle that. The app uses environment variables to configure the URL to use and the schedule interval, and those are templated in the manifest for Helm. Listing 10.2 shows the Pod spec with the templated variables.
 
@@ -188,7 +184,7 @@ Helm has a rich set of templating functions you can use to manipulate the values
 
 ​	You need to think carefully about the parts of your spec that need to be templated. One of the big benefits of Helm over standard manifest deployments is that you can run multiple instances of the same app from a single chart. You can’t do that with kubectl because the manifests contain resource names that need to be unique. If you deploy the same set of YAML multiple times, Kubernetes will just update the same resources. If you template all the unique parts of the spec—like resource names and label selectors—then you can run many copies of the same app with Helm.
 
-​	**TRY IT NOW	Deploy a second release of the web-ping app, using the samechart folder but specifying a different URL to ping.**
+​	<b>现在就试试</b>	Deploy a second release of the web-ping app, using the samechart folder but specifying a different URL to ping.**
 
 ```
 # check the available settings for the chart:
@@ -209,11 +205,11 @@ You’ll see in this exercise that I need to do some optimization on my blog—i
 
 ![图10.7](.\images\Figure10.7.png)
 
-​									**Figure 10.7 You can’t install multiple instances of an app with plain manifests, but you can with Helm.**
+​									<center>图 10.7 You can’t install multiple instances of an app with plain manifests, but you can with Helm</center>
 
 You can use any server technology to host your repository, but for the rest of this section, we’ll use a dedicated repository server called ChartMuseum, which is a popular open source option. You can run ChartMuseum as a private Helm repository in your own organization, and it’s easy to set up because you can install it with a Helm chart.
 
-​	**TRY IT NOW	The ChartMuseum chart is on the official Helm repository, conventionally called “stable.” Add that repository, and you can install a release to run your own repository locally.**
+​	<b>现在就试试</b>	The ChartMuseum chart is on the official Helm repository, conventionally called “stable.” Add that repository, and you can install a release to run your own repository locally.**
 
 ```
 # add the official Helm repository:
@@ -239,11 +235,11 @@ Now you have three repositories registered with Helm: the Kiamol repository, the
 
 ![图10.8](.\images\Figure10.8.png)
 
-​								**Figure 10.8 Running your own Helm repository is as simple as installing a chart from a Helmrepository.**
+​								<center>图 10.8 Running your own Helm repository is as simple as installing a chart from a Helmrepository</center>
 
 Charts need to be packaged before they can be published to a repository, and publishing is usually a three-stage process: package the chart into a zip archive, upload the archive to a server, and update the repository index to add the new chart. ChartMuseum takes care of the last step for you, so you just need to package and upload the chart for the repository index to be automatically updated.
 
-​	**TRY IT NOW	Use Helm to create the zip archive for the chart, and use curl to upload it to your ChartMuseum repository. Check the repository—you’ll see your chart has been indexed.**
+​	<b>现在就试试</b>	Use Helm to create the zip archive for the chart, and use curl to upload it to your ChartMuseum repository. Check the repository—you’ll see your chart has been indexed.**
 
 ```
 # package the local chart:
@@ -267,7 +263,7 @@ Helm uses compressed archives to make charts easy to distribute, and the files a
 
 ​	You can use ChartMuseum or another repository server in your organization to share internal applications or to push charts as part of your continuous integration process before making release candidates available on your public repository. The local repository you have is running only in your lab environment, but it’s published using a LoadBalancer Service, so anyone with network access can install the web-ping app from it.
 
-​	**TRY IT NOW	Install yet another version of the web-ping app, this time using the chart from your local repository and providing a values file instead of specifying each setting in the install command.**
+​	<b>现在就试试</b>	Install yet another version of the web-ping app, this time using the chart from your local repository and providing a values file instead of specifying each setting in the install command.**
 
 ```
 # update your repository cache:
@@ -289,7 +285,7 @@ kubectl get pod -l app=web-ping -o custom-
 
 ![图10.9](.\images\Figure10.9.png)
 
-​									**Figure 10.9 You can run ChartMuseum as a private repository to easily share charts between teams.**
+​									<center>图 10.9 You can run ChartMuseum as a private repository to easily share charts between teams</center>
 
 In this exercise, you saw another way to install a Helm release with custom settings—using a local values file. That’s a good practice, because you can store the settings for different environments in different files, and you mitigate the risk that an update reverts back to a default value when a setting isn’t provided. My output is shown in figure 10.10.
 
@@ -297,7 +293,7 @@ In this exercise, you saw another way to install a Helm release with custom sett
 
 ![图10.10](.\images\Figure10.10.png)
 
-​										**Figure 10.10 Installing charts from your local repository is the same as installing from any remote repository.**
+​										<center>图 10.10 Installing charts from your local repository is the same as installing from any remote repository</center>
 
 know whether the package they’re about to upgrade is a beta release or if it has breaking changes.
 
@@ -330,7 +326,7 @@ You need to keep your charts flexible when you model dependencies. The parent ch
 
 My proxy is generically useful; it’s just a caching reverse proxy, which can use any HTTP server as the content source. The chart uses a templated value for the name of the server to proxy, so although it’s primarily intended for the Pi app, it can be used to proxy any Kubernetes Service. We can verify that by installing a release that proxies an existing app in the cluster.
 
-​	**TRY IT NOW	Install the proxy chart on its own, using it as a reverse proxy for the vweb app we installed earlier in the chapter.**
+​	<b>现在就试试</b>	Install the proxy chart on its own, using it as a reverse proxy for the vweb app we installed earlier in the chapter.**
 
 ```
 # install a release from the local chart folder:
@@ -347,7 +343,7 @@ The proxy chart in that exercise is completely independent of the Pi app; it’s
 
 ![图10.11](.\images\Figure10.11.png)
 
-​										**Figure 10.11 The proxy subchart is built to be useful as a chart in its own right—it can proxy any app.**
+​										<center>图 10.11 The proxy subchart is built to be useful as a chart in its own right—it can proxy any app</center>
 
 To use the proxy as a dependency, you need to add it in the dependency list in a parent chart, so it becomes a subchart. Then you can specify values for the subchart settings in the parent chart, by prefixing the setting name with the dependency name— the setting upstreamToProxy in the proxy chart is referenced as proxy.upstreamToProxy in the Pi chart. Listing 10.4 shows the default values file for the Pi app, which includes settings for the app itself and for the proxy dependency.
 
@@ -370,7 +366,7 @@ These values deploy the app itself without the proxy, using a LoadBalancer Servi
 
 ​	Charts need to have their dependencies available before you can install or package them, and you use the Helm command line to do that. Building dependencies will populate them into the chart’s charts folder, either by downloading the archive from a repository or packaging a local folder into an archive.
 
-​	**TRY IT NOW	Build the dependencies for the Pi chart, which downloads the remote chart, packages the local chart, and adds them to the chart folder.**
+​	<b>现在就试试</b>	Build the dependencies for the Pi chart, which downloads the remote chart, packages the local chart, and adds them to the chart folder.**
 
 ```
 # build dependencies:
@@ -388,9 +384,9 @@ Figure 10.12 shows why versioning is so important for Helm charts. Chart package
 
 ![图10.12](.\images\Figure10.12.png)
 
-​										**Figure 10.12 Helm bundles dependencies into the parent chart, and they are distributed as one package.**
+​										<center>图 10.12 Helm bundles dependencies into the parent chart, and they are distributed as one package</center>
 
-​	**TRY IT NOW	Deploy the Pi app with the proxy subchart enabled. Use Helm’s dry-run feature to check the default deployment, and then use custom settings for the actual install.**
+​	<b>现在就试试</b>	Deploy the Pi app with the proxy subchart enabled. Use Helm’s dry-run feature to check the default deployment, and then use custom settings for the actual install.**
 
 ```
 # print the YAML Helm would deploy with default values:
@@ -413,7 +409,7 @@ You’ll see in this exercise that the dry-run flag is quite useful: it applies 
 
 ![图10.13](.\images\Figure10.13.png)
 
-​													**Figure 10.13 Installing a chart with an optional subchart by overriding default settings**
+​													<center>图 10.13 Installing a chart with an optional subchart by overriding default settings</center>
 
 There’s a whole lot of Helm that I haven’t made room for in this chapter, because there’s a level of complexity you need to dive into only if you bet big on Helm and plan to use it extensively. If that’s you, you’ll find Helm has the power to cover you. How’s this for an example: you can generate a hash from the contents of a ConfigMap template and use that as a label in a Deployment template, so every time the configuration changes, the Deployment label changes too, and upgrading your configuration triggers a Pod rollout.
 
@@ -425,7 +421,7 @@ Upgrading an app with Helm doesn’t do anything special; it just sends the upda
 
 ​	One other advantage you get with Helm is the ability to safely try out a new version by deploying an additional instance to your cluster. I started this chapter by deploying version 1.0.0 of the vweb app in my cluster, and it’s still running happily. Version 2.0.0 is available now, but before I upgrade the running app, I can use Helm to install a separate release and test the new functionality.
 
-​	**TRY IT NOW	Check that the original vweb release is still there, and then install a version 2 release alongside, specifying settings to keep the app private.**
+​	<b>现在就试试</b>	Check that the original vweb release is still there, and then install a version 2 release alongside, specifying settings to keep the app private.**
 
 ```
 # list all releases:
@@ -449,7 +445,7 @@ This exercise uses the parameters the chart supports to install the app without 
 
 ​	Now I’m happy that the 2.0.0 version is good, I can use the Helm upgrade command to upgrade my actual release. I want to make sure I deploy with the same values I set in the previous release, and Helm has features to show the current values and to reuse custom values in the upgrade.
 
-​	**TRY IT NOW	Remove the temporary version 2 release, and upgrade the ver- sion 1 release to the version 2 chart reusing the same values set on the current release.**
+​	<b>现在就试试</b>	Remove the temporary version 2 release, and upgrade the ver- sion 1 release to the version 2 chart reusing the same values set on the current release.**
 
 ```
 # remove the test release:
@@ -465,17 +461,17 @@ helm upgrade --reuse-values --atomic ch10-vweb kiamol/vweb --version
 
 ![图10.14](.\images\Figure10.14.png)
 
-​												**Figure 10.14 Charts that deploy Services typically let you set the type, so you can keep them private.**
+​												<center>图 10.14 Charts that deploy Services typically let you set the type, so you can keep them private</center>
 
 Oh dear. This is a particularly nasty issue that will take some tracking down to understand. The reuse-values flag tells Helm to reuse all the values set for the current release on the new release, but the version 2.0.0 chart includes another value, the type of the Service, which wasn’t set in the current release because it didn’t exist. The net result is that the Service type is blank, which defaults to ClusterIP in Kubernetes, and the update fails because that clashes with the existing Service spec. You can see this hinted at in the output in figure 10.15.
 
 ![图10.15](./images/Figure10.15.png)
 
-​											**Figure 10.15 An invalid upgrade fails, and Helm can automatically roll back to the previous release.**
+​											<center>图 10.15 An invalid upgrade fails, and Helm can automatically roll back to the previous release</center>
 
 This sort of problem is where Helm’s abstraction layer really helps. You can get the same issue with a standard kubectl deployment, but if one resource update fails, you need to check through all the other resources and manually roll them back. Helm does that automatically with the atomic flag. It waits for all the resource updates to complete, and if any of them fails, it rolls back every other resource to the previous state. Check the history of the release, and you can see that Helm has automatically rolled back to version 1.0.0.
 
-​	**TRY IT NOW	Recall from chapter 9 that Kubernetes doesn’t give you much information on the history of a rollout—compare that to the detail you get from Helm.**
+​	<b>现在就试试</b>	Recall from chapter 9 that Kubernetes doesn’t give you much information on the history of a rollout—compare that to the detail you get from Helm.**
 
 ```
 # show the history of the vweb release:
@@ -486,11 +482,11 @@ That command gets an exercise all to itself, because there’s a wealth of infor
 
 ![图10.16](.\images\Figure10.16.png)
 
-​													**Figure 10.16 The release history clearly links application and chart versions to revisions.**
+​													<center>图 10.16 The release history clearly links application and chart versions to revisions</center>
 
 To fix the failed update, I can manually set all the values in the upgrade command or use a values file with the same settings that are currently deployed. I don’t have that values file, but I can save the output of the get values command to a file and use that in the upgrade, which gives me all my previous settings plus the defaults in the chart for any new settings.
 
-​	**TRY IT NOW	Upgrade to version 2 again, this time saving the current version 1 values to a file and using that in the upgrade command.**
+​	<b>现在就试试</b>	Upgrade to version 2 again, this time saving the current version 1 values to a file and using that in the upgrade command.**
 
 ```
 # save the values of the current release to a YAML file:
@@ -510,11 +506,11 @@ This upgrade succeeds, so the atomic rollback doesn’t kick in. The upgrade is 
 
 ![图10.17](.\images\Figure10.17.png)
 
-​										**Figure 10.17 The upgrade succeeds by exporting the release settings to a file and using them again.**
+​										<center>图 10.17 The upgrade succeeds by exporting the release settings to a file and using them again</center>
 
 application to version 1.0.0 but preserve the values I set in revision 2, I can check those values first.
 
-​	**TRY IT NOW	Roll back to the second revision, which was version 1.0.0 of the app upgraded to use three replicas.**
+​	<b>现在就试试</b>	Roll back to the second revision, which was version 1.0.0 of the app upgraded to use three replicas.**
 
 ```
 # confirm the values used in revision 2:
@@ -533,7 +529,7 @@ You can see my output in figure 10.18, where the rollback is successful and the 
 
 ![图10.18](.\images\Figure10.18.png)
 
-​																	**Figure 10.18 Helm makes it easy to check exactly what you’re rolling back to.**
+​																	<center>图 10.18 Helm makes it easy to check exactly what you’re rolling back to</center>
 
 versions of the application might be modeled in different ways. A chart might use a ReplicationController in an early release, then change to a ReplicaSet and then a Deployment; as long as the user-facing parts remain the same, the internal workings become an implementation detail.
 
@@ -547,7 +543,7 @@ Helm adds a lot of value to Kubernetes, but it’s invasive—once you template 
 
 ​	That’s all for Helm in this chapter, so it’s time to tidy up the cluster before moving on to the lab.
 
-​	**TRY IT NOW	Everything in this chapter was deployed with Helm, so we can use Helm to uninstall it all.**
+​	<b>现在就试试</b>	Everything in this chapter was deployed with Helm, so we can use Helm to uninstall it all.**
 
 ```
 # uninstall all the releases:
