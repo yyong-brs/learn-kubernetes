@@ -61,7 +61,7 @@ Charts 包含 Kubernetes YAML 清单，清单通常包含参数化值，因此�
 
 vweb charts 包包含了我们在第9章中用来演示更新和回滚的简单 web 应用程序。每个 Chart 都包含一个 Service 和 Deployment 的 spec，以及一些参数化值和默认设置。您可以在安装 Chart 之前使用 Helm 命令行检查所有可用值，然后在安装版本时使用自定义值覆盖默认值。
 
-​	<b>现在就试试</b> 检查 vweb Chart 版本 1 中可用的值，然后使用自定义值安装一个 release
+​<b>现在就试试</b> 检查 vweb Chart 版本 1 中可用的值，然后使用自定义值安装一个 release
 
 ```
 # 查看 chart 中默认参数信息:
@@ -82,7 +82,7 @@ helm ls
 
 Helm 提供了一组用于使用存储库和 Chart 以及安装、更新和回滚版本的特性，但它不适用于应用程序的持续管理。Helm 命令行并不是 kubectl 的替代品—您可以同时使用它们。现在已经安装了 release，您可以以通常的方式使用 Kubernetes 资源，如果需要修改设置，还可以返回 Helm 操作。
 
-​	<b>现在就试试</b> 使用 kubectl 检查 Helm 部署的资源，然后返回Helm 扩容部署并检查应用程序是否正常工作
+​<b>现在就试试</b> 使用 kubectl 检查 Helm 部署的资源，然后返回Helm 扩容部署并检查应用程序是否正常工作
 
 ```
 # 查看 Deployment:
@@ -136,10 +136,9 @@ Helm 对 Chart 中的文件结构非常讲究。您可以使用 helm create 命�
 - values.yaml 文件，为参数设置默认值
 - 存放 Kubernetes 清单模板的 templates 文件夹
 
-Listing 10.1 is from a file called web-ping-deployment.yaml in the web-ping/templates folder in this chapter’s source. The web-ping folder contains all the files needed for a valid chart, and Helm can validate the chart contents and install a release from the chart folder.
 清单 10.1 来自一个名为 web-ping-deployment 的文件。Yaml 在本章源代码的 web-ping/templates 文件夹中。web-ping 文件夹包含有效 chart 所需的所有文件，Helm 可以验证 chart 内容并从 chart 文件夹中安装一个 release。
 
-​	<b>现在就试试</b>	当你在开发 chart 时，你不需要将它们打包在 zip 档案中;您可以使用 chart 文件夹。
+​<b>现在就试试</b>	当你在开发 chart 时，你不需要将它们打包在 zip 档案中;您可以使用 chart 文件夹。
 ```
 # 切换到本章源码目录:
 cd ch10
@@ -449,8 +448,8 @@ helm upgrade --reuse-values --atomic ch10-vweb kiamol/vweb --version
 
 这类问题正是 Helm 的抽象层真正有用的地方。在标准kubectl部署中也会遇到同样的问题，但是如果一个资源更新失败，则需要检查所有其他资源并手动回滚它们。helm 用原子 flag 自动做到了。它等待所有资源更新完成，如果其中任何一个更新失败，它将所有其他资源回滚到前一个状态。检查发布的历史记录，您可以看到Helm已经自动回滚到版本1.0.0。
 
-​	<b>现在就试试</b>	Recall from chapter 9 that Kubernetes doesn’t give you much information on the history of a rollout—compare that to the detail you get from Helm.**
 <b>现在就试试</b>回想第9章，Kubernetes没有给你太多关于rollout历史的信息，与Helm的细节相比
+
 ```
 # 显示 vweb release 的历史信息:
 helm history ch10-vweb
