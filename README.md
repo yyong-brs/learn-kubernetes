@@ -138,16 +138,30 @@
 
     - 9.6 [实验室](./chapter9.md#96-实验室)
 
-  - 第十章 [通过 Helm 打包并管理应用](./chapter10.md)
+  - 第十章 [通过 Helm 打包并管理应用](./chapter11.md)
 
-    - 10.1 [Helm 给 Kubernetes 带来了什么](./chapter10.md#101-helm-给-Kubernetes-带来了什么)
+    - 10.1 [Helm 给 Kubernetes 带来了什么](./chapter11.md#101-helm-给-Kubernetes-带来了什么)
 
-    - 10.2 [使用 Helm 打包你自己的应用](./chapter10.md#102-使用-helm-打包你自己的应用)
+    - 10.2 [使用 Helm 打包你自己的应用](./chapter11.md#102-使用-helm-打包你自己的应用)
 
-    - 10.3 [charts 中的模块依赖](./chapter10.md#103-charts-中的模块依赖)
+    - 10.3 [charts 中的模块依赖](./chapter11.md#103-charts-中的模块依赖)
 
-    - 10.4 [升级及回滚 Helm releases](./chapter10.md#104-升级及回滚-helm-releases)
+    - 10.4 [升级及回滚 Helm releases](./chapter11.md#104-升级及回滚-helm-releases)
 
-    - 10.5 [理解 Helm 定位](./chapter10.md#105-理解-helm-定位)
+    - 10.5 [理解 Helm 定位](./chapter11.md#105-理解-helm-定位)
 
-    - 10.6 [实验室](./chapter10.md#106-实验室)
+    - 10.6 [实验室](./chapter11.md#106-实验室)
+
+  - 第十一章 [App 开发——开发人员工作流程及 CI/CD](./chapter11.md)
+
+    - 11.1 [Docker 开发人员工作流程](./chapter11.md#111-docker-开发人员工作流程)
+
+    - 11.2 [Kubernetes 开发人员工作流程](./chapter11.md#112-kubernetes-开发人员工作流程)
+
+    - 11.3 [使用上下文和名称空间隔离工作负载](./chapter11.md#113-使用上下文和名称空间隔离工作负载)
+
+    - 11.4 [在不考虑 Docker 的 Kubernetes 中持续交付](./chapter11.md#114-在不考虑-docker-的-kubernetes-中持续交付)
+
+    - 11.5 [评估 Kubernetes 上的开发人员工作流程](./chapter11.md#115-评估-kubernetes-上的开发人员工作流程)
+
+    - 11.6 [实验室](./chapter11.md#116-实验室)
