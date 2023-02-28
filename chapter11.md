@@ -274,63 +274,55 @@ kubectl config view
 
 Kubectl 还可以使用令牌与 Kubernetes API 服务器进行身份验证，Pods也提供了一个令牌，可以用作Secret，因此运行在Kubernetes中的应用程序可以连接到Kubernetes API来查询或部署对象。这距离我们接下来要去的地方还有很长的路要走:我们将在Pod中运行一个构建服务器，当Git中的源代码发生变化时触发构建，使用BuildKit构建镜像，并将其部署到测试命名空间中的Kubernetes。
 
-## 11.4 Continuous delivery in Kubernetes without Docker
-Actually, we’re not quite there yet, because the build process needs to push the image to a registry, so Kubernetes can pull it to run Pod containers. Real clusters have multiple nodes, and each of them needs to be able to access the image registry. That’s been easy so far because we’ve used public images on Docker Hub, but in your own builds, you’ll push to a private repository first. Kubernetes supports pulling private images by storing registry credentials in a special type of Secret object.
+## 11.4 在不考虑 Docker 的 Kubernetes 中持续交付
 
-You’ll need to have an account set up on an image registry to follow along with this section—Docker Hub is fine, or you can create a private registry on the cloud using Azure Container Registry (ACR) or Amazon Elastic Container Registry (ECR). If you’re running your cluster in the cloud, it makes sense to use that cloud’s registry to reduce download times, but all registries use the same API as Docker Hub, so they’re interchangeable.
+实际上，我们还没有完全做到这一点，因为构建过程需要将镜像推到仓库中，这样Kubernetes才能将其拉出以运行Pod容器。真正的集群有多个节点，每个节点都需要能够访问镜像仓库。到目前为止，这还很简单，因为我们在Docker Hub上使用了公共镜像，但在您自己的构建中，您将首先推入私有存储库。Kubernetes支持通过在特殊类型的Secret对象中存储仓库凭据来提取私有镜像。
 
-TRY IT NOW
-Create a Secret to store registry credentials. To make it easier to follow along, there’s a script to collect the credentials into local variables. Don’t worry—the scripts don’t email your credentials to me. . .
+您需要在镜像仓库上设置一个帐户来跟随本节的内容—docker Hub就可以了，或者您可以使用Azure容器仓库(ACR)或Amazon弹性容器仓库(ECR)在云中创建一个私有仓库。如果你在云中运行集群，使用云的仓库来减少下载时间是有意义的，但所有仓库都使用与Docker Hub相同的API，所以它们是可互换的。
+
+现在试试吧,创建Secret来存储仓库凭证。为了便于理解，有一个脚本将凭据收集到局部变量中。别担心，脚本不会把你的证书发邮件给我…
 
 ```
-# collect the details—on Windows:
+# 收集Windows上的详细信息:
 . .\set-registry-variables.ps1
-# OR on Linux/Mac:
+# 或者 Linux/Mac:
 . ./set-registry-variables.sh
-# create the Secret using the details from the script:
-kubectl create secret docker-registry registry-creds --docker-
-server=$REGISTRY_SERVER --docker-username=$REGISTRY_USER --docker-
-password=$REGISTRY_PASSWORD
-# show the Secret details:
+# 使用脚本中的细节创建Secret:
+kubectl create secret docker-registry registry-creds --docker-server=$REGISTRY_SERVER --docker-username=$REGISTRY_USER --docker-password=$REGISTRY_PASSWORD
+# 查看 Secret:
 kubectl get secret registry-creds
 ```
 
-My output appears in figure 11.12. I’m using Docker Hub, which lets you create temporary access tokens that you can use in the same way as a password for your account. When I’m done with this chapter, I’ll revoke the access token—that’s a nice security
-feature in Hub.
+我的输出如图11.12所示。我使用的是Docker Hub，它允许您创建临时访问令牌，您可以以与帐户密码相同的方式使用它。当我完成本章时，我将撤销访问令牌——这是Hub中的一个很好的安全功能。
 
 ![图 11.12](images/Figure11.12.png)
-<center> 11.12 Your organization may use a private image registry—you need a Secret to authenticate</center>
+<center>图 11.12 您的组织可能使用私有镜像仓库—您需要一个Secret来进行身份验证</center>
 
-Okay, now we’re ready. We have a Docker-less build server running in the BuildKit Pod, a local Git server we can use to quickly iterate over the build process, and a registry Secret stored in the cluster. We can use all of those pieces with an automation
+好了，我们准备好了。我们有一个在BuildKit Pod中运行的无docker构建服务器，一个本地Git服务器，我们可以使用它快速遍历构建过程，还有一个存储在集群中的仓库 Secret。我们可以使用自动化服务器来运行构建管道，我们将使用Jenkins来实现这一点。Jenkins作为构建服务器有着悠久的历史，它非常受欢迎，但您不需要成为Jenkins专家来设置此构建，因为我已经在自定义Docker Hub 镜像中配置了它。
 
+本章的Jenkins 镜像安装了BuildKit和kubectl命令行，Pod设置为在正确的位置显示凭据。在前面的练习中创建的仓库 Secret 被挂载在Pod容器中，因此BuildKit在推送镜像时可以使用它对仓库进行身份验证。Kubectl被配置为使用Kubernetes在另一个Secret中提供的令牌连接到集群中的本地API服务器。部署Jenkins服务器，并检查所有配置是否正确。
 
-server to run the build pipeline, and we’ll be using Jenkins for that. Jenkins has a long legacy as a build server, and it’s very popular, but you don’t need to be a Jenkins guru to set up this build, because I have it already configured in a custom
-Docker Hub image.
-
-The Jenkins image for this chapter has the BuildKit and kubectl command lines installed, and the Pod is set up to surface credentials in the right places. The registry Secret you created in the previous exercise is mounted in the Pod container, so  BuildKit can use it to authenticate to the registry when it pushes the image. Kubectl is configured to connect to the local API server in the cluster using the token Kubernetes provides in another Secret. Deploy the Jenkins server, and check that everything is correctly configured.
-
-TRY IT NOW
-Jenkins gets everything it needs from Kubernetes Secrets, using a startup script in the container image. Start by deploying Jenkins and confirming it can connect to Kubernetes.
+现在试试吧，Jenkins使用容器镜像中的启动脚本，从Kubernetes Secrets中获得所需的一切。首先部署Jenkins并确认它可以连接到Kubernetes。
 
 ```
-# deploy Jenkins:
+# 部署 Jenkins:
 kubectl apply -f infrastructure/jenkins.yaml
-# wait for the Pod to spin up:
+# 等待 pod 就绪:
 kubectl wait --for=condition=ContainersReady pod -l app=jenkins
-# check that kubectl can connect to the cluster:
+# 检查集群可连接:
 kubectl exec deploy/jenkins -- sh -c 'kubectl version --short'
-# check that the registry Secret is mounted:
+# 检查仓库 secret 已挂载:
 kubectl exec deploy/jenkins -- sh -c 'ls -l /root/.docker'
 ```
 
-In this exercise, you’ll see kubectl report the version of your own Kubernetes lab cluster—that confirms the Jenkins Pod container is set up correctly to authenticate to Kubernetes, so it can deploy applications to the same cluster where it is running. My output is shown in figure 11.13.
+在本练习中，您将看到kubectl报告您自己的Kubernetes实验室集群的版本，这将确认Jenkins Pod容器已正确设置为向Kubernetes进行身份验证，因此它可以将应用程序部署到运行它的同一集群中。我的输出如图11.13所示。
 
 ![图 11.13](images/Figure11.13.png) 
-<center> 11.13 Jenkins runs the pipeline, so it needs authentication details for Kubernetes and the registry</center>
+<center>图 11.13 Jenkins运行管道，因此它需要Kubernetes和仓库的身份验证细节</center>
 
-Everything is in place now for Jenkins to fetch application code from the Gogs Git server, connect to the BuildKit server to build the container image using Buildpacks and push it to the registry, and deploy the latest application version to the test namespace. That work is already set up using a Jenkins pipeline, but the pipeline steps just use simple build scripts in the application folder. Listing 11.3 shows the build stage, which packages and pushes the image.
+现在一切就绪，Jenkins可以从Gogs Git服务器获取应用程序代码，连接到BuildKit服务器，使用Buildpacks构建容器镜像并将其推送到仓库，并将最新的应用程序版本部署到测试命名空间。这项工作已经使用Jenkins管道进行了设置，但是管道步骤只使用应用程序文件夹中的简单构建脚本。清单11.3显示了构建阶段，该阶段打包并推送镜像。
 
-> Listing 11.3 build.sh, the build script using BuildKit
+> 清单 11.3 build.sh, 使用BuildKit构建脚本
 
 ```
 buildctl --addr tcp://buildkitd:1234 \ # The command runs on Jenkins,
@@ -342,12 +334,11 @@ buildctl --addr tcp://buildkitd:1234 \ # The command runs on Jenkins,
      ${BUILD_NUMBER}-kiamol,push=true # Pushes the output to the registry
 ```
 
-The script is an extension of the simpler BuildKit command you ran in section 11.2, when you were pretending to be the build server. The buildctl command uses the same integration component for Buildpacks, so there’s no Dockerfile in here. This command runs inside the Jenkins Pod, so it specifies an address for the BuildKit server, which is running in a separate Pod behind the Service called buildkitd. No Docker here, either. The variables in the image name are all set by Jenkins, but they’re standard
-environment variables, so there’s no dependency on Jenkins in the build scripts.
+该脚本是您在11.2节中运行的更简单的BuildKit命令的扩展，当时您假装是构建服务器。buildctl命令对Buildpacks使用相同的集成组件，因此这里没有Dockerfile。该命令在Jenkins Pod中运行，因此它为BuildKit服务器指定了一个地址，该服务器在名为buildkitd的服务后面的单独Pod中运行。这里也没有Docker。镜像名称中的变量都是由Jenkins设置的，但它们是标准的环境变量，因此在构建脚本中不依赖于Jenkins。
 
-When this stage of the pipeline completes, the image will have been built and pushed to the registry. The next stage is to deploy the updated application, which is in a separate script, shown in listing 11.4. You don’t need to run this yourself—it’s all in the Jenkins pipeline.
+当管道的这一阶段完成时，镜像将被构建并推送到仓库。下一阶段是部署更新后的应用程序，该应用程序位于单独的脚本中，如清单11.4所示。你不需要亲自操作，这都在Jenkins的流程中。
 
-> Listing 11.4 run.sh, the deployment script using Helm
+> 清单 11.4 run.sh, 使用Helm的部署脚本
 
 ```
 helm upgrade --install --atomic \ # Upgrades or installs the release
@@ -359,60 +350,57 @@ bulletin-board \
 helm/bulletin-board
 ```
 
-The deployment uses Helm with a chart that has values for the parts of the image name. They’re set from the same variables used in the build stage, which are compiled from the Docker registry Secret and the build number in Jenkins. In my case, the first
-build pushes an image to Docker Hub named sixeyed/bulletin-board:1-kiamol and installs a Helm release using that image. To run the build in your cluster and push to your registry, you just need to log in to Jenkins and enable the build—the pipeline itself is already set up.
+deployment 使用Helm和一个 chart，其中包含镜像名称部分的值。它们是从构建阶段使用的相同变量设置的，这些变量是从Docker 仓库 Secret和Jenkins中的构建号编译的。在我的例子中，第一个构建将一个名为sixeyed/bulletin-board:1-kiamol的镜像推送到Docker Hub，并使用该镜像安装Helm发行版。要在集群中运行构建并推送到仓库，您只需要登录到Jenkins并启用构建—管道本身已经设置好了。
 
-TRY IT NOW
-Jenkins is running and configured, but the pipeline job isn’t enabled. Log in to enable the job, and you will see the pipeline execute and the app deployed to the cluster.
+现在试试吧，Jenkins正在运行并配置，但管道作业未启用。登录以启用作业，您将看到管道执行，应用程序部署到集群。
 
 ```
-# get the URL for Jenkins:
+# 获取 Jenkins url:
 kubectl get svc jenkins -o
 jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080/job/kiamol'
-# browse and login with username kiamol and password kiamol;
-# if Jenkins is still setting itself up you’ll see a wait screen
-# click enable for the Kiamol job and wait . . .
-# when the pipeline completes, check the deployment:
+# 用用户名kiamol和密码kiamol浏览和登录;
+# 如果Jenkins还在设置，你会看到等待屏幕
+# 单击Kiamol作业的启用，然后等待…
+# 当管道完成时，检查部署:
 kubectl get pods -n kiamol-ch11-test -l
 app.kubernetes.io/name=bulletin-board -o=custom-
 columns=NAME:.metadata.name,IMAGE:.spec.containers[0].image
-# find the URL of the test app:
+# 获取 test app url:
 kubectl get svc -n kiamol-ch11-test bulletin-board -o
 jsonpath='http://{.status.loadBalancer.ingress[0].*}:8012'
-# browse
+# 浏览 url
 ```
 
-The build should be fast because it’s using the same BuildKit server that has already cached the images for the Buildpack build from section 11.2. When the build has completed, you can browse to the application deployed by Helm in the test namespace and see the app running—mine is shown in figure 11.14.
+构建应该很快，因为它使用的是同一个BuildKit服务器，该服务器已经为11.2节中的Buildpack构建缓存了镜像。构建完成后，您可以浏览到Helm在test命名空间中部署的应用程序，并看到应用程序正在运行——mine如图11.14所示。
 
 ![图 11.14](images/Figure11.14.png)
-<center> 11.14 The pipeline in action, built and deployed to Kubernetes without Docker or Dockerfiles</center>
+</center>图 11.14运行中的管道，在没有Docker或Dockerfiles的情况下构建并部署到Kubernetes</center>
 
-So far so good. We’re playing the ops role, so we understand all the moving parts in the delivery of this app—we would own the pipeline in the Jenkinsfile and the application specs in the Helm chart. Lots of small fiddly details are in there, like the templated image name and the image pull Secret in the Deployment YAML, but from the developer’s point of view, that’s all hidden.
+到目前为止一切顺利。我们扮演的是运维角色，所以我们了解这个应用程序交付过程中的所有活动部分——我们将拥有Jenkinsfile中的管道和Helm Chart中的应用程序规格。其中有许多细微的细节，如模板化的镜像名称和部署YAML中的镜像拉密，但从开发人员的角度来看，这些都是隐藏的。
 
-The developer’s view is that you can work on the app using your local environment, push changes, and see them running at the test URL, without worrying what happens in between. We can see that workflow now. You made an application change earlier to add event descriptions to the site, and to deploy that, all you need to do is push the changes to your local Git server and wait for the Jenkins build to complete.
+开发人员的观点是，您可以使用本地环境在应用程序上工作，推送更改，并看到它们在测试URL上运行，而不用担心中间会发生什么。我们现在可以看到工作流了。您在前面进行了应用程序更改，将事件描述添加到站点，要部署该应用程序，只需将更改推到本地Git服务器，并等待Jenkins构建完成。
 
-TRY IT NOW
-Push your code change to your Gogs server; Jenkins will see the change within one minute and start a new build. That will push a new image version to your registry and update the Helm release to use that version.
+现在试试吧，推送你的代码更改到你的Gogs服务器;Jenkins将在一分钟内看到更改并开始新的构建。这将向仓库推送一个新的镜像版本，并更新Helm版本以使用该版本。
 
 ```
-# add your code change, and push it to Git:
+# 更改代码, 推送到 Git:
 git add bulletin-board/src/backend/events.js
 git commit -m 'Add event descriptions'
 git push gogs
-# browse back to Jenkins, and wait for the new build to finish
-# check that the application Pod is using the new image version:
+# 访问 Jenkins, 等待新的构建结束
+# 检查 Pod 使用新的镜像版本:
 kubectl get pods -n kiamol-ch11-test -l
 app.kubernetes.io/name=bulletin-board -o=custom-
 columns=NAME:.metadata.name,IMAGE:.spec.containers[0].image
-# browse back to the app
+# 浏览 app
 ```
 
-This is the git push PaaS workflow applied to Kubernetes. We’re dealing with a simple app here, but the approach is the same for a large system with many components: a shared namespace could be the deployment target for all the latest versions, pushed by many different teams. Figure 11.15 shows an application update in Kubernetes triggered from a push of code, with no  requirement for developers to use Docker, Kubernetes, or Helm.
+这是应用于Kubernetes的git推送PaaS工作流。这里我们处理的是一个简单的应用程序，但对于具有许多组件的大型系统，方法是相同的:共享命名空间可以是由许多不同团队推动的所有最新版本的部署目标。图11.15显示了Kubernetes中由代码推送触发的应用程序更新，不需要开发人员使用Docker、Kubernetes或Helm。
 
 ![图 11.15](images/Figure11.15.png)
-<center> 11.15 It’s PaaS on your own Kubernetes cluster—a lot of complexity is hidden from the developer</center>
+<center> 图 11.15 它是在你自己的Kubernetes集群上的PaaS——很多复杂的东西对开发人员来说是隐藏的</center>
 
-Of course, the PaaS approach and the Docker approach are not mutually exclusive. If your cluster is running on Docker, you can take advantage of a simpler build process for Docker-based apps but still support a Docker-free PaaS approach for other apps, all in the same cluster. Each approach offers benefits and drawbacks, and we’ll end by looking at how you should choose between them.
+当然，PaaS方法和Docker方法并不相互排斥。如果你的集群运行在Docker上，你可以利用一个更简单的基于Docker的应用程序构建过程，但仍然支持其他应用程序的无Docker PaaS方法，所有这些都在同一个集群中。每种方法都有优点和缺点，最后我们将讨论如何在它们之间进行选择。
 
 ## 11.5 Evaluating developer workflows on Kubernetes
 
