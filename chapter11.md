@@ -176,7 +176,7 @@ exit
 最大的问题是构建过程的复杂性和所有组件的成熟度。 BuildKit是一个稳定的工具，但它远不如标准的Docker构建引擎使用得广泛。 Buildpacks是一种有前途的方法，但对Docker的依赖意味着它们在像云中的受管Kubernetes集群这样的无Docker环境中无法很好地工作。我们用来桥接它们的组件是由BuildKit项目的维护者Tõnis Tiigi编写的一种工具。它实际上只是一个将Buildpacks插入BuildKit中的概念验证工具；它足以演示工作流程，但不是您想依靠构建生产应用程序的工具。
 
 有替代方案。 GitLab是将Git服务器与使用Buildpacks的构建流水线相结合的产品，而Jenkins X是Kubernetes的本地构建服务器。它们本身就是复杂的产品，您需要知道，如果想从开发人员工作流程中删除Docker，则会在构建过程中换取更多的复杂性。本章的最后，您将能够决定结果是否值得。接下来，我们将看看如何在Kubernetes中隔离工作负载，以便单个集群可以运行您的交付流水线和所有测试环境。
-## 11.3 Isolating workloads with contexts and namespaces
+## 11.3 使用上下文和名称空间隔离工作负载
 
 在第3章中，我介绍了Kubernetes命名空间，并很快就进行了下一步。您需要了解它们才能理解Kubernetes为服务使用的完全限定DNS名称，但在开始划分集群之前，您不需要使用它们。命名空间是一种分组机制——每个Kubernetes对象都属于一个命名空间——您可以使用多个命名空间从一个真实的集群创建虚拟集群。
 
