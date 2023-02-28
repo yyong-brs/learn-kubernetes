@@ -429,13 +429,11 @@ kubectl delete all -l app=bulletin-board
 
 ## 11.6 实验室
 
-This lab is a bit nasty, so I’ll apologize in advance—but I want you to see that going down the PaaS path with a custom set of tools has danger in store. The bulletin board app for this chapter used a very old version of the Node runtime, version 10.5.0, and in
-the lab, that needs updating to a more recent version. There’s a new source code folder for the lab that uses Node 10.6.0, and your job is to set up a pipeline to build that version, and then find out why it fails and fix it. There are a few hints that follow because the goal isn’t for you to learn Jenkins but to see how to debug failing pipelines:
+这个实验室有点麻烦，所以我要提前道歉——但是我想让您看到，使用自定义工具集走PaaS之路是有危险的。本章的公告栏应用程序使用了Node运行时的一个非常旧的版本，10.5.0版本，在实验室，需要更新到最新版本。有一个用于使用Node 10.6.0的实验室的新源代码文件夹，您的工作是建立一个构建该版本的管道，然后找出它失败的原因并修复它。下面有一些提示，因为我们的目标不是让你学习Jenkins，而是看看如何调试失败的管道:
 
-- Start by creating a new item from the Jenkins home page: choose the option to copy an existing job, and copy the kiamol job; call the new job anything you like.
-- In the new job configuration in the Pipeline tab, change the path to the pipeline file to the new source code folder: ch11/lab/bulletin-board/Jenkinsfile.
-- Build the job, and look through the logs to find out why it failed.
-- You’ll need to make a change in the lab source folder and push it to Gogs to fix the build
+- 开始从Jenkins主页创建一个新项目:选择复制一个现有作业的选项，并复制kiamol作业;你喜欢怎么称呼新工作都行。
+- 在Pipeline选项卡的新作业配置中，将管道文件的路径更改为新的源代码文件夹:ch11/lab/bulletin-board/Jenkinsfile。
+- 构建作业，并查看日志以找出失败的原因。
+- 你需要在实验室源代码文件夹中进行更改，并将其推送到Gogs以修复构建
 
-
-My sample solution is on GitHub with some screenshots for the Jenkins setup to help you: https://github.com/sixeyed/kiamol/blob/master/ch11/lab/README.md.
+我的样例解决方案在GitHub上，有一些Jenkins设置的截图，可以帮助你:https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch11/lab/README.md。
