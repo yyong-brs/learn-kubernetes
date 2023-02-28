@@ -123,7 +123,7 @@ jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000'
 图11.5显示了我的输出。您不需要为此工作流程运行自己的Git服务器；使用GitHub或任何其他源代码控制系统都可以使用相同的方式，但是这样做可以获得易于重复的环境 - 本章的Gogs设置已经预配置了用户帐户，因此您可以快速启动。
 
 ![图 11.5](images/Figure11.5.png)
-<center> 11.5 在Kubernetes中运行自己的Git服务器非常容易</center>
+<center>图 11.5 在Kubernetes中运行自己的Git服务器非常容易</center>
 
 现在，我们有了一个本地源代码控制服务器，可以在其中插入其他组件。接下来是可以构建容器镜像的系统。为了使其可移植，以便在任何集群上运行，我们需要一些不需要Docker的东西，因为群集可能使用不同的容器运行时。我们有几个选项，但是最好的之一是BuildKit，这是Docker团队的一个开源项目。BuildKit最初是Docker Engine内部的镜像构建组件的替代品，它具有可插拔的架构，因此您可以使用或不使用Dockerfiles构建映像。您可以将BuildKit作为服务器运行，因此工具链中的其他组件可以使用它来构建映像。
 
@@ -144,7 +144,7 @@ kubectl exec deploy/buildkitd -- sh -c 'docker version'
 您可以在图11.6中看到我的输出，其中BuildKit Pod正在运行一个安装了BuildKit和Git客户端但没有Docker的镜像。重要的是要意识到，BuildKit完全独立——它不连接到Kubernetes中的容器运行时以构建镜像；所有这些都将在Pod内部完成。
 
 ![图 11.6](images/Figure11.6.png)
-<center> 11.6 BuildKit作为容器镜像构建服务运行，无需Docker</center>
+<center>图 11.6 BuildKit作为容器镜像构建服务运行，无需Docker</center>
 
 在我们能够看到完整的PaaS工作流程之前，我们需要设置更多的组件，但是现在我们已经有足够的内容来看到其中的构建部分是如何工作的。我们在这里针对无Docker的方法，因此我们将忽略上一节中使用的Dockerfile，并直接从源代码中构建应用程序到容器镜像中。如何做到这一点呢？通过使用一个名为Buildpacks的CNCF项目，这是由Heroku推出的一种技术，用于支持其PaaS产品。
 
@@ -166,11 +166,10 @@ type=image,name=kiamol/ch11-bulletin-board:buildkit
 exit
 ```
 
-This exercise takes a while to run, but keep an eye on the output from BuildKit, and you’ll see what’s happening—first, it downloads the component that provides the Buildpacks integration, and then that runs and finds this is a Node.js app; it packages the app into a compressed archive and then exports the archive into a container image that has the Node.js runtime installed. My output is shown in figure 11.7.
 这项任务需要运行一段时间，但请注意来自BuildKit的输出，您将看到正在发生的事情——首先，它下载提供Buildpacks集成的组件，然后运行并发现这是一个Node.js应用程序；它将应用程序打包成压缩归档文件，然后将归档文件导出到包含Node.js运行时的容器镜像中。图11.7显示了我的输出。
 
 ![图 11.7](images/Figure11.7.png)
-<center> 11.7 在没有Docker和Dockerfile的情况下构建容器镜像会增加很多复杂性</center>
+<center>图 11.7 在没有Docker和Dockerfile的情况下构建容器镜像会增加很多复杂性</center>
 
 您不能在BuildKit Pod上从该镜像运行容器，因为它没有配置容器运行时，但是BuildKit能够将镜像推送到仓库中构建和打包应用程序以在容器中运行而不需要Dockerfile或Docker是相当令人印象深刻的，但代价是很大的。
 
@@ -374,7 +373,7 @@ jsonpath='http://{.status.loadBalancer.ingress[0].*}:8012'
 构建应该很快，因为它使用的是同一个BuildKit服务器，该服务器已经为11.2节中的Buildpack构建缓存了镜像。构建完成后，您可以浏览到Helm在test命名空间中部署的应用程序，并看到应用程序正在运行——mine如图11.14所示。
 
 ![图 11.14](images/Figure11.14.png)
-</center>图 11.14运行中的管道，在没有Docker或Dockerfiles的情况下构建并部署到Kubernetes</center>
+<center>图 11.14运行中的管道，在没有Docker或Dockerfiles的情况下构建并部署到Kubernetes</center>
 
 到目前为止一切顺利。我们扮演的是运维角色，所以我们了解这个应用程序交付过程中的所有活动部分——我们将拥有Jenkinsfile中的管道和Helm Chart中的应用程序规格。其中有许多细微的细节，如模板化的镜像名称和部署YAML中的镜像拉密，但从开发人员的角度来看，这些都是隐藏的。
 
