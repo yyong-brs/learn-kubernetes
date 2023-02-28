@@ -402,38 +402,33 @@ columns=NAME:.metadata.name,IMAGE:.spec.containers[0].image
 
 当然，PaaS方法和Docker方法并不相互排斥。如果你的集群运行在Docker上，你可以利用一个更简单的基于Docker的应用程序构建过程，但仍然支持其他应用程序的无Docker PaaS方法，所有这些都在同一个集群中。每种方法都有优点和缺点，最后我们将讨论如何在它们之间进行选择。
 
-## 11.5 Evaluating developer workflows on Kubernetes
+## 11.5 评估 Kubernetes 上的开发人员工作流程
 
-In this chapter, we’ve looked at developer workflows at extreme ends of the spectrum, from teams who fully embrace containers and want to make them front and center in every environment, to teams who don’t want to add any ceremony to their development process, want to keep working natively, and leave all the container bits to the CI/CD pipeline. There are plenty of places in between, and the likelihood is that you’ll build an approach to suit your organization, your application architectures, and your Kubernetes platform.
+在本章中，我们研究了极端的开发人员工作流程，从完全接受容器并希望将其置于每个环境的前沿和中心的团队，到不希望在开发过程中添加任何仪式，希望保持本地工作，并将所有容器部分留给CI/CD管道的团队。在两者之间有很多地方，很可能您将构建一种适合您的组织、应用程序架构和Kubernetes平台的方法。
 
+这个决定既关乎技术，也关乎文化。您是希望每个团队都能提高容器知识的水平，还是希望将这些知识集中在服务团队中，而让开发人员团队专注于交付软件?虽然我希望看到每个人的办公桌上都有《一个月的午餐学会Docker》和《一个月的午餐学会Kubernetes》，但熟练使用容器确实需要相当大的承诺。以下是我认为在项目中保留Docker和Kubernetes的主要优势:
+- PaaS方法是复杂的和定制的——你将把许多不同的技术与不同的成熟度级别和支持结构组合在一起。
+- Docker方法很灵活——你可以在Dockerfile中添加任何你需要的依赖和设置，而PaaS方法更规范，所以它们不适合每一个应用。
+- PaaS技术没有你在微调Docker镜像时所获得的优化;Docker工作流的公告牌镜像是95mb，而Buildpacks版本是1gb——这是一个更小的表面区域来保护。
+- 致力于学习Docker和Kubernetes是值得的，因为它们是可移植的技能——开发人员可以使用标准工具集轻松地在项目之间移动。
+- 团队不必使用完整的容器堆栈;他们可以在不同的阶段选择退出——一些开发人员可能只使用Docker来运行容器，而另一些开发人员可能使用Docker Compose或Kubernetes。
+- 分布式知识有助于更好的协作文化—集中式服务团队可能会因为成为唯一能玩所有有趣技术的人而被怨恨。
 
-The decision is as much about culture as about technology. Do you want every team to level up on container knowledge, or do you want to centralize that knowledge in a service team and leave the developer teams to focus on delivering software? Although I’d love to see copies of Learn Docker in a Month of Lunches and Learn Kubernetes in a Month of Lunches on every desk, skilling up on containers does require a pretty big commitment. Here are the major advantages I see in keeping Docker and Kubernetes visible in your projects:
+最终，这是您的组织和团队的决定，需要考虑从当前工作流迁移到所需工作流的痛苦。在我自己的咨询工作中，我经常平衡开发和运营角色，而且我倾向于务实。当我积极开发时，我使用本地工具(我通常使用Visual Studio处理.net项目)，但在我推动任何更改之前，我在本地运行CI进程，用Docker Compose构建容器镜像，然后在本地Kubernetes集群中旋转所有内容。这并不适用于所有场景，但我发现它在开发速度和我的更改在下一个环境中以同样的方式工作的信心之间取得了很好的平衡。
 
-* The PaaS approach is complicated and bespoke—you’ll be plugging together lots of different technologies with different maturity levels and support structures.
+以上就是开发人员工作流的全部内容，因此我们可以在继续前进之前整理集群。让您的构建组件(Gogs、BuildKit和Jenkins)继续运行—您将在实验室中需要它们。
 
-* The Docker approach is flexible—you can add any dependencies and setup you need in a Dockerfile, whereas PaaS approaches are more prescriptive, so they won’t fit every app.
-
-* PaaS technologies don’t have the optimizations you can get when you fine-tune your Docker images; the bulletin board image from the Docker workflow is 95 MB compared to 1 GB for the Buildpacks version—that’s a much smaller surface area to secure.
-* The commitment to learning Docker and Kubernetes pays off because they’re portable skills—developers can easily move between projects using a standard toolset.
-* Teams don’t have to use the full container stack; they can opt out at different stages—some developers might just use Docker to run containers, whereas others might use Docker Compose and others Kubernetes.
-* Distributed knowledge makes for a better collaborative culture—centralized service teams might be resented for being the only ones who get to play with all the fun technology.
-
-Ultimately, it’s a decision for your organization and teams, and the pain of migrating from the current workflow to the desired workflow needs to be considered. In my own consulting work, I’m often balancing development and operations roles, and I tend to be pragmatic. When I’m actively developing, I use native tooling (I typically work on .NET projects using Visual Studio), but before I push any changes, I run the CI process locally to build container images with Docker Compose and then spin everything
-up in my local Kubernetes cluster. That won’t fit every scenario, but I find it a good balance between development speed and  confidence that my changes will work the same way in the next environment.
-
-That’s all for the developer workflow, so we can tidy up the cluster before we move on. Leave your build components running (Gogs, BuildKit, and Jenkins)—you’ll need them for the lab.
-
-TRY IT NOW
-Remove the bulletin board deployments.
+现在试试吧，移除布告板部署。
 
 ```
-# uninstall the Helm release from the pipeline:
+# 卸载 helm release:
 helm -n kiamol-ch11-test uninstall bulletin-board
-# delete the manual deployment:
+# 删除手动部署的 deployment:
 kubectl delete all -l app=bulletin-board
 ```
 
-## 11.6 Lab
+## 11.6 实验室
+
 This lab is a bit nasty, so I’ll apologize in advance—but I want you to see that going down the PaaS path with a custom set of tools has danger in store. The bulletin board app for this chapter used a very old version of the Node runtime, version 10.5.0, and in
 the lab, that needs updating to a more recent version. There’s a new source code folder for the lab that uses Node 10.6.0, and your job is to set up a pipeline to build that version, and then find out why it fails and fix it. There are a few hints that follow because the goal isn’t for you to learn Jenkins but to see how to debug failing pipelines:
 
