@@ -179,109 +179,100 @@ This exercise takes a while to run, but keep an eye on the output from BuildKit,
 有替代方案。 GitLab是将Git服务器与使用Buildpacks的构建流水线相结合的产品，而Jenkins X是Kubernetes的本地构建服务器。它们本身就是复杂的产品，您需要知道，如果想从开发人员工作流程中删除Docker，则会在构建过程中换取更多的复杂性。本章的最后，您将能够决定结果是否值得。接下来，我们将看看如何在Kubernetes中隔离工作负载，以便单个集群可以运行您的交付流水线和所有测试环境。
 ## 11.3 Isolating workloads with contexts and namespaces
 
-Way back in chapter 3, I introduced Kubernetes namespaces—and very quickly moved on. You need to be aware of them to make sense of the fully qualified DNS names Kubernetes uses for Services, but you don’t need to use them until you start dividing up  your cluster. Namespaces are a grouping mechanism—every Kubernetes object belongs to a namespace—and you can use multiple namespaces to create virtual clusters from one real cluster.
+在第3章中，我介绍了Kubernetes命名空间，并很快就进行了下一步。您需要了解它们才能理解Kubernetes为服务使用的完全限定DNS名称，但在开始划分集群之前，您不需要使用它们。命名空间是一种分组机制——每个Kubernetes对象都属于一个命名空间——您可以使用多个命名空间从一个真实的集群创建虚拟集群。
 
-Namespaces are very flexible, and organizations use them in different ways. You might use them in a production cluster to divide it up for different products or to divide up a nonproduction cluster for different environments—integration test, system test, and user testing. You might even have a development cluster where each developer has their own namespace, so they don’t need to run their own cluster. Namespaces are a boundary where you can apply security and resource restrictions, so deployment, but we’ll start with a simple walkthrough.
+命名空间非常灵活，组织以不同的方式使用它们。您可以在生产集群中将它们用于将其划分为不同的产品，或将非生产集群划分为不同的环境——集成测试、系统测试和用户测试。您甚至可能有一个开发集群，每个开发人员都有自己的命名空间，以便他们不需要运行自己的集群。命名空间是一个边界，您可以在其中应用安全性和资源限制，以便部署，但我们将从简单的演练开始。
 
-TRY IT NOW
-Kubectl is namespace aware. You can explicitly create a namespace, and then deploy and query resources using the namespace flag—this creates a simple sleep Deployment.
+NOW 尝试一下Kubectl是命名空间感知的。您可以显式地创建一个命名空间，然后使用命名空间标志部署和查询资源——这将创建一个简单的sleep部署。
 
 ```
-# create a new namespace:
+# 创建命名空间:
 kubectl create namespace kiamol-ch11-test
-# deploy a sleep Pod in the new namespace:
+# 在命名空间中部署 sleep pod:
 kubectl apply -f sleep.yaml --namespace kiamol-ch11-test
-# list sleep Pods—this won’t return anything:
+# 查询 sleep Pods—不会返回任何内容:
 kubectl get pods -l app=sleep
-# now list the Pods in the namespace:
+# 现在指定命名空间查询:
 kubectl get pods -l app=sleep -n kiamol-ch11-test
 ```
 
-My output is shown in figure 11.8, where you can see that namespaces are an essential part of resource metadata. You need to explicitly specify the namespace to work with an object in kubectl. The only reason we’ve avoided this for the first 10 chapters is that every cluster has a namespace called default, which is used if you don’t specify a namespace, and that’s where we’ve created and used everything so far.
+我的输出如图11.8所示，其中可以看到命名空间是资源元数据的重要组成部分。您需要显式地指定命名空间来处理kubectl中的对象。我们在前10章中避免这样做的唯一原因是，每个集群都有一个名为default的命名空间，如果您没有指定就会使用它，到目前为止，我们已经在这里创建和使用了所有内容。
 
 ![图 11.8](images/Figure11.8.png)
-<center> 11.8 Namespaces isolate workloads—you can use them to represent different environments</center>
+<center>图 11.8 命名空间隔离工作负载—您可以使用它们来表示不同的环境</center>
 
-Objects within a namespace are isolated, so you can deploy the same apps with the same object names in different namespaces. Resources can’t see resources in other namespaces. Kubernetes networking is flat, so Pods in different namespaces can communicate through Services, but a controller looks for Pods only in its own namespace. Namespaces are ordinary Kubernetes resources, too. Listing 11.2 shows a namespace spec in YAML, along with the metadata for another sleep Deployment that uses the new namespace.
+命名空间中的对象是隔离的，因此您可以在不同的命名空间中部署具有相同对象名称的相同应用程序。资源不能看到其他命名空间中的资源。Kubernetes的网络是扁平化的，所以不同命名空间中的pod可以通过Services通信，但是控制器只在自己的命名空间中查找pod。命名空间也是普通的Kubernetes资源。清单11.2显示了YAML中的命名空间 spec，以及另一个使用新命名空间的 sleep 部署的元数据。
 
-> Listing 11.2 sleep-uat.yaml, a manifest that creates and targets a namespace
+> 清单 11.2 sleep-uat.yaml, 创建和定位命名空间的清单
 
 ```
 apiVersion: v1
-kind: Namespace # Namespace specs need only a name.
+kind: Namespace # 命名空间只需要一个名称的配置.
 metadata:
   name: kiamol-ch11-uat
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: # The target namespace is part of the
-  name: sleep # object metadata. The namespace needs
-  namespace: kiamol-ch11-uat # to exist, or the deployment fails.
-# The Pod spec follows.
+metadata: # namespace 是 metadata 对象的一个属性，必须存在，否则 deployment 将失败
+  name: sleep 
+  namespace: kiamol-ch11-uat 
+# 后续就是 pod 相关的 spec.
 ```
 
-The Deployment and Pod specs in that YAML file use the same names as the objects you deployed in the previous exercise, but because the controller is set to use a different namespace, all the objects it creates will be in that namespace, too. When you deploy this manifest, you’ll see the new objects created without any naming collisions.
+该YAML文件中的Deployment和Pod规范使用与上一练习中部署的对象相同的名称，但由于控制器设置为使用不同的命名空间，因此它创建的所有对象也将位于该命名空间中。当您部署这个清单时，您将看到创建的新对象没有任何命名冲突。
 
-TRY IT NOW
-Create a new UAT namespace and Deployment from the YAML in listing 11.2. The controller uses the same name, and you can see objects across namespaces using kubectl. Deleting a namespace deletes all its resources.
+现在试试吧，从清单11.2中的YAML创建一个新的UAT命名空间和Deployment。控制器使用相同的名称，您可以使用kubectl跨命名空间查看对象。删除命名空间会删除命名空间中的所有资源。
 
 ```
-# create the namespace and Deployment:
+# 创建 namespace and Deployment:
 kubectl apply -f sleep-uat.yaml
-# list the sleep Deployments in all namespaces:
+# 查看所有命名空间下的 sleep deployment:
 kubectl get deploy -l app=sleep --all-namespaces
-# delete the new UAT namespace:
+# 删除 UAT namespace:
 kubectl delete namespace kiamol-ch11-uat
-# list Deployments again:
+# 再次查看 Deployment:
 kubectl get deploy -l app=sleep --all-namespaces
 ```
 
-You can see my output in figure 11.9. The original sleep Deployment didn’t specify a namespace in the YAML file, and we created it in the kiamol-ch11-test namespace by specifying that in the kubectl command. The second sleep Deployment specified the   kiamol-ch11-uat namespace in the YAML, so it was created there without needing a kubectl namespace flag.
+可以在图11.9中看到我的输出。最初的sleep Deployment没有在YAML文件中指定命名空间，我们通过在kubectl命令中指定kiamol-ch11-test命名空间创建了它。第二个sleep 部署在YAML中指定了kiamol-ch11-uat命名空间，因此它是在那里创建的，不需要kubectl 命名空间标志。
 
 ![图 11.9](images/Figure11.9.png)
-<center> 11.9 Namespaces are a useful abstraction for managing groups of objects</center>
+<center>图 11.9 命名空间是管理对象组的有用抽象</center>
 
-In a shared cluster environment, you might regularly use different namespaces— deploying apps in your own development namespace and then looking at logs in the test namespace. Switching between them using kubectl flags is time consuming and
-error prone, and kubectl provides an easier way with contexts. A context defines the connection details for a Kubernetes cluster and sets the default namespace to use in kubectl commands. Your lab environment will already have a context set up, and you
-can modify that to switch namespaces.
+在共享集群环境中，您可能经常使用不同的命名空间——在您自己的开发命名空间中部署应用程序，然后在测试命名空间中查看日志。使用kubectl标志在它们之间切换既耗时又容易出错，而kubectl提供了一种更简单的上下文方式。上下文定义Kubernetes集群的连接细节，并设置kubectl命令中使用的默认命名空间。您的实验室环境已经设置了上下文，您可以修改它来切换命名空间。
 
-TRY IT NOW
-Show your configured contexts, and update the current one to set the default namespace to the test namespace.
-
+现在试试吧，显示您配置的上下文，并更新当前上下文，以将默认命名空间设置为test 命名空间。
 ```
-# list all contexts:
+# 查看所有contexts:
 kubectl config get-contexts
-# update the default namespace for the current context:
+# 更新默认的 命名空间上下文:
 kubectl config set-context --current --namespace=kiamol-ch11-test
-# list the Pods in the default namespace:
+# 查看默认命名空间下的 Pods:
 kubectl get pods
 ```
 
-You can see in figure 11.10 that setting the namespace for the context sets the default namespace for all kubectl commands. Any queries that don’t specify a namespace and any create commands where the YAML doesn’t specify a namespace will now all use the test namespace. You can create multiple contexts, all using the same cluster but different namespaces, and switch between them with the kubectl use-context command.
+在图11.10中可以看到，为上下文设置命名空间将为所有kubectl命令设置默认命名空间。任何没有指定命名空间的查询和任何YAML没有指定命名空间的创建命令现在都将使用test命名空间。您可以创建多个上下文，所有上下文都使用相同的集群但不同的命名空间，并使用kubectl use-context命令在它们之间切换。
 
 ![图 11.10](images/Figure11.10.png)
-<center> 11.10 Contexts are an easy way to switch between namespaces and clusters</center>
+<center>图 11.10 上下文是在命名空间和集群之间切换的一种简单方法</center>
 
-The other important use for contexts is to switch between clusters. When you set up Docker Desktop or K3s, they create a context for your local cluster—the details all live in a configuration file, which is stored in the .kube directory in your home folder. Managed
+上下文的另一个重要用途是在集群之间切换。当您设置Docker Desktop或K3s时，它们会为您的本地集群创建一个上下文—所有细节都保存在配置文件中，该配置文件存储在主文件夹中的.kube目录中。管理Kubernetes服务通常具有向配置文件添加集群的功能，因此您可以在本地计算机上使用远程集群。远程API服务器将使用TLS进行保护，并且您的kubectl配置将使用客户端证书将您标识为用户。您可以通过查看配置来查看这些安全细节。
 
-Kubernetes services usually have a feature to add a cluster to your config file, so you can work with remote clusters from your local machine. The remote API server will be secured using TLS, and your kubectl configuration will use a client certificate to identify you as the user. You can see those security details by viewing the configuration.
-
-TRY IT NOW
-Reset your context to use the default namespace, and then print out the details of the client configuration.
+现在试试吧，重置上下文以使用默认命名空间，然后打印客户端配置的详细信息。
 
 ```
-# setting the namespace to blank resets the default:
+# 将命名空间设置为空白将重置默认值:
 kubectl config set-context --current --namespace=
-# printing out the config file shows your cluster connection:
+# 打印配置文件显示您的集群连接:
 kubectl config view
 ```
 
-Figure 11.11 shows my output, with a local connection to my Docker Desktop cluster using TLS certificates—which aren’t shown by kubectl—to authenticate the connection.
+图11.11显示了我的输出，其中使用TLS证书(kubectl没有显示)对连接进行身份验证的Docker Desktop集群的本地连接。
 
 ![图 11.11](images/Figure11.11.png)
-<center> 11.11 Contexts contain the connection details for the cluster, which could be local or remote</center>
+<center>图 11.11 上下文包含集群的连接细节，可以是本地的，也可以是远程的</center>
 
-Kubectl can also use a token to authenticate with the Kubernetes API server, and Pods are provided with a token they can use as a Secret, so apps running in Kubernetes can connect to the Kubernetes API to query or deploy objects. That’s a long way to getting where we want to go next: we’ll run a build server in a Pod that triggers a build when the source code changes in Git, builds the image using BuildKit, and deploys it to Kubernetes in the test namespace.
+Kubectl 还可以使用令牌与 Kubernetes API 服务器进行身份验证，Pods也提供了一个令牌，可以用作Secret，因此运行在Kubernetes中的应用程序可以连接到Kubernetes API来查询或部署对象。这距离我们接下来要去的地方还有很长的路要走:我们将在Pod中运行一个构建服务器，当Git中的源代码发生变化时触发构建，使用BuildKit构建镜像，并将其部署到测试命名空间中的Kubernetes。
 
 ## 11.4 Continuous delivery in Kubernetes without Docker
 Actually, we’re not quite there yet, because the build process needs to push the image to a registry, so Kubernetes can pull it to run Pod containers. Real clusters have multiple nodes, and each of them needs to be able to access the image registry. That’s been easy so far because we’ve used public images on Docker Hub, but in your own builds, you’ll push to a private repository first. Kubernetes supports pulling private images by storing registry credentials in a special type of Secret object.
