@@ -165,3 +165,19 @@
     - 11.5 [评估 Kubernetes 上的开发人员工作流程](./chapter11.md#115-评估-kubernetes-上的开发人员工作流程)
 
     - 11.6 [实验室](./chapter11.md#116-实验室)
+
+- **第三部分** 为生产而准备
+
+  - 第十二章 [增强自我修复应用程序](./chapter12.md)
+
+    - 12.1 [使用 readiness 探测将流量路由到健康 Pods](./chapter12.md#121-使用-readiness-探测将流量路由到健康-pods)
+
+    - 12.2 [通过 liveness 探测重启不健康的 Pods](./chapter12.md#122-通过-liveness-探测重启不健康的-pods)
+
+    - 12.3 [使用 Helm 安全地部署升级](./chapter12.md#123-使用-helm-安全地部署升级)
+
+    - 12.4 [通过 resource limits 保护应用和节点](./chapter12.md#124-通过-resource-limits-保护应用和节点)
+
+    - 12.5 [了解自我修复应用的局限性](./chapter12.md#125-了解自我修复应用的局限性)
+
+    - 12.6 [实验室](./chapter12.md#126-实验室)
