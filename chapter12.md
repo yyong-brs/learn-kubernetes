@@ -1,126 +1,115 @@
 # 第十二章 增强自我修复应用程序
-Kubernetes models your application with abstractions over the compute and networking layers. The abstractions allow Kubernetes to control network traffic and container lifetimes, so it can take corrective action if parts of your app fail. If you have
-enough detail in your specifications, the cluster can find and fix temporary problems and keep applications online. These are self-healing applications, which ride out any transient issues without needing a human to guide them. In this chapter, you’ll learn how to model that in your own apps, using container probes to test for health and  imposing resource limits so apps don’t soak up too much compute.
 
-There are limits to Kubernetes’s healing powers, and you’ll learn those in this chapter, too. We’re mainly going to look at how you keep your apps running without manual administration, but we’ll also look again at application updates. Updates are the most  likely cause of downtime, and we’ll look at some additional features of Helm that can keep your apps healthy during update cycles.
+Kubernetes 在计算和网络层上对应用程序进行抽象建模。这些抽象允许Kubernetes控制网络流量和容器的生命周期，因此如果应用程序的某些部分出现故障，它可以采取纠正措施。如果您的规范中有足够的细节，集群可以发现并修复临时问题，并保持应用程序在线。这些是自我修复的应用程序，可以在不需要人工指导的情况下渡过任何短暂的问题。在本章中，你将学习如何在你自己的应用程序中建模，使用容器探测来测试健康状况，并施加资源限制，这样应用程序就不会占用太多的计算量。
 
-
+Kubernetes 的治疗能力是有限的，你也会在本章学到这些。我们将主要研究如何在没有手动管理的情况下保持应用程序的运行，但我们也将再次研究应用程序更新。更新是最有可能导致停机的原因，我们将看看Helm的一些其他功能，可以让你的应用在更新周期内保持健康。
 
 ## 12.1 使用 readiness 探测将流量路由到健康 Pods
 
-Kubernetes knows if your Pod container is running, but it doesn’t know if the application inside the container is healthy. Every app will have its own idea of what “healthy” means—it might be a 200 OK response to an HTTP request—and Kubernetes  provides a generic mechanism for testing health using container probes. Docker images can have healthchecks configured, but Kubernetes ignores them in favor of its own probes. Probes are defined in the Pod spec, and they execute on a fixed schedule, testing some aspect of the application and returning an indicator to say if the app is still healthy.
+Kubernetes 知道 Pod 容器是否正在运行，但它不知道容器内的应用程序是否健康。每个应用程序都有自己对“健康”的定义——对HTTP请求的响应可能是200 OK——Kubernetes提供了一种使用容器探测来测试健康状况的通用机制。Docker 镜像可以配置健康检查，但Kubernetes会忽略它们，而是使用自己的探测。探针在Pod spec 中定义，它们按照固定的时间表执行，测试应用程序的某些方面，并返回一个指示器，以判断应用程序是否仍然健康。
 
-If the probe response says the container is unhealthy, Kubernetes will take action, and the action it takes depends on the type of probe. Readiness probes take action at the network level, managing the routing for components that listen for network requests.
-If the Pod container is unhealthy, the Pod is taken out of the ready state and removed from the list of active Pods for a Service. Figure 12.1 shows how that looks for a Deployment with multiple replicas, where one Pod is unhealthy.
+如果探测响应显示容器不健康，Kubernetes将采取行动，而所采取的行动取决于探测的类型。Readiness 探测在网络级执行操作，管理侦听网络请求的组件的路由。
+如果 Pod 容器不健康，则将Pod从就绪状态中取出，并从服务的活动Pod列表中删除。图12.1显示了如何查找具有多个副本的部署，其中一个Pod不健康。
 
 ![图 12.1](images/Figure12.1.png)
-<center>图 12.1 The list of endpoints for a Service excludes Pods that are not ready to receive traffic</center>
+<center>图12.1 服务的端点列表排除了尚未准备好接收流量的pod </center>
 
-Readiness probes are a great way to manage temporary load issues. Some Pods might be overloaded, returning a 503 status code to every request. If the readiness probe checks for a 200 response and those Pods return 503, they will be removed from the Service and will stop receiving requests. Kubernetes keeps running the probe after it has failed, so if the overloaded Pod has a chance to recover while it’s resting, the probe will succeed again, and the Pod will be enlisted back into the Service.
+Readiness 就绪探测是管理临时负载问题的好方法。有些 pod 可能过载，对每个请求返回 503 状态代码。如果 readiness 就绪探测检查了200响应，而这些pod返回503，那么它们将从 Service 中删除，并停止接收请求。Kubernetes在探测器失败后继续运行探测器，所以如果过载的 Pod 在休息时有机会恢复，探测器将再次成功，Pod将重新加入 Service。
 
-The random-number generator we’ve used in this book has a couple of features we can use to see how this works. The API can run in a mode where it fails after a certain number of requests, and it has an HTTP endpoint that returns whether it is healthy or
-in a failed state. We’ll start by running it without a readiness probe so we can understand the problem.
+我们在本书中使用的随机数生成器有几个特性，我们可以使用它来了解它是如何工作的。API可以在一种模式下运行，即在特定数量的请求后失败，并且它具有一个HTTP端点，该端点返回它是正常状态还是处于失败状态。我们将在没有准备 readiness 探测的情况下运行它，以便了解问题。
 
-TRY IT NOW
-Run the API with multiple replicas, and see what happens when the application fails without any container probes to test it.
+现在试试吧,使用多个副本运行API，看看当应用程序在没有任何容器探测进行测试的情况下失败时会发生什么。
 
 ```
-# switch to the chapter’s directory:
+# 进入章节目录:
 cd ch12
-# deploy the random-number API:
+# 部署 random-number API:
 kubectl apply -f numbers/
-# wait for it to be ready:
+# 等待就绪:
 kubectl wait --for=condition=ContainersReady pod -l app=numbers-api
-# check that the Pod is registered as Service endpoints:
+# 确认 Pod 注册作为 Service endpoints:
 kubectl get endpoints numbers-api
-# save the URL for the API in a text file:
+# 将 api url 保存到文本文件:
 kubectl get svc numbers-api -o jsonpath='http://{.status.loadBalancer
 .ingress[0].*}:8013' > api-url.txt
-# call the API—after returning, this app server is now unhealthy:
+# 访问 API—返回之后, 应用会显示不正常:
 curl "$(cat api-url.txt)/rng"
-# test the health endpoints to check:
+# 检查 health 端点:
 curl "$(cat api-url.txt)/healthz"; curl "$(cat api-url.txt)/healthz"
-# confirm the Pods used by the service:
+# 确认 service 使用的 Pods:
 kubectl get endpoints numbers-api
 ```
 
-You’ll see from this exercise that the Service keeps both Pods in its list of endpoints, even though one of them is unhealthy and will always return a 500 error response. My output in figure 12.2 shows two IP addresses in the endpoint list before and after the
-request, which causes one instance to become unhealthy. 
-
-This happens because Kubernetes doesn’t know one of the Pods is unhealthy. The application in the Pod container is still running, and Kubernetes doesn’t know there’s a health endpoint it can use to see if the app is working correctly. You can give it that information with a readiness probe in the container spec for the Pod. Listing 12.1 shows an update to the API spec, which includes the health check.
-
-> Listing 12.1 api-with-readiness.yaml, a readiness probe for the API container
-
-```
-spec: # This is the Pod spec in the Deployment.
-  containers:
-    - image: kiamol/ch03-numbers-api
-      readinessProbe: # Probes are set at the container level.
-        httpGet:
-          path: /healthz # This is an HTTP GET, using the health URL.
-          port: 80
-        periodSeconds: 5 # The probe fires every five seconds.
-```
-
-Kubernetes supports different types of container probe. This one uses an HTTP GET action, which is perfect for web applications and APIs. The probe tells Kubernetes to
+从本练习中您将看到，Service 将两个pod都保存在其端点列表中，尽管其中一个不健康，并且总是返回500错误响应。图12.2中的输出在请求之前和之后显示了端点列表中的两个IP地址，这导致一个实例变得不健康。
 
 ![图 12.2](images/Figure12.2.png)
-<center>图 12.2 Application containers may be unhealthy, but the Pod stays in the ready state</center>
+<center>图 12.2 应用程序容器可能不健康，但Pod保持就绪状态</center>
 
-test the /healthz endpoint every five seconds; if the response has an HTTP status code between 200 and 399, then the probe succeeds; if any other status code is returned, it will fail. The random-number API returns a 500 code when it’s unhealthy, so we can see the readiness probe in action.
+这是因为 Kubernetes 不知道其中一个pod是不健康的。Pod容器中的应用程序仍在运行，Kubernetes不知道有一个健康端点可以用来查看应用程序是否正常工作。你可以在Pod的容器 spec 中给它准备 readiness 探测的信息。清单12.1显示了API spec 的更新，其中包括健康检查。
 
-TRY IT NOW
-Deploy the updated spec, and verify that the Pod with the failed application is removed from the Service.
+> 清单 12.1 api-with-readiness.yaml, API 容器的 readiness 探测
 
 ```
-# deploy the updated spec from listing 12.1:
+spec: # 这是 Deployment 的 Pod spec 
+  containers:
+    - image: kiamol/ch03-numbers-api
+      readinessProbe: # 探测在容器层面指定
+        httpGet:
+          path: /healthz # 这是一个 Get 路由
+          port: 80
+        periodSeconds: 5 # 探测每隔 5 秒钟触发
+```
+
+Kubernetes 支持不同类型的容器探测。这一个使用HTTP GET操作，这是完美的web应用程序和api。探测器告诉Kubernetes每5秒测试一次/healthz端点;如果响应的HTTP状态码在200到399之间，则探测成功;如果返回任何其他状态代码，它将失败。随机数API在不健康时返回500代码，因此我们可以看到准备就绪探测的工作。
+
+现在试试吧，部署更新后的 spec ，并验证包含失败应用程序的Pod已从 Service 中删除。
+
+```
+# 部署清单 12.1 更新的 spec:
 kubectl apply -f numbers/update/api-with-readiness.yaml
-# wait for the replacement Pods:
-kubectl wait --for=condition=ContainersReady pod -l app=numbers-
-api,version=v2
-# check the endpoints:
+# 等待替换的 Pods 就绪:
+kubectl wait --for=condition=ContainersReady pod -l app=numbers-api,version=v2
+# 检查 endpoints:
 kubectl get endpoints numbers-api
-# trigger an application container to become unhealthy:
+# 触发一个应用容器变成不健康状态:
 curl "$(cat api-url.txt)/rng"
-# wait for the readiness probe to take effect:
+# 等待 readiness 探测生效:
 sleep 10
-# check the endpoints again:
+# 再次检查 endpoints:
 kubectl get endpoints numbers-api
 ```
 
-As shown in my output in figure 12.3, the readiness probe detects one of the Pods is unhealthy because the response to the HTTP request returns 500. That Pod’s IP address is removed from the Service endpoint list, so it won’t receive any more traffic.
+如图12.3中的输出所示，readiness 探测检测到其中一个pod不健康，因为对HTTP请求的响应返回500。Pod的IP地址从服务端点列表中删除，因此它将不再接收任何流量。
 
 ![图 12.3](images/Figure12.3.png)
-<center>图 12.3 Failing readiness probes move Pods out of the ready state so they’re removed from Services</center>
+<center>图 12.3 就绪失败探测将pod移出就绪状态，从而将它们从服务中移除</center>
 
-This app is also a good example of how readiness probes on their own can be dangerous. The logic in the random-number API means once it has failed, it will always fail, so the unhealthy Pod will stay excluded from the Service, and the application will run
-below the expected capacity. Deployments do not replace Pods that leave the ready state when a probe fails, so we’re left with two Pods running but only one receiving traffic. The situation gets much worse if the other Pod fails, too.
+这个应用程序也是一个很好的例子，说明准备 readiness 探测本身是多么危险。随机数API中的逻辑意味着一旦失败，它将始终失败，因此不健康的Pod将被排除在服务之外，应用程序将以低于预期的容量运行。当探测失败时，部署不会替换离开就绪状态的pod，因此我们留下两个正在运行的pod，但只有一个接收流量。如果另一个Pod也失败了，情况会更糟。
 
-TRY IT NOW
-Only one Pod is in the Service list. You will make a request, and that Pod goes unhealthy, too, so both Pods are removed from the Service.
-
+现在试试吧,服务列表中只有一个Pod。你会发出一个请求，Pod也会变得不健康，所以两个Pod都会从服务中删除。
 ```
-# check the Service endpoints:
+# 检查 Service endpoints:
 kubectl get endpoints numbers-api
-# call the API, triggering it to go unhealthy:
+# 访问 API, 触发应用都变成不健康状态:
 curl "$(cat api-url.txt)/rng"
-# wait for the readiness probe to fire:
+# 等待 readiness 探测触发:
 sleep 10
-# check the endpoints again:
+# 再次检查 endpoints:
 kubectl get endpoints numbers-api
-# check the Pod status:
+# 检查 Pod status:
 kubectl get pods -l app=numbers-api
-# we could reset the API... but there are no Pods ready to
-# receive traffic so this will fail:
+# 我们可以重置 API... 但是没有 Pods 可以接受请求，所以将会失败:
 curl "$(cat api-url.txt)/reset"
 ```
 
-Now we’re in a fix—both Pods have failed readiness probes, and Kubernetes has removed them both from the Service endpoint list. That leaves the Service with no endpoints, so the app is offline, as you can see in figure 12.4. The situation now is that any clients trying to use the API will get a connection failure rather than an HTTP error status code, and that’s true for administrators who try to reset the app using the special admin URL.
+现在我们有了一个解决方案——两个pod readiness 就绪探测都失败了，Kubernetes已经从服务端点列表中删除了它们。这样服务就没有端点了，所以应用程序处于离线状态，如图12.4所示。现在的情况是，任何试图使用API的客户端都会得到一个连接失败，而不是一个HTTP错误状态代码，对于试图使用特殊管理URL重置应用程序的管理员来说也是如此。
 
-If you’re thinking, “This isn’t a self-healing app,” you’re absolutely right, but remember that the application is in a failed state anyway. Without the readiness probe, the app still doesn’t work, but with the readiness probe, it’s protected from incoming
-requests until it recovers and is able to handle them. You need to understand the failure modes of your application to know what will happen when probes fail and whether the app is likely to recover by itself.
+![图 12.4](images/Figure12.4.png)
+<center>图 12.4 探头应该帮助应用程序，但它们可以从一个服务中删除所有 Pods</center>
 
-The random-number API never becomes healthy again, but we can fix the failed state by restarting the Pod. Kubernetes will do that for you if you include another healthcheck in the container spec: a liveness probe.
+如果您认为“这不是一个自我修复应用程序”，那么您完全正确，但请记住，应用程序无论如何都处于失败状态。没有 readiness 就绪探测，应用程序仍然不能工作，但有了 readiness 就绪探测，它就不会受到攻击请求，直到它恢复并能够处理它们。您需要了解应用程序的失败模式，以了解当探测失败时会发生什么，以及应用程序是否可能自行恢复。
+
+随机数API再也不会恢复正常，但我们可以通过重新启动Pod来修复失败状态。如果你在容器 spec 中包含另一个健康检查:一个 liveness 探测，Kubernetes将为你做这件事。
 
 ## 12.2 通过 liveness 探测重启不健康的 Pods
 Liveness probes use the same healthcheck mechanism as readiness probes—the test configurations might be identical in your Pod spec—but the action for a failed probe is different. Liveness probes take action at the compute level, restarting Pods if they
@@ -128,8 +117,6 @@ become unhealthy. A restart is when Kubernetes replaces the Pod container with a
 
 Listing 12.2 shows a liveness probe for the random-number API. This probe uses the same HTTP GET action to run the probe, but it has some additional configuration.
 
-![图 12.4](images/Figure12.4.png)
-<center>图 12.4 Probes are supposed to help the app, but they can remove all Pods from a Service</center>
 
 Restarting a Pod is more invasive than removing it from a Service, and the extra settings help to ensure that happens only when we really need it.
 
