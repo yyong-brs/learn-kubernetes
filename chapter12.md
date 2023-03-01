@@ -112,120 +112,113 @@ curl "$(cat api-url.txt)/reset"
 随机数API再也不会恢复正常，但我们可以通过重新启动Pod来修复失败状态。如果你在容器 spec 中包含另一个健康检查:一个 liveness 探测，Kubernetes将为你做这件事。
 
 ## 12.2 通过 liveness 探测重启不健康的 Pods
-Liveness probes use the same healthcheck mechanism as readiness probes—the test configurations might be identical in your Pod spec—but the action for a failed probe is different. Liveness probes take action at the compute level, restarting Pods if they
-become unhealthy. A restart is when Kubernetes replaces the Pod container with a new one; the Pod itself isn’t replaced; it continues to run on the same node but with a new container.
 
-Listing 12.2 shows a liveness probe for the random-number API. This probe uses the same HTTP GET action to run the probe, but it has some additional configuration.
+Liveness 探针使用与 readiness 探针相同的健康检查机制——在Pod spec 中测试配置可能是相同的——但失败探针的操作是不同的。liveness 探测在计算级采取行动，如果pod变得不健康，将重新启动pod。重启是当Kubernetes用一个新的Pod容器替换Pod容器时;Pods 本身没有被替换;它继续在相同的节点上运行，但是使用了一个新的容器。
 
+清单 12.2 显示了用于随机数API的 liveness 探测。这个探测使用相同的HTTP GET操作来运行探测，但是它有一些额外的配置。
 
-Restarting a Pod is more invasive than removing it from a Service, and the extra settings help to ensure that happens only when we really need it.
+重新启动 Pod 比从 Service 中删除它更具侵入性，并且额外的设置有助于确保仅在我们真正需要它时才发生。
 
-> Listing 12.2 api-with-readiness-and-liveness.yaml, adding a liveness probe
+> 清单 12.2 api-with-readiness-and-liveness.yaml, 添加 liveness probe
 
 ```
 livenessProbe:
-  httpGet: # HTTP GET actions can be used in liveness and
-    path: /healthz # readiness probes—they use the same spec.
+  httpGet: # HTTP GET 可以使用在 liveness 和 readiness 探测 - 他们使用相同的配置
+    path: /healthz 
 	port: 80
   periodSeconds: 10
-  initialDelaySeconds: 10 # Wait 10 seconds before running the first probe.
-  failureThreshold: 2 # Allow two probes to fail before taking action.
+  initialDelaySeconds: 10 # 在第一次探测前等待 10 秒
+  failureThreshold: 2 # 在采取进一步行动前允许两次探测失败
 ```
 
-This is a change to the Pod spec, so applying the update will create new replacement Pods that start off healthy. This time, when a Pod becomes unhealthy after the application fails, it will be removed from the Service thanks to the readiness probe. It will be restarted thanks to the liveness probe, and then the Pod will be added back into the Service.
+这是对Pod spec 的更改，因此应用更新将创建新的替换Pod，开始时健康。这一次，当Pod在应用程序失败后变得不健康时，由于 readiness 就绪探测，它将从 service 中删除。由于 liveness 探针，它将重新启动，然后Pod将被添加回 Service 中。
 
-TRY IT NOW
-Update the API, and verify that liveness and readiness checks combined keep the application healthy.
+现在试试吧,更新API，并验证 liveness 状态检查和 readiness 状态检查相结合是否能保持应用程序正常运行。
 
 ```
-# update the Pod spec from listing 12.2:
+# 部署清单 12.2 的更新:
 kubectl apply -f numbers/update/api-with-readiness-and-liveness.yaml
-# wait for the new Pods:
-kubectl wait --for=condition=ContainersReady pod -l app=numbers-
-api,version=v3
-# check the Pod status:
+# 等待新 pods 就绪:
+kubectl wait --for=condition=ContainersReady pod -l app=numbers-api,version=v3
+# 检查 Pod status:
 kubectl get pods -l app=numbers-api -o wide
-# check the Servivce endpoints:
+# 检查 Servivce endpoints:
 kubectl get endpoints numbers-api # two
-# cause one application to become unhealthy:
+# 使其中一个 Pod 变成不健康:
 curl "$(cat api-url.txt)/rng"
-# wait for the probes to fire, and check the Pods again:
+# 等待探测触发, 然后再次检查 pods:
 sleep 20
 kubectl get pods -l app=numbers-api
 ```
 
-In this exercise, you see the liveness probe in action, restarting the Pod when the application fails. The restart is a new Pod container, but the Pod environment is the same—it has the same IP address, and if the container mounted an EmptyDir volume in the Pod, it would have access to the files written by the previous container. You can see in figure 12.5 that both Pods are running and ready after the restart, so Kubernetes fixed the failure and healed the application.
-
-Restarts aren’t a permanent fix if the app keeps failing without a healthy streak, because Kubernetes won’t indefinitely restart a failing Pod. For transient issues, it works well, provided the application can restart successfully in a replacement container.  Probes are also useful to keep applications healthy during upgrades, because rollouts proceed only as new Pods enter the ready state, so if a readiness probe fails, that will pause the rollout.
-
-We’ll show that with the to-do list application, with specifications that include liveness and readiness checks for the web  application Pod and the database. The web probes use the same HTTP GET action we’ve already seen, but the database doesn’t
-have an HTTP endpoint we can use. Instead, the spec uses the other types of probe action that Kubernetes supports—the TCP socket action, which checks that a port is open and listening for incoming traffic, and the exec action, which runs a command inside the container. Listing 12.3 shows the probe setup.
+在本练习中，您将看到 liveness 探测的运行，在应用程序失败时重新启动Pod。重新启动是一个新的Pod容器，但是Pod环境是一样的——它有相同的IP地址，如果容器在Pod中挂载了一个EmptyDir卷，它就可以访问由前一个容器写入的文件。在图12.5中可以看到，两个pod在重新启动后都在运行并准备就绪，因此Kubernetes修复了故障并修复了应用程序。
 
 ![图 12.5](images/Figure12.5.png)
-<center>图 12.5 Readiness probes and liveness probes combined help keep applications online</center>
+<center>图12.5 readiness 探测和 liveness 探测相结合有助于保持应用程序在线</center>
 
-> Listing 12.3 todo-db.yaml, using TCP and command probes
+如果应用程序一直失败而没有健康的表现，重新启动并不是一个永久性的解决方案，因为Kubernetes不会无限期地重新启动一个失败的Pod。对于瞬态问题，它工作得很好，只要应用程序可以在替换容器中成功重新启动。探测对于在升级期间保持应用程序健康也很有用，因为只有当新的pod进入就绪状态时，才会进行铺开，因此如果 readiness 就绪探测失败，将暂停铺开。
+
+我们将通过待办事项列表应用程序来展示这一点，其中的 spec 包括对web应用程序Pod和数据库的 liveness和 readiness 检查。web探针使用我们已经看到的相同的HTTP GET操作，但是数据库没有我们可以使用的HTTP端点。相反，该 spec 使用了Kubernetes支持的其他类型的探测动作——TCP套接字动作，用于检查端口是否打开并侦听传入的流量，以及exec动作，用于在容器内运行命令。清单12.3显示了探针的设置。
+
+> 清单 12.3 todo-db.yaml, 使用 TCP 和 command 探针
 
 ```
 spec:
   containers:
 	- image: postgres:11.6-alpine
-	# full spec includes environment config
 	readinessProbe:
-	  tcpSocket: # The readiness probe tests the
-		port: 5432 # database is listening on the port.
+	  tcpSocket: # readiness 探测测试数据库监听端口
+		port: 5432 
 	  periodSeconds: 5
-	livenessProbe: # The liveness probe runs a Postgres tool,
-	  exec: # which confirms the database is running.
+	livenessProbe: # liveness 探测运行一个 Postgres 工具确认数据库在运行
+	  exec: 
 		command: ["pg_isready", "-h", "localhost"]
  	  periodSeconds: 10
 	  initialDelaySeconds: 10
 ```
 
-When you deploy this code, you’ll see the app works in the same way as always, but now it’s protected against transient failures in both the web and database components.
+当你部署这段代码时，你会看到应用程序的工作方式和往常一样，但现在它受到了保护，防止了web和数据库组件中的瞬时故障。
 
-TRY IT NOW
-Run the to-do list app with the new self-healing specification.
+现在试试吧，使用新的自修复 spec 运行待办事项列表应用程序。
 
 ```
-# deploy the web and database:
+# 部署 web and database:
 kubectl apply -f todo-list/db/ -f todo-list/web/
-# wait for the app to be ready:
+# 等待应用 ready:
 kubectl wait --for=condition=ContainersReady pod -l app=todo-web
-# get the URL for the service:
+# 获取 service url:
 kubectl get svc todo-web -o
 jsonpath='http://{.status.loadBalancer.ingress[0].*}:8081'
-# browse to the app, and add a new item
+# 访问并添加一个数据项
 ```
 
-Nothing new here, as you can see in my output in figure 12.6. But the database probes mean Postgres won’t get any traffic until the database is ready, and if the Postgres server fails, then the database Pod will be restarted, with the replacement using the same data files in the EmptyDir volume in the Pod.
+这里没有什么新内容，如图12.6中的输出所示。但是数据库探测意味着Postgres在数据库准备好之前不会收到任何流量，如果Postgres服务器失败，则数据库Pod将重新启动，使用Pod中EmptyDir卷中的相同数据文件进行替换。
 
 ![图 12.6](images/Figure12.6.png)
-<center>图 12.6 Probes are firing and returning healthy responses, so the app works in the usual way</center>
+<center>图12.6 探针正在触发并返回健康的响应，因此应用程序以通常的方式工作</center>
 
-Container probes can also keep an application running if an update goes wrong. There’s a new database spec for the to-do app that upgrades the version of Postgres, but it also overrides the container command, so it sleeps instead of starting Postgres. This is a classic left-over-from-debugging mistake: someone wanted to start a Pod with the correct configuration but without running the app so they could run a shell inside the container to check the environment, but they didn’t revert their change. If the Pod  didn’t have any probes, the update would succeed and take down the app. The sleep command keeps the Pod container running, but there’s no database server for the website to use. The probes stop that happening and keep the app available.
+容器探测还可以在更新出错时保持应用程序运行。待办事项应用程序有一个新的数据库 spec，它升级了Postgres的版本，但它也覆盖了容器命令，所以它会休眠而不是启动Postgres。这是一个典型的调试遗留错误:有人想用正确的配置启动Pod，但没有运行应用程序，这样他们就可以在容器中运行shell来检查环境，但他们没有恢复他们的更改。如果Pod没有任何探测，更新将成功并关闭应用程序。sleep命令保持Pod容器运行，但没有数据库服务器供网站使用。探测会阻止这种情况发生，并保持应用程序可用。
 
-TRY IT NOW
-Deploy the bad update, and verify that the failing probes in the new Pod prevent the original Pod from being removed.
+现在试试吧,部署坏的更新，并验证新Pod中失败的探测阻止了原始Pod被删除。
 
 ```
-# apply the update:
+# 部署更新:
 kubectl apply -f todo-list/db/update/todo-db-bad-command.yaml
-# watch the Pod status changing:
+# 监控 Pod 状态变更:
 kubectl get pods -l app=todo-db --watch
-# refresh the app to check that it still works
+# 刷新应用确认应用还正常工作
 # ctrl-c or cmd-c to exit the Kubectl watch
 ```
 
-You can see my output in figure 12.7. The replacement database Pod is created, but it never enters the ready state because the readiness probe checks port 5342 for a process listening, and there isn’t one. The Pod will keep restarting, too, because the liveness probe runs a command that checks that Postgres is ready to receive client connections. While the new Pod keeps failing, the old one is left running, and the app keeps working.
-
-If you leave this app running for another five minutes or so and check the Pod status again, you’ll see the new Pod goes into the CrashLoopBackOff status. This is how Kubernetes protects the cluster from wasting compute resources on applications that constantly fail: it adds a time delay between Pod restarts, and that delay increases with each restart. If you see a Pod in  CrashLoopBackOff, it usually means the app is beyond repair.
-
-The to-do app is in the same situation now that we first saw in chapter 9 when rollouts fail. The Deployment is managing two ReplicaSets, and its goal is to scale down the old one to zero as soon as the new one is up to capacity. But the new ReplicaSet
-never reaches capacity, because the probes in the new Pod constantly fail. The Deployment stays like this, hoping it can  eventually finish the rollout. Kubernetes doesn’t have an automatic rollback option, but Helm does, and you can extend your Helm charts to support healthy upgrades.
+可以在图12.7中看到我的输出。创建了替换数据库Pod，但它永远不会进入就绪状态，因为就绪探测检查端口5342是否有进程在监听，但没有。Pod也会不断重新启动，因为 liveness 探测会运行一个命令来检查Postgres是否准备好接收客户端连接。虽然新的Pod不断出现故障，但旧的Pod仍在运行，应用程序也在继续工作。
 
 ![图 12.7](images/Figure12.7.png)
-<center>图 12.7 Rollouts wait for new Pods to become ready, so probes protect against failed updates</center>
+<center>图12.7 rollout等待新的pod准备就绪，因此探针保护失败的更新</center>
+
+如果你让这个应用程序再运行五分钟左右，然后再次检查Pod状态，你会看到新的Pod进入CrashLoopBackOff状态。这就是Kubernetes如何保护集群不浪费计算资源在不断失败的应用程序上:它在Pod重新启动之间增加了一个时间延迟，并且这个延迟随着每次重新启动而增加。如果你在CrashLoopBackOff中看到Pod，这通常意味着应用程序无法修复。
+
+待办事项应用程序现在的情况与我们在第9章中首次看到的rollout失败相同。Deployment正在管理两个ReplicaSets，它的目标是在新的ReplicaSets达到容量后，将旧的ReplicaSets缩小到零。但是新的ReplicaSet
+永远不会达到容量，因为新Pod中的探针不断失效。部署就这样，希望它最终能完成部署。Kubernetes没有自动回滚选项，但Helm有，您可以扩展Helm Chart 以支持健康升级。
 
 ## 12.3 使用 Helm 安全地部署升级
 
