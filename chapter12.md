@@ -222,120 +222,110 @@ kubectl get pods -l app=todo-db --watch
 
 ## 12.3 使用 Helm 安全地部署升级
 
-A little bit of Helm goes a long way. You learned the basics in chapter 10, and you don’t need to dig too deeply into the templating  functions and the dependency management to make good use of Helm for safe application upgrades. Helm supports atomic  installs and upgrades, which automatically roll back if they fail, and it also has a deployment life cycle you can hook into to run validation jobs before and after installation.
+有 Helm 的话帮助就很大了。您已经在第10章学习了基本知识，不需要深入了解模板函数和依赖管理，就可以很好地利用Helm进行安全的应用程序升级。Helm支持原子安装和升级，如果失败会自动回滚，而且它还有一个部署生命周期，可以在安装前后运行验证作业。
 
-The source folder for this chapter has multiple Helm charts for the to-do app, which represent different versions (normally that would be a single Helm chart that evolves with each release). The version 1 chart deploys the app using the same liveness and  readiness checks we used in section 12.2; the only difference is that the database uses a PersistentVolumeClaim, so data is preserved between upgrades. We’ll start by clearing down the previous exercises and installing the Helm version.
+本章的源文件夹有多个用于待办事项应用程序的Helm Chart，它们代表不同的版本(通常情况下，每个版本都有一个单独的Helm Chart)。版本1 chart使用我们在第12.2节中使用的相同的 liveness和 readiness 检查来部署应用程序;唯一的区别是数据库使用PersistentVolumeClaim，因此数据在升级之间被保留。我们将从清理之前的练习和安装Helm版本开始。
 
-TRY IT NOW
-Run the to-do app using the same Pod specs but deployed using a Helm chart.
+现在试试吧,使用相同的Pod spec 运行待办事项应用程序，但使用 Helm chart 进行部署。
 
 ```
-# remove all existing apps from the chapter:
+# 删除章节已存在的应用:
 kubectl delete all -l kiamol=ch12
-# install the Helm release:
+# 安装 Helm release:
 helm install --atomic todo-list todo-list/helm/v1/todo-list/
-# browse to the app, and add a new item
+# 访问应用，添加新的数据项
 ```
 
-Version 1 of the app is now running through Helm, and there’s nothing new here except that the chart contains a file in the templates folder called NOTES.txt, which displays the helpful text you see after installation. My output is shown in figure 12.8. I
-haven’t included an application screenshot, so you’ll just have to take my word that I browsed and added an item saying “finish chapter 12.”
+该应用的 Version 1 现在正在Helm上运行，除了 chart 在模板文件夹中包含一个名为NOTES.txt的文件外，这里没有什么新内容，该文件显示了安装后看到的有用文本。我的输出如图12.8所示。我没有附上应用程序的截图，所以你只需要相信我的话，我浏览了并添加了一个条目，上面写着“完成第12章”。
 
-![图 12.8](images/Figure12.8.png)
-<center>图 12.8 Installing apps with Helm waits for container probes to be healthy</center>
+![图12.8](images/Figure12.8.png)
+<center>图12.8 使用Helm安装应用程序等待容器探测器正常运行</center>
 
-Version 2 of the Helm chart attempts the same database image upgrade we saw in section 12.2, complete with the misconfiguration in the command for the Postgres container. When you deploy this with Helm, the same thing happens under the hood: Kubernetes updates the Deployment, which adds a new ReplicaSet, and that ReplicaSet never reaches capacity because the Pod readiness probe fails. But Helm checks the status of the rollout, and if it doesn’t succeed within a specific period, it  automatically rolls back.
+Helm chart 的 Version 2 尝试了我们在第12.2节中看到的相同的数据库镜像升级，完成了Postgres容器命令中的错误配置。当您使用 Helm 部署它时，同样的事情在底层发生:Kubernetes更新部署，这添加了一个新的ReplicaSet，并且ReplicaSet永远不会达到容量，因为Pod readiness 探测失败。但是Helm会检查 rollout 的状态，如果在特定的时间内没有成功，它会自动回滚。
 
-TRY IT NOW
-Upgrade the to-do app release using Helm. The upgrade fails because the Pod spec is misconfigured, and Helm rolls it back.
+现在试试吧, 使用Helm升级待办事项应用程序发布。升级失败是因为 Pod spec 配置错误，Helm 将其回滚。
 
 ```
-# list the current Pod status and container image:
-kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata
-.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image
-# upgrade the release with Helm—this will fail:
-helm upgrade --atomic --timeout 30s todo-list todo-list/helm/v2/todo-
-list/
-# list the Pods again:
-kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata
-.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image
-# browse back to the app, and refresh the list
+# 列出当前 Pod 状态以及容器镜像信息:
+kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image
+# 通过 helm 升级 release—将会失败:
+helm upgrade --atomic --timeout 30s todo-list todo-list/helm/v2/todo-list/
+# 再次列出 Pods:
+kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image
+# 访问应用，刷新列表
 ```
 
-If you check the Pod list a few times in that exercise, you’ll see the rollback happening, as you can see in figure 12.9. At first,  there’s a single Pod running Postgres 11.6, and then it’s joined by a new Pod running 11.8, but that’s the Pod with the failing container probes. The Pod isn’t ready within the Helm timeout period, so the upgrade is rolled back, and the new Pod is removed; it doesn’t keep restarting and hit CrashLoopBackOff as it did with the kubectl update.
+如果在该练习中检查 Pod 列表几次，就会看到发生了回滚，如图12.9所示。起初，只有一个运行Postgres 11.6的Pod，然后加入了一个运行11.8的新Pod，但那是一个容器探测失败的Pod。Pod在Helm超时时间内没有准备好，因此升级回滚，新的 Pod 被移除;它不会像kubectl更新那样不断重新启动并命中CrashLoopBackOff。
 
-The to-do app has been online without interruption or reduced capacity during the failed upgrade to version 2. The next version fixes the upgrade by removing the bad container command in the Pod spec, and it also adds an extra template for a Kubernetes  Job, which you can run as a deployment test with Helm. Tests run on demand and not as part of the install, so they’re perfect for smoke tests—automated test suites that you run to confirm that a successful release is working correctly. Listing 12.4 shows a test for the to-do database.
+![图 12.9](images/Figure12.9.png)
+<center>图 12.9 升级失败，因为新的 Pod 还没有准备好，Helm 回滚</center>
 
-> Listing 12.4 todo-db-test-job.yaml, a Kubernetes Job to run as a Helm test
+在升级到版本 2 失败期间，待办事项应用程序一直在线，没有中断或减少容量。下一个版本通过删除Pod spec 中的坏容器命令修复了升级，它还为 Kubernetes Job添加了一个额外的模板，您可以使用 Helm 作为部署测试运行。测试按需运行，而不是作为安装的一部分，因此它们非常适合烟雾测试—您可以运行这些自动化测试套件来确认成功的发行版正在正确运行。清单 12.4 显示了待办事项数据库的测试。
+
+> 清单 12.4 todo-db-test-job.yaml, Kubernetes Job 作为 Helm 测试运行
 
 ```
 apiVersion: batch/v1
-kind: Job # This is a standard Job spec.
+kind: Job # 这个是标准的 Job spec
 metadata:
-  # metadata includes name and labels
+  # metadata 包括 name 和 labels
   annotations:
-    "helm.sh/hook": test # Tells Helm the Job can be run in the test
-spec: # suite for the release
+    "helm.sh/hook": test # 告诉Helm Job可以在发布的测试套件中运行
+spec: 
   completions: 1
-  backoffLimit: 0 # The Job should run once and not retry.
+  backoffLimit: 0 # 作业应该运行一次，而不是重试。
 ```
-
-![图 12.9](images/Figure12.9.png)
-<center>图 12.9 The upgrade fails because the new Pod doesn’t become ready, and Helm rolls back</center>
 
 ```
 template:
-  spec: # The container spec runs a SQL query.
+  spec: # 容器 spec 运行一个 sql 查询
 	containers:
 	  - image: postgres:11.8-alpine
 	    command: ["psql", "-c", "SELECT COUNT(*) FROM \"public\".\"ToDos\""]
 ```
 
-We met Jobs in chapter 8, and Helm makes good use of them. Job specs include an expectation of how many times they should run to successful completion, and Helm uses that to evaluate if the test succeeds. The version 3 upgrade should succeed, and when it completes, you can run the test Job, which runs a SQL statement to confirm the to-do database is accessible.
+我们在第 8 章中用到了 Jobs，helm 很好地利用了他们。Job specs 包括期望运行多少次才能成功完成，Helm 使用该期望来评估测试是否成功。版本 3 升级应该会成功，当它完成时，您可以运行测试 Job，它将运行一条 SQL 语句来确认待办事项数据库是可访问的。
 
-TRY IT NOW
-Upgrade to the version 3 chart, which fixes the Postgres update. Then run the test with Helm, and check the logs for the Job Pod.
+现在试试吧，升级到版本 3 chart，修复Postgres更新。然后用 Helm 运行测试，并检查 Job Pod 的日志。
 
 ```
-# run the upgrade:
+# 执行升级:
 helm upgrade --atomic --timeout 30s todo-list todo-list/helm/v3/todo-list/
 
-# list the database Pods and images:
+# 列出数据库 Pods 和镜像:
 kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image,IP:.status.podIPs[].ip
 
-# check the database Service endpoints:
+# 检查数据库 Service 端点:
 kubectl get endpoints todo-list-db
 
-# now run the test Job with Helm:
+# 现在使用 helm 运行 test job:
 helm test todo-list
 
-# check the output:
+# 检查输出:
 kubectl logs -l job-name=todo-list-db-test
 ```
 
-I’ve snipped my output in figure 12.10, but the detail is all there—the upgrade is successful, but there are no tests as part of the upgrade command. The database is now
+我在图12.10中截取了我的输出，但是细节都在那里——升级成功了，但是没有作为升级命令一部分的测试。数据库现在使用升级版的Postgres，当测试运行时，Job连接到数据库并确认数据仍然存在。
 
 ![图 12.10](images/Figure12.10.png)
-<center>图 12.10 Running test suites on demand with Helm lets you smoke-test your app at any time</center>
+<center>图 12.10 使用Helm按需运行测试套件，让您可以随时对应用进行冒烟测试</center>
 
-using the upgraded version of Postgres, and when the test runs, the Job connects to
-the database and confirms the data is still there.
+Helm 为你管理 Jobs。它不会清理已完成的作业，因此如果需要，您可以检查Pod状态和日志，但是当您重复测试命令时，它会替换它们，因此您可以随时重新运行测试套件。job还有另一个用途，它有助于确保升级是安全的，在升级之前运行它们，这样您就可以检查当前版本是否处于可以升级的有效状态。
 
-Helm manages Jobs for you. It doesn’t clean up completed Jobs, so you can check the Pod status and logs if you need to, but it replaces them when you repeat the test command, so you can rerun the test suite as often as you like. There’s one other use for Jobs that helps to make sure upgrades are safe, by running them before upgrades so you can check the current release is in a  valid state to be upgraded.
+如果你的应用程序支持多个版本，但只支持增量升级，那么这个功能就特别有用，所以版本1.1需要先升级到版本1.2，然后才能升级到版本2。这样做的逻辑可能涉及到查询不同服务的API版本或数据库的模式版本，Helm 可以在一个Job中运行，该Job可以访问所有其他Kubernetes对象，这些对象与应用程序Pods共享相同的ConfigMaps和Secrets。清单12.5显示了版本4中的待办事项Helm chart 的升级前测试。
 
-This capability is especially useful if you support multiple versions of your app, but only with incremental upgrades, so version 1.1  needs to upgrade to version 1.2 before it can upgrade to version 2. The logic for this might involve querying the API version for  different services or the schema version of a database, and Helm can run it all in a Job that has access to all the other Kubernetes objects sharing the same ConfigMaps and Secrets as the application Pods. Listing 12.5 shows a pre-upgrade test in version 4 of  the to-do Helm chart.	
-
-> Listing 12.5 todo-db-check-job.yaml, a Job that runs before a Helm upgrade
+> 清单 12.5 todo-db-check-job.yaml, 在 helm 升级前运行的 job
 
 ```
 apiVersion: batch/v1
-kind: Job # The standard Job spec again
+kind: Job # 标准的 job spec
 metadata:
   # metadata has name and labels
   annotations:
-	"helm.sh/hook": pre-upgrade # This runs before an upgrade and
-	"helm.sh/hook-weight": "10" # tells Helm the order in which to create
-spec: # the object after the ConfigMap
-  template: # that the Job requires
+	"helm.sh/hook": pre-upgrade # 它在升级之前运行，并告诉Helm创建的顺序
+	"helm.sh/hook-weight": "10" 
+spec: 
+  template: 
 	spec:
 	  restartPolicy: Never
 	  containers:
@@ -343,38 +333,34 @@ spec: # the object after the ConfigMap
 		# env includes secrets
 		command: ["/scripts/check-postgres-version.sh"]
 		volumeMounts:
-		  - name: scripts # Mounts the ConfigMap volume
+		  - name: scripts 
 		    mountPath: "/scripts"
 ```
 
-There are two templates for the pre-upgrade check: one is the Job spec, and the other is a ConfigMap that contains the script to run in the Job. You use annotations to control where Jobs need to run in the Helm life cycle, and this Job will run only for upgrades, not as part of a new install. The weighting annotations make sure the ConfigMap is created before the Job. Life cycles and weights let you model complex validation steps in Helm, but this one is simple—it upgrades the database image but only if
-the release is currently running version 11.6.
+升级前检查有两个模板:一个是 Job spec，另一个是 ConfigMap，其中包含要在 Job 中运行的脚本。您可以使用注释来控制 Helm 生命周期中需要运行Job的位置，并且此Job仅在升级时运行，而不是作为新安装的一部分运行。权重注释确保在Job之前创建ConfigMap。生命周期和权重让您可以在Helm中建模复杂的验证步骤，但是这个很简单——它升级数据库镜像，但前提是该版本目前运行的是11.6版本。
 
-TRY IT NOW
-The upgrade from version 3 to version 4 isn’t valid because version 3 has already upgraded the Postgres version. Run the upgrade to verify that it doesn’t get deployed.
+现在试试吧，从版本3升级到版本4无效，因为版本3已经升级了Postgres版本。运行升级以验证它没有被部署。
 
 ```
-# run the upgrade to version 4—this will fail:
+# 运行升级到 version 4— 将会失败:
 helm upgrade --atomic --timeout 30s todo-list todo-list/helm/v4/todo-list/
 
-# list the Jobs:
+# 列出 Jobs:
 kubectl get jobs --show-labels
 
-# print the output of the pre-upgrade Job:
+# 输出 pre-upgrade job 的日志输出:
 kubectl logs -l job-name=todo-list-db-check
 
-# confirm that the database Pod is unchanged:
+# 确认 database pod 并没有变化:
 kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata.name,STATUS:.status.phase,IMAGE:.spec.containers[0].image
 ```
 
-In this exercise, you’ll see that Helm effectively blocks the upgrade, because the preupgrade hook runs and the Job fails. That’s all recorded in the history for the release, which will show that the latest upgrade failed and the release was rolled back to the last  good revision. My output is shown in figure 12.11, and throughout this update, the app was still available.
-
-It’s good to understand what Helm brings in terms of keeping your applications healthy, because pre-upgrade validation and automatic rollbacks help to keep your application upgrades self-healing, too. Helm isn’t a prerequisite for that, but if you’re
+在本练习中，您将看到Helm有效地阻止了升级，因为升级前钩子运行并且Job失败。这些都记录在发行版的历史记录中，这将显示最新的升级失败，并且发行版已回滚到最后一个良好的修订。我的输出如图12.11所示，在整个更新过程中，应用程序仍然可用。
 
 ![图 12.11](images/Figure12.11.png)
-<center>图 12.11 Pre-upgrade Jobs in Helm charts let you validate that the release is suitable to upgrade</center>
+<center>图12.11 Helm chart 中的升级前作业让您验证版本适合升级</center>
 
-not using Helm, you should consider implementing these features using kubectl in your deployment pipeline. There’s one more part of application health that we’ll cover in this chapter— managing the compute resources available to your Pod containers.
+了解Helm在保持应用程序健康方面所带来的好处是有益的，因为升级前验证和自动回滚也有助于保持应用程序升级的自我修复。Helm不是这样做的先决条件，但如果您不使用Helm，则应该考虑在部署管道中使用kubectl实现这些特性。在本章中，我们还将介绍应用程序运行状况的另一部分——管理Pod容器可用的计算资源。
 
 ## 12.4 通过 resource limits 保护应用和节点
 
