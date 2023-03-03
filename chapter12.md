@@ -364,43 +364,42 @@ kubectl get pods -l app=todo-list-db -o=custom-columns=NAME:.metadata.name,STATU
 
 ## 12.4 通过 resource limits 保护应用和节点
 
-Containers are a virtualized environment for your application process. Kubernetes builds that environment, and you know that Kubernetes creates the container filesystem and sets up networking. The container environment also includes memory and CPU, and those can be managed by Kubernetes, too, but by default, they’re not. That means Pod containers get access to all the  memory and CPU on the node where they’re running, which is bad for two reasons: apps can max out on memory and crash, or they can starve the node of resources so other apps can’t run.
+容器是应用程序进程的虚拟环境。Kubernetes构建了该环境，并且您知道Kubernetes创建了容器文件系统并设置了网络。容器环境还包括内存和CPU，这些也可以由Kubernetes管理，但默认情况下，它们不是。这意味着Pod容器可以访问它们正在运行的节点上的所有内存和CPU，这是不好的，原因有两个:应用程序可能会耗尽内存并崩溃，或者它们会耗尽节点的资源，从而使其他应用程序无法运行。
 
-You can limit the resources available to a container in the Pod spec, and those limits are like container probes—you really shouldn’t go to production without them. Apps with memory leaks can ruin your cluster very quickly, and causing a CPU spike is a nice, easy attack vector for intruders. In this section, you’ll learn how to spec your Pods to prevent that, and we’ll start with a new  app that has a large appetite for memory.
+您可以在 Pod spec 中限制容器的可用资源，这些限制就像容器探针一样——如果没有它们，您真的不应该进入生产环境。有内存泄漏的应用程序可以很快地破坏您的集群，导致 CPU 峰值对入侵者来说是一个很好的、容易的攻击向量。在本节中，您将学习如何配置您的 Pods 来防止这种情况，我们将从一个内存需求很大的新应用程序开始。
 
-TRY IT NOW
-Clear down from the last exercise, and run the new app—it doesn’t do anything other than allocate memory and log how much it has allocated. This Pod runs without any container limits.
+现在试试吧,从上一个练习中清除，并运行新的应用程序—除了分配内存和记录已分配的内存量外，它什么也不做。这个Pod运行没有任何容器限制。
 
 ```
-# remove the Helm release to free up resources:
+# 删除 helm release 释放资源:
 helm uninstall todo-list
 
-# print how much memory your nodes have:
+# 打印你的节点拥有多少内存可分配:
 kubectl get nodes -o jsonpath='{.items[].status.allocatable.memory}'
 
-# deploy the memory-allocating app:
+# 部署内存分配应用程序:
 kubectl apply -f memory-allocator/
 
-# wait a few minutes, and then see how much memory it has allocated:
+# 等待几分钟，然后查看它分配了多少内存:
 kubectl logs -l app=memory-allocator --tail 1
 ```
 
-The memory-allocator app grabs about 10 MB of memory every five seconds, and it will keep going until it uses all the memory in your lab cluster. You can see from my output in figure 12.12 that my Docker Desktop node has access to about 25 GB of memory, and the allocator app had grabbed almost 1.5 GB when I took the screenshot.
+内存分配器应用程序每5秒就会获取大约 10mb 的内存，并且它将一直持续下去，直到用完实验室集群中的所有内存。您可以从图12.12中的输出中看到，我的Docker Desktop节点可以访问大约25 GB的内存，而在我截屏时，allocator应用程序已经占用了近1.5 GB的内存。
 
-As long as the app is running, it will keep allocating memory, so we need to get on quickly before my machine dies and I lose the edits to this chapter. Listing 12.6 shows an updated Pod spec that includes resource limits, restricting the app to 50 MB of  memory.
+只要应用程序在运行，它就会继续分配内存，所以我们需要在我的机器死机之前快速启动，以免我失去对这一章的编辑。清单12.6显示了一个更新的Pod spec，其中包括资源限制，将应用程序的内存限制在50 MB。
 
 ![图 12.12](images/Figure12.12.png)
-<center>图 12.12 Don’t run this app in production— it just keeps allocating memory until it has it all</center>
+<center>图 12.12 不要在生产环境中运行这个应用程序——它会一直分配内存，直到拥有所有内存为止</center>
 
-> Listing 12.6 memory-allocator-with-limit.yaml, adding memory limits to the container
+> 清单 12.6 memory-allocator-with-limit.yaml, 添加 memory limits 到容器
 
 ```
-spec: # The Pod spec in the Deployment
+spec: # Deployment 中的  Pod spec
   containers:
 	- image: kiamol/ch12-memory-allocator
 	  resources:
-	    limits: # Resource limits constrain the compute power
-		  memory: 50Mi # for the container; this limits RAM to 50 MB.
+	    limits: # resources limits 限制了容器的计算能力;这将 RAM 限制在50 MB。
+		  memory: 50Mi
 ```
 
 Resources are specified at the container level, but this is a new Pod spec, so when you deploy the update, you’ll get a new Pod. The replacement will start off with zero memory allocated, and it will start allocating 10 MB every five seconds again. Now,  however, it will hit a limit at 50 MB, and Kubernetes will take action.
@@ -408,100 +407,98 @@ Resources are specified at the container level, but this is a new Pod spec, so w
 TRY IT NOW
 Deploy an update to the memory-allocator app with the resource limits defined in listing 12.6. You should see the Pod is restarted, but only if your Linux host is running without swap memory enabled. K3s doesn’t have that setup (unless you’re using the Vagrant VM setup), so you won’t see the same results as Docker Desktop or a cloud Kubernetes service.
 
+资源是在容器级别指定的，但这是一个新的Pod spec，所以当您部署更新时，您将得到一个新的Pod。替换开始时没有分配内存，然后每隔5秒重新分配10mb。然而，现在它将达到50mb的限制，Kubernetes将采取行动。
+
+现在试试吧,使用清单12.6中定义的资源限制将更新部署到内存分配器应用程序。您应该看到Pod已重新启动，但前提是您的Linux主机在没有启用交换内存的情况下运行。K3s没有这个设置(除非你使用Vagrant VM设置)，所以你不会看到与Docker Desktop或云Kubernetes服务相同的结果。
+
 ```
-# appy the update:
+# 应用更新:
 kubectl apply -f memory-allocator/update/memory-allocator-with-limit.yaml
 
-# wait for the app to allocate a chunk of memory:
+# 等待应用程序分配内存块:
 sleep 20
 
-# print the application logs:
+# 打印应用日志:
 kubectl logs -l app=memory-allocator --tail 1
 
-# watch the status of the Pod:
+# 查看 Pod 状态:
 kubectl get pods -l app=memory-allocator --watch
 ```
 
-In this exercise, you’ll see that Kubernetes enforces the memory limit: when the app tries to allocate more than 50 MB of memory, the container is replaced, and you can see the Pod enters the OOMKilled status. Exceeding the limit causes a Pod restart, so this has the same drawback as a failing liveness probe—if the replacement containers keep failing, the Pod restarts will take longer and longer as Kubernetes applies CrashLoopBackOff, as you see in figure 12.13.
+在本练习中，您将看到Kubernetes强制执行内存限制:当应用程序试图分配超过50mb的内存时，容器将被替换，您可以看到Pod进入OOMKilled状态。超过限制会导致Pod重新启动，因此这与失败的 liveiness探测有相同的缺点——如果替换容器一直失败，随着Kubernetes应用CrashLoopBackOff, Pod重新启动将花费越来越长的时间，如图12.13所示。
 
 ![图 12.13](images/Figure12.13.png)
-<center>图 12.13 Memory limits are hard limits—if a container exceeds them, it gets killed and the Pod restarts</center>
+<center>图 12.13 内存限制是硬性限制——如果容器超过了这些限制，它将被杀死，Pod将重新启动</center>
 
-The hard part of applying resource constraints is working out what the limits should be. You’ll need to factor in some performance testing to see what your app can manage with—be aware that some application platforms will grab more than they need if they see lots of available memory. You should be generous with your initial releases and then look to bring the limits  down as you get more feedback from your monitoring.
+应用资源约束的困难之处在于确定限制应该是什么。您需要考虑一些性能测试，以了解您的应用程序可以管理什么—要注意，如果某些应用程序平台看到大量可用内存，它们会占用超过所需的内存。您应该宽宏大量地发布初始版本，然后随着您从监视中获得更多反馈，逐渐降低限制。
 
-You can apply resource limits in another way, too—by specifying maximum quotas for a namespace. This method is especially useful for shared clusters where you use namespaces to divide the cluster for different teams or environments; you can enforce limits on the total amount of resources the namespace can use. Listing 12.7 shows the spec for a ResourceQuota object, which restricts the total amount of memory available to 150 MB in the namespace called kiamol-ch12-memory.
+您还可以以另一种方式应用资源限制——为命名空间指定最大配额。这种方法对于使用命名空间为不同团队或环境划分集群的共享集群特别有用;您可以强制限制命名空间可以使用的资源总量。清单12.7显示了ResourceQuota对象的 spec，它将名为kiamol-ch12-memory 的命名空间中的可用内存总量限制在150 MB。
 
-> Listing 12.7 02-memory-quota.yaml, setting memory quota for a namespace
+> 清单 12.7 02-memory-quota.yaml, 为命名空间设置内存配额
 
 ```
 apiVersion: v1
-kind: ResourceQuota # The ResourceQuota is applied
-metadata: # at the specified namespace.
+kind: ResourceQuota # ResourceQuota 生效在指定的命名空间
+metadata: 
   name: memory-quota
   namespace: kiamol-ch12-memory
 spec:
-  hard: # Quotas can include CPU and memory.
+  hard: # 配额包括 CPU 和内存
 	limits.memory: 150Mi
 ```
 
-Container limits are reactive, so Pods are restarted when the memory limit is exceeded. Because resource quotas are proactive, Pods won’t be created if the limits they specify exceed what’s available in the quota. If there’s a quota in place, then every Pod  spec needs to include a resource section so Kubernetes can compare what the spec needs to what’s currently available in the  namespace. An updated version of the memory-allocator spec to demonstrate that follows, where the Pod specifies a limit that is greater than the quota.
+容器限制是反应性的，因此当内存限制超过时 pod 将重新启动。因为资源配额是主动的，所以如果 pod 指定的限制超过了配额中的可用容量，则不会创建pod。如果有配额，那么每个Pod spec 都需要包含一个资源部分，这样Kubernetes就可以将规范需要的资源与命名空间中当前可用的资源进行比较。下面是内存分配器 spec 的更新版本，其中Pod指定了一个大于配额的限制。
 
-TRY IT NOW
-Deploy a new version of the memory allocator in its own namespace with a resource quota applied.
+现在试试吧,在应用了资源配额的命名空间中部署内存分配器的新版本。
 
 ```
-# delete the existing app:
+# 删除之前的应用:
 kubectl delete deploy memory-allocator
 
-# deploy namespace, quota, and new Deployment:
+# 部署 namespace, quota, 以及新的 Deployment:
 kubectl apply -f memory-allocator/namespace-with-quota/
 
-# print the staus of the ReplicaSet:
+# 打印 ReplicaSet 的状态:
 kubectl get replicaset -n kiamol-ch12-memory
 
-# show the events in the ReplicaSet:
+# 查看 RepicaSet 的 events:
 kubectl describe replicaset -n kiamol-ch12-memory
 ```
 
-You’ll see from the output of the ReplicaSet that it has zero Pods out of a desired total of one. It can’t create the Pod because it would exceed the quota for the namespace, as you can see in figure 12.14. The controller keeps trying to create the Pod, but it
-won’t succeed unless enough quota becomes available, such as from other Pods terminating, but in this case there aren’t any, so it would need to be an update to the quota. Kubernetes can also apply CPU limits to containers and quotas, but they work in a
-slightly different way. Containers with a CPU limit run with a fixed amount of processing power, and they can use as much of that CPU as they like—they aren’t replaced if they hit the limit. You can limit a container to one half of a CPU core, and it can run at  100% CPU while all the other cores on the node remain idle and available for other
+您将从 ReplicaSet 的输出中看到，它有 0 个pod，而所需的总数是 1 个。它不能创建 Pod，因为它会超过命名空间的配额，如图12.14所示。控制器一直尝试创建Pod，但它不会成功，除非有足够的配额可用，比如其他 Pod 终止，但在这种情况下，没有任何配额，因此需要更新配额。Kubernetes还可以将CPU限制应用于容器和配额，但它们的工作方式略有不同。具有CPU限制的容器以固定数量的处理能力运行，并且它们可以使用任意数量的CPU—如果达到限制，则不会替换它们。您可以将容器限制为CPU核心的一半，它可以在100% CPU的情况下运行，而节点上的所有其他内核保持空闲并可用于其他容器。计算Pi是一个计算密集型操作，我们可以看到在书中之前使用过的Pi应用程序上应用CPU限制的影响。
 
 ![图 12.14](images/Figure12.14.png)
-<center>图 12.14 Quotas with hard limits prevent Pods being created if they would exceed the quota</center>
+<center>图 12.14 具有硬限制的配额可以防止在 pod 超过配额时创建 pod</center>
 
-containers. Calculating Pi is a compute-intensive operation, and we can see the effect of applying a CPU limit on the Pi application we’ve used before in the book.
-
-TRY IT NOW
-Run the Pi application with and without CPU limits, and compare its performance.
+现在试试吧,在有和没有CPU限制的情况下运行Pi应用程序，并比较其性能。
 
 ```
-# show the total CPU available to the nodes:
+# 显示节点可用的总CPU:
 kubectl get nodes -o jsonpath='{.items[].status.allocatable.cpu}'
 
-# deploy Pi without any CPU limits:
+# 部署Pi没有任何CPU限制:
 kubectl apply -f pi/
 
-# get the URL for the app:
+# 获取访问 url:
 kubectl get svc pi-web -o jsonpath='http://{.status.loadBalancer
 .ingress[0].*}:8012/?dp=50000'
 
-# browse to the URL, and see how long the calculation takesFigure
+# 浏览到URL，并查看计算需要多长时间
 
-# now update the Pod spec with a CPU limit:
+# 现在更新Pod spec 与CPU限制:
 kubectl apply -f pi/update/web-with-cpu-limit.yaml
 
-# refresh the Pi app, and see how long the calculation takes
+# 刷新Pi应用程序，看看计算需要多长时间
 ```
 
-My output is shown in figure 12.15. Your timings will be different, depending on how much CPU is available on your node. Mine has eight cores, and with no limits, the app calculates Pi to 50,000 decimal places consistently within 3.4 seconds. After the update, the app container is limited to one quarter of one core, and the same calculation takes 14.4 seconds.
+我的输出如图12.15所示。计时将有所不同，这取决于您的节点上有多少CPU可用。我的应用有8个内核，而且没有限制，它能在3.4秒内连续计算圆周率到小数点后5万位。更新后，应用程序容器被限制为一个核心的四分之一，同样的计算需要14.4秒。
 
 ![图 12.15](images/Figure12.15.png)
-<center>图 12.15 Squint and you’ll see that limiting CPU has an impact on calculation speed</center>
+<center>图 12.15 眯着眼看，你会发现限制CPU对计算速度有影响</center>
 
-Kubernetes defines CPU limits using a fixed unit, where one represents a single core. You can use multiples to give your app container access to many cores or divide a single core into “millicores,” where one millicore is one-thousandth of a core. Listing 12.8 shows the CPU limit applied to the Pi container from the previous exercise, where 250 millicores is one quarter of one core.
+Kubernetes 使用一个固定的单位来定义 CPU 限制，其中一个代表一个单核。你可以使用倍数来让你的应用程序容器访问多个内核，或者将单个内核划分为“毫核”，其中一毫核是一个内核的千分之一。清单12.8显示了应用于上一练习中的Pi容器的CPU限制，其中250毫核是一个核的四分之一。
 
-> Listing 12.8 web-with-cpu-limit.yaml
+> 清单 12.8 web-with-cpu-limit.yaml
 
 ```
 spec:
@@ -510,43 +507,40 @@ spec:
 	  command: ["dotnet", "Pi.Web.dll", "-m", "web"]
 	  resources:
 		limits:
-		  cpu: 250m # 250 millicores limits the container to 0.25 cores.
+		  cpu: 250m # 250 豪核限制容器占用 四分之一核
 ```
 
-I’m focusing on one resource at a time so you can clearly see the impact, but typically you should include both CPU and memory  limits so your apps don’t surge and starve the cluster. Resource specs can also include a requests section, which states how much
-CPU and memory the container is expected to use. That helps Kubernetes decide which node should run the Pod, and we’ll cover it more when we get to scheduling in chapter 18.
+我一次只关注一种资源，这样你就能清楚地看到影响，但通常你应该包括CPU和内存的限制，这样你的应用程序就不会激增和耗尽集群。资源 specs 还可以包括请求部分，它说明容器预计使用多少CPU和内存。这有助于Kubernetes决定哪个节点应该运行Pod，我们将在第18章讨论调度时详细介绍。
 
-We’ll finish this chapter with one more exercise to show how CPU limits can be applied to a quota for a namespace and what it means when the quota is exceeded. The new spec for the Pi application tries to run two replicas with 300 millicore CPU limits in a namespace that has a quota with a maximum of 500 millicores.
+我们将用另一个练习来结束本章，演示如何将CPU限制应用于名称空间的配额，以及超过配额时的含义。Pi应用程序的新规范尝试在一个具有最大500毫核配额的命名空间中运行两个具有300毫核CPU限制的副本。
 
-TRY IT NOW
-Run an updated Pi application in its own namespace, which has a CPU quota applied.
+现在试试吧,在其自己的命名空间中运行更新后的Pi应用程序，该名称空间应用了CPU配额。
 
 ```
-# remove the existing app:
+# 删除存量 app:
 kubectl delete deploy pi-web
 
-# deploy the namespace, quota, and new app spec:
+# 部署 namespace, quota, 以及新的 app spec:
 kubectl apply -f pi/namespace-with-quota/
 
-# print the ReplicaSet status:
+# 输出 ReplicaSet status:
 kubectl get replicaset -n kiamol-ch12-cpu
 
-# list the endpoints for the Service:
+# 列出 Service 的 endpoints:
 kubectl get endpoints pi-web -n kiamol-ch12-cpu
 
-# show the events for the ReplicaSet:
+# 显示 RepicaSet 的 events:
 kubectl describe replicaset -n kiamol-ch12-cpu
 ```
 
-In this exercise, you can see that quotas apply across all Pods in the namespace. The ReplicaSet is running with one Pod instead of two, because the first Pod allocated 300 m CPU, which only left 200 m in the quota—not enough for the second Pod to run. Figure 12.16 shows the failure reason in the events for the ReplicaSet. The Pi app is still running but under capacity because there isn’t enough CPU available. 
-
-Quotas are more for protecting your cluster than the apps themselves, but they’re a good way of  enforcing that all Pod specs have limits specified. If you’re not dividing up your cluster with namespaces, you can still apply a quota with large CPU and memory limits to the default namespace to make sure Pod specs include limits of their own.
+在本练习中，您可以看到配额应用于命名空间中的所有 pod。ReplicaSet 使用一个Pod而不是两个Pod运行，因为第一个Pod分配了 300m CPU，只剩下 200m 的配额—不足以让第二个Pod运行。图 12.16 显示了ReplicaSet事件中的失败原因。Pi应用程序仍在运行，但容量不足，因为没有足够的CPU可用。 
 
 ![图 12.16](images/Figure12.16.png)
+<center>图 12.16 在配额中强制执行硬 CPU 限制，以阻止对象超过总限制</center>
 
-<center>图 12.16 Hard CPU limits in quotas are enforced to block objects from exceeding the total limit</center>
+配额更多的是为了保护你的集群而不是应用本身，但它们是一种强制所有 Pod spec 都有指定限制的好方法。如果您没有使用命名空间划分集群，您仍然可以对默认命名空间应用具有较大 CPU 和内存限制的配额，以确保 Pod spec 包含它们自己的限制。
 
-Resource limits, container probes, and atomic upgrades all help to keep your apps running in the face of normal failure conditions. These should be on your road map to production, but you also need to be aware that Kubernetes can’t repair every kind of failure.
+资源限制、容器探测和原子升级都有助于保持应用程序在正常故障条件下运行。这些应该在您的生产路线图上，但您也需要意识到Kubernetes不能修复所有类型的故障。
 
 ## 12.5 了解自我修复应用的局限性
 
