@@ -544,21 +544,20 @@ kubectl describe replicaset -n kiamol-ch12-cpu
 
 ## 12.5 了解自我修复应用的局限性
 
-Kubernetes allocates a Pod to a node, and that’s the node where it will run. Pods aren’t replaced unless the node goes offline, so all the repair mechanisms we’ve seen in this chapter work by restarting the Pod—replacing the application container. You need to make sure your app can tolerate that, especially in the multicontainer scenarios we covered in chapter 7, because init containers are executed again and sidecars are replaced when a Pod restarts.
+Kubernetes 将 Pod 分配给一个节点，这就是它将运行的节点。除非节点离线，否则 pod 不会被替换，因此我们在本章中看到的所有修复机制都是通过重新启动 pod 来工作的——替换应用程序容器。你需要确保你的应用程序可以容忍这种情况，特别是在我们在第7章中介绍的多容器场景中，因为 init 容器会再次执行，当 Pod 重新启动时，sidecars 会被替换。
 
-Pod restarts are fine for most scenarios with temporary failures, but repeated failures will end up in a CrashLoopBackOff state,  which can take your app offline. Kubernetes doesn’t provide any configuration options for how many restarts are allowed or the backoff period, and it doesn’t support replacing failed Pods with a new Pod on a different node. Those features are requested, but until they land, your nicely configured self-healing app still has the potential for all its Pods to be in a backoff state with no endpoints in the Service.
+对于大多数暂时失败的场景，Pod 重新启动是很好的，但重复失败将以 CrashLoopBackOff 状态结束，这可能会使应用程序离线。Kubernetes 没有提供任何关于允许重启多少次或回退周期的配置选项，并且它不支持在不同的节点上用新 Pod 替换失败的 Pod。这些功能是需要的，但在它们着陆之前，你精心配置的自我修复应用程序仍然有可能使所有 Pods 处于回退状态，服务中没有端点。
 
-That edge case usually appears as a result of misconfigured specs or fatal problems with the application, which take more intervention than Kubernetes can manage by itself. For the typical failure states, the combination of container probes and resource limits go a long way to keeping your app running smoothly all by itself. And that’s all for self-healing apps, so we can tidy up the cluster in preparation for the lab.
+这种边缘情况通常是由于配置错误的 spec 或应用程序的致命问题而出现的，这些问题需要 Kubernetes 本身无法处理的干预。对于典型的失败状态，容器探测和资源限制的组合对于保持应用程序自身平稳运行大有帮助。这就是自我修复应用程序的全部内容，所以我们可以整理集群，为实验室做准备。
 
-TRY IT NOW
-Remove the objects from this chapter.
+现在试试吧,从本章中移除对象。
 
 ```
-# delete namespaces:
+# 删除 namespaces:
 kubectl delete ns -l kiamol=ch12
 kubectl delete all -l kiamol=ch12
 
-# delete all the leftover objects:
+# 删除其余对象:
 kubectl delete secret,configmap,pvc -l kiamol=ch12
 ```
 
