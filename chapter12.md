@@ -563,11 +563,11 @@ kubectl delete secret,configmap,pvc -l kiamol=ch12
 
 ## 12.6 实验室
 
-I’ve got a nice little capacity-planning exercise for you in this lab. The goal is to divide your cluster into three environments to run the Pi app: dev, test, and UAT. UAT should be limited to 50% of your node’s total CPU, and dev and test to 25% each. Your Pi Deployment should be set with limits so it can run at least four replicas in every environment, and then you need to verify how much you can scale up to in UAT.
+在这个实验室里，我为你们准备了一个很好的能力规划练习。目标是将集群划分为三个环境来运行 Pi 应用程序:开发环境、测试环境和UAT环境。UAT应限制在节点总CPU的50%，开发和测试各占25%。你的Pi部署应该设置限制，以便在每个环境中至少可以运行四个副本，然后你需要验证在UAT中可以扩展到多少。
 
-- Start by deploying the namespaces and Services in the lab folder.
-- Then work out the CPU capacity of your node, and deploy resource quotas to limit CPU in each namespace (you’ll need to write the quota specs).
-- Update the Deployment spec in web.yaml to include a CPU limit that allows four replicas to run in each namespace.
-- When everything’s running, scale up the UAT Deployment to eight replicas, and try to find out why they don’t all run.
+- 首先在实验室文件夹中部署命名空间和服务。
+- 然后计算出您的节点的 CPU 容量，并部署资源配额来限制每个命名空间的CPU(您需要编写配额规格)。
+- 更新 web 部署规范。yaml包含一个 CPU 限制，允许在每个命名空间中运行四个副本。
+- 当一切都在运行时，将UAT部署扩展到8个副本，并尝试找出它们不能全部运行的原因。
 
-This is a good exercise to help you understand how CPU resources get shared and to practice working with multiple namespaces. My solution is on GitHub for you to check: https://github.com/sixeyed/kiamol/blob/master/ch12/lab/README.md.
+这是一个很好的练习，可以帮助您理解如何共享 CPU 资源，并练习如何使用多个命名空间。我的解决方案在GitHub上，你可以查看: https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch12/lab/README.md。
