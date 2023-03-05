@@ -402,11 +402,6 @@ spec: # Deployment 中的  Pod spec
 		  memory: 50Mi
 ```
 
-Resources are specified at the container level, but this is a new Pod spec, so when you deploy the update, you’ll get a new Pod. The replacement will start off with zero memory allocated, and it will start allocating 10 MB every five seconds again. Now,  however, it will hit a limit at 50 MB, and Kubernetes will take action.
-
-TRY IT NOW
-Deploy an update to the memory-allocator app with the resource limits defined in listing 12.6. You should see the Pod is restarted, but only if your Linux host is running without swap memory enabled. K3s doesn’t have that setup (unless you’re using the Vagrant VM setup), so you won’t see the same results as Docker Desktop or a cloud Kubernetes service.
-
 资源是在容器级别指定的，但这是一个新的Pod spec，所以当您部署更新时，您将得到一个新的Pod。替换开始时没有分配内存，然后每隔5秒重新分配10mb。然而，现在它将达到50mb的限制，Kubernetes将采取行动。
 
 现在试试吧,使用清单12.6中定义的资源限制将更新部署到内存分配器应用程序。您应该看到Pod已重新启动，但前提是您的Linux主机在没有启用交换内存的情况下运行。K3s没有这个设置(除非你使用Vagrant VM设置)，所以你不会看到与Docker Desktop或云Kubernetes服务相同的结果。
