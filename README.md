@@ -181,3 +181,17 @@
     - 12.5 [了解自我修复应用的局限性](./chapter12.md#125-了解自我修复应用的局限性)
 
     - 12.6 [实验室](./chapter12.md#126-实验室)
+
+  - 第十三章 [使用 Fluentd 和 Elasticsearch 集中化日志](./chapter13.md)
+
+    - 13.1 [Kubernetes 如何存储日志条目](./chapter13.md#131-kubernetes-如何存储日志条目)
+
+    - 13.2 [使用 Fluentd 收集节点日志](./chapter13.md#132-使用-fluentd-收集节点日志)
+
+    - 13.3 [向 Elasticsearch 发送日志](./chapter13.md#133-向-elasticsearch-发送日志)
+
+    - 13.4 [解析和过滤日志条目](./chapter13.md#134-解析和过滤日志条目)
+
+    - 13.5 [了解 Kubernetes 中的日志记录选项](./chapter13.md#135-了解-kubernetes-中的日志记录选项)
+
+    - 13.6 [实验室](./chapter13.md#136-实验室)
