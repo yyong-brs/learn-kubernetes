@@ -1,9 +1,5 @@
 # 第十三章 使用 Fluentd 和 Elasticsearch 集中化日志
 
-Applications generate lots of logs, which often aren’t very useful. As you scale up your apps across multiple Pods running in a  cluster, it’s difficult to manage those logs using standard Kubernetes tooling. Organizations usually deploy their own logging framework, which uses a collect-and-forward model to read container logs and send them to a central store where they can be indexed, filtered, and searched.You’ll learn how to do that in this chapter using the most popular technologies in this space: Fluentd and Elasticsearch. Fluentd is the collector component, and it has some nice integrations with Kubernetes; Elasticsearch is the storage component and can run either as Pods in the cluster or as an external service.
-
-You should be aware of a couple of points before we start. The first is that this model assumes your application logs are written to the container’s standard output streams so Kubernetes can find them. We covered that in chapter 7, with sample apps that wrote to standard out directly or used a logging sidecar to relay logs. The second is that the logging model in Kubernetes is very different from Docker. Appendix D in the ebook shows you how to use Fluentd with Docker, but with Kubernetes, we’ll take a different approach.
-
 应用程序生成大量日志，这些日志通常不是很有用。当您在集群中运行的多个pod上扩展应用程序时，使用标准的Kubernetes工具很难管理这些日志。组织通常部署自己的日志框架，该框架使用收集-转发模型来读取容器日志并将它们发送到中央存储，在那里可以对它们进行索引、筛选和搜索。在本章中，您将学习如何使用该领域最流行的技术:Fluentd和Elasticsearch。Fluentd是一个收集器组件，它与Kubernetes有一些很好的集成;Elasticsearch是存储组件，既可以作为集群中的Pods运行，也可以作为外部服务运行。
 
 在我们开始之前，你应该注意几点。首先，这个模型假设你的应用程序日志被写入容器的标准输出流，这样Kubernetes就可以找到它们。我们在第7章中讨论了这个问题，使用了直接写入标准输出或使用日志sidecar来中继日志的示例应用程序。其次，Kubernetes的日志记录模型与Docker有很大的不同。电子书的附录D向您展示了如何在Docker中使用Fluentd，但在Kubernetes中，我们将采用不同的方法。
