@@ -5,134 +5,91 @@
 在我们开始之前，你应该注意几点。首先，这个模型假设你的应用程序日志被写入容器的标准输出流，这样Kubernetes就可以找到它们。我们在第7章中讨论了这个问题，使用了直接写入标准输出或使用日志sidecar来中继日志的示例应用程序。其次，Kubernetes的日志记录模型与Docker有很大的不同。电子书的附录D向您展示了如何在Docker中使用Fluentd，但在Kubernetes中，我们将采用不同的方法。
 
 ## 13.1 Kubernetes 如何存储日志条目
-Kubernetes has a very simplistic approach to log management: it collects log entries from the container runtime and stores them as files on the node running the container. If you want to do anything more advanced, then you need to deploy your own log  management system, and, fortunately, you have a world-class container platform on which to run it. The moving pieces of the logging system collect logs from the nodes, forward them to a centralized store, and provide a UI to search and filter them. Figure 13.1 shows the technologies we’ll use in this chapter. 
 
-![图 13.1](images/Figure13.1.png)
-<center>图 13.1 Logging in Kubernetes uses a collector like Fluentd to read the log files from the node</center>
-
-Nodes store log entries exactly as they come from the container, using filenames that include the namespace, Pod, and container names. The standard naming system makes it easy for the log collector to add metadata to the log entries to identify the source, and because the collector runs as a Pod itself, it can query the Kubernetes API server to get even more details. Fluentd adds Pod labels and the image tag as additional metadata, which you can use to filter or search the logs.
-
-Deploying the log collector is straightforward. We’ll start by exploring the raw log files on the node to see what we’re working with. The prerequisite for any of this is to get application logs out of the container, whether the app writes those logs directly or you use a sidecar container. Start by deploying the timecheck app from chapter 7 in a couple of different configurations to  generate some logs.
-
-TRY IT NOW
-Run the timecheck app using different setups in different namespaces, and then check the logs to see how you work with them natively in kubectl.
-
-Kubernetes有一种非常简单的日志管理方法:它从容器运行时收集日志条目，并将它们作为文件存储在运行容器的节点上。如果您想执行更高级的操作，那么您需要部署自己的日志管理系统，幸运的是，您有一个世界级的容器平台来运行它。日志系统的移动部分从节点收集日志，将它们转发到集中存储，并提供一个UI来搜索和过滤它们。图13.1显示了我们将在本章中使用的技术。
+Kubernetes 有一种非常简单的日志管理方法:它从容器运行时收集日志条目，并将它们作为文件存储在运行容器的节点上。如果您想执行更高级的操作，那么您需要部署自己的日志管理系统，幸运的是，您有一个世界级的容器平台来运行它。日志系统的移动部分从节点收集日志，将它们转发到集中存储，并提供一个UI来搜索和过滤它们。图13.1显示了我们将在本章中使用的技术。
 
 ![图 13.1](images/Figure13.1.png)
 <center>图13.1 登录Kubernetes使用Fluentd这样的采集器从节点读取日志文件</center>
 
-节点使用包含名称空间、Pod和容器名称的文件名存储来自容器的日志条目。标准命名系统使日志采集器很容易向日志条目添加元数据以识别源，而且由于采集器本身作为Pod运行，因此它可以查询Kubernetes API服务器以获得更多详细信息。Fluentd添加Pod标签和图像标记作为额外的元数据，您可以使用它们过滤或搜索日志。
+节点使用包含命名空间、Pod和容器名称的文件名存储来自容器的日志条目。标准命名系统使日志采集器很容易向日志条目添加元数据以识别源，而且由于采集器本身作为Pod运行，因此它可以查询Kubernetes API服务器以获得更多详细信息。Fluentd 添加 Pod 标签和镜像标记作为额外的元数据，您可以使用它们过滤或搜索日志。
 
-日志采集器的部署非常简单。我们将从探索节点上的原始日志文件开始，看看我们正在处理什么。这一切的前提是将应用程序日志从容器中取出，无论应用程序直接写入这些日志还是使用sidecar容器。首先将第7章中的timecheck应用部署到几个不同的配置中，以生成一些日志。
+日志采集器的部署非常简单。我们将探索从节点上的原始日志文件开始，看看我们正在处理什么。这一切的前提是将应用程序日志从容器中取出，无论应用程序直接写入这些日志还是使用sidecar容器。首先将第7章中的timecheck应用部署到几个不同的配置中，以生成一些日志。
 
-现在试试吧
-在不同的名称空间中使用不同的设置运行timecheck应用程序，然后检查日志，看看如何在kubectl中本机使用它们。
+现在试试吧，在不同的命名空间中使用不同的设置运行timecheck应用程序，然后检查日志，看看如何在kubectl中本机使用它们。
 
 ```
-# switch to the chapter’s folder:
+# 切换到本章目录:
 cd ch13
 
-# deploy the timecheck app in development and test namespaces:
+# 在开发和测试命名空间中部署时间检查应用程序:
 kubectl apply -f timecheck/
 
-# wait for the development namespace to spin up:
+# 等待开发命名空间启动:
 kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n kiamol-ch13-dev
 
-# check the logs:
+# 检查日志:
 kubectl logs -l app=timecheck --all-containers -n kiamol-ch13-dev --tail 1
 ```
 
-You’ll see from that exercise that in a realistic cluster environment, it’s hard to work with container logs directly, as shown in my output in figure 13.2. You have to use one namespace at a time, you can’t identify the Pod that logged the message, and you can
-filter only by a number of log entries or a time period.
-
-![图 13.2](images/Figure13.2.png)
-<center>图 13.2 Kubectl is great for quickly checking logs, but it’s harder with many Pods in many namespaces</center>
-
-Kubectl is the simplest option for reading logs, but ultimately the log entries come from the files on each node, which means you have other options to work with logs. The source for this chapter includes a simple sleep Deployment that mounts the log path  on the node as a HostPath volume, and you can use that to explore the log files, even if you don’t have direct access to the nodes.
-
-TRY IT NOW
-Run a Pod with a volume mount for the host’s log directory, and explore the files using the mount.
-
-您将从这个练习中看到，在实际的集群环境中，很难直接使用容器日志，如图13.2中的输出所示。一次只能使用一个命名空间，不能识别记录消息的Pod，但可以
-仅根据日志条目的数量或时间段进行过滤。
+您将从这个练习中看到，在实际的集群环境中，很难直接使用容器日志，如图13.2中的输出所示。一次只能使用一个命名空间，不能识别记录消息的Pod，但可以仅根据日志条目的数量或时间段进行过滤。
 
 ![图 13.2](images/Figure13.2.png)
 <center>图13.2 Kubectl非常适合快速检查日志，但是在许多命名空间中有许多pod，这就比较困难了</center>
 
 Kubectl是读取日志的最简单选项，但最终日志条目来自每个节点上的文件，这意味着您可以使用其他选项来处理日志。本章的源代码包括一个简单的睡眠部署，它将日志路径作为HostPath卷挂载到节点上，即使您没有直接访问节点，也可以使用它来查看日志文件。
 
-现在试试吧
-为主机的日志目录运行一个带卷挂载的Pod，并使用挂载浏览文件。
+现在试试吧，为主机的日志目录运行一个带卷挂载的Pod，并使用挂载浏览文件。
 
 ```
-# run the Deployment:
+# 运行 Deployment:
 kubectl apply -f sleep.yaml
 
-# connect to a session in the Pod container:
+# 连接到 Pod 中的容器会话:
 kubectl exec -it deploy/sleep -- sh
 
-# browse to the host log mount:
+# 进入到日志挂载目录:
 cd /var/log/containers/
 
-# list the timecheck log files:
+# 查看日志文件:
 ls timecheck*kiamol-ch13*_logger*
 
-# view the contents of the dev log file:
+# 查看 dev log 文件内容:
 cat $(ls timecheck*kiamol-ch13-dev_logger*) | tail -n 1
 
-# exit from the session:
+# 退出会话:
 exit
 ```
 
-Each Pod container has a file for its log output. The timecheck app uses a sidecar container called logger to relay the logs from the application container, and you can see in figure 13.3 the standard naming convention Kubernetes uses for log files: pod-name_namespace_container-name-container-id.log. The filename has enough data to identify the source of the logs, and the content of the file is the raw JSON log output from the container runtime.
+每个 Pod 容器都有一个用于日志输出的文件。timecheck应用程序使用一个名为logger的sidecar容器来从应用程序容器中中继日志，您可以在图13.3中看到Kubernetes为日志文件使用的标准命名约定:pod-name_namespace_container-name-container-id.log。文件名有足够的数据来识别日志的来源，文件的内容是容器运行时输出的原始JSON日志。
 
 ![图 13.3](images/Figure13.3.png)
-<center>图 13.3 For a modern platform, Kubernetes has an old-school approach to log storage</center>
-
-Log files are retained after a Pod restart, but most Kubernetes implementations include a log rotation system running on the nodes—outside of Kubernetes—to prevent logs from swallowing up all your disk space. Collecting and forwarding logs to a central store lets you keep them for longer and isolate log storage in one place—that also applies to logs from core Kubernetes components. The Kubernetes DNS server, API server, and network proxy all run as Pods, and you can view and collect logs from them in the same way as from application logs.
-
-TRY IT NOW
-Not every Kubernetes node runs the same core components, but you can use the sleep Pod to see which common components are running on your node.
-
-每个Pod容器都有一个用于日志输出的文件。timecheck应用程序使用一个名为logger的sidecar容器来从应用程序容器中中继日志，您可以在图13.3中看到Kubernetes为日志文件使用的标准命名约定:pod-name_namespace_container-name-container-id.log。文件名有足够的数据来识别日志的来源，文件的内容是容器运行时输出的原始JSON日志。
-
-![图 13.3](images/Figure13.3.png)
-<center>图13.3对于一个现代平台，Kubernetes有一个老派的日志存储方法</center>
+<center>图13.3 对于一个现代平台，Kubernetes有一个老派的日志存储方法</center>
 
 Pod重新启动后，日志文件仍会保留，但大多数Kubernetes实现都包括在节点上运行的日志旋转系统(在Kubernetes之外)，以防止日志占用所有磁盘空间。收集日志并将其转发到中央存储可以让您更长时间地保存它们，并将日志存储隔离在一个地方—这也适用于来自Kubernetes核心组件的日志。Kubernetes的DNS服务器、API服务器和网络代理都以Pods的方式运行，您可以像查看应用程序日志一样查看和收集它们的日志。
 
-现在试试吧
-并不是每个Kubernetes节点都运行相同的核心组件，但是您可以使用sleep Pod查看哪些通用组件正在您的节点上运行。
+现在试试吧，并不是每个Kubernetes节点都运行相同的核心组件，但是您可以使用sleep Pod查看哪些通用组件正在您的节点上运行。
 
 ```
-# connect to a session in the Pod:
+# 连接一个 Pod 容器:
 kubectl exec -it deploy/sleep -- sh
 
-# browse to the host path volume:
+# 进入到主机path 卷目录:
 cd /var/log/containers/
 
-# the network proxy runs on every node:
+# 网络代理服务运行在每个节点上:
 cat $(ls kube-proxy*) | tail -n 1
 
-# if your cluster uses Core DNS, you’ll see logs here:
+# 如果你使用的是 core dns，你将看到日志:
 cat $(ls coredns*) | tail -n 1
 
-# if your node is running the API server, you’ll see these logs:
+# 如果你的节点运行 API server ，你将看到日志:
 cat $(ls kube-apiserver*) | tail -n 1
 
-# leave the session:
+# 退出会话:
 exit
 ```
 
-You might get a different output from that exercise, depending on how your lab cluster is set up. The network proxy Pod runs on every node, so you should see those logs, but you’ll only see DNS logs if your cluster is using CoreDNS (which is the default DNS plugin), and you’ll only see API server logs if your node is running the API server. My output from Docker Desktop is shown in figure 13.4; if you see something different, you can run ls *.log to see all the Pod log files on your node.
-
-![图 13.4](images/Figure13.4.png)
-<center>图 13.4 Collecting and forwarding logs from the node will also include all the system Pod logs</center>
-
-Now that you know how container logs are processed and stored by Kubernetes, you can see how a centralized log system makes troubleshooting so much easier. A collector runs on every node, grabbing entries from the log files and forwarding them. In the rest of the chapter, you’ll learn how to implement that with the EFK stack: Elasticsearch, Fluentd, and Kibana.
-
-您可能会从该练习中得到不同的输出，这取决于您的实验室集群是如何设置的。网络代理Pod运行在每个节点上，所以你应该看到这些日志，但如果你的集群使用CoreDNS(这是默认的DNS插件)，你只会看到DNS日志，如果你的节点正在运行API服务器，你只会看到API服务器日志。我从Docker Desktop的输出如图13.4所示;如果你看到一些不同的东西，你可以运行ls *.log来查看节点上所有的Pod日志文件。
+您可能会从该练习中得到不同的输出，这取决于您的实验室集群是如何设置的。网络代理Pod运行在每个节点上，所以你应该看到这些日志，但如果你的集群使用CoreDNS(这是默认的DNS插件)，你只会看到DNS日志，如果你的节点正在运行API Server，你只会看到API server 日志。我从Docker Desktop的输出如图13.4所示;如果你看到一些不同的东西，你可以运行ls *.log来查看节点上所有的Pod日志文件。
 
 ![图 13.4](images/Figure13.4.png)
 <center>图13.4收集和转发节点的日志也包括所有系统Pod日志</center>
@@ -179,13 +136,13 @@ There’s nothing in the DaemonSet spec for Fluent Bit that you haven’t alread
 
 We’re currently running a simple configuration with three stages: the input stage reads log files, the parser stage deconstructs the JSON log entries, and the output stage writes each log as a separate line to the standard output stream in the Fluent Bit container. The JSON parser is standard for all container logs and isn’t very interesting, so we’ll focus on the input and output configuration in listing 13.1.
 
-我的输出如图13.5所示，其中您可以看到来自timecheck容器的日志被显示在Fluent Bit容器中。创建日志条目的pod位于不同的名称空间中，但是Fluent Bit从节点上的文件中读取它们。
+我的输出如图13.5所示，其中您可以看到来自timecheck容器的日志被显示在Fluent Bit容器中。创建日志条目的pod位于不同的命名空间中，但是Fluent Bit从节点上的文件中读取它们。
 内容是原始JSON加上更精确的时间戳，Fluent Bit将其添加到每个日志条目中。
 
 ![图 13.5](images/Figure13.5.png)
 <center>图13.5一个非常基本的Fluent Bit配置仍然可以聚合来自多个pod </center>的日志条目
 
-在Fluent Bit的DaemonSet规范中，您已经看到了所有内容。我使用单独的名称空间进行日志记录，因为您通常希望它作为集群上运行的所有应用程序所使用的共享服务运行，而名称空间是隔离所有对象的好方法。运行Fluent Bit pod很简单——复杂之处在于配置日志处理管道，我们需要深入研究这一点，以充分利用日志模型。图13.6显示了管道的各个阶段以及如何使用它们。
+在Fluent Bit的DaemonSet规范中，您已经看到了所有内容。我使用单独的命名空间进行日志记录，因为您通常希望它作为集群上运行的所有应用程序所使用的共享服务运行，而命名空间是隔离所有对象的好方法。运行Fluent Bit pod很简单——复杂之处在于配置日志处理管道，我们需要深入研究这一点，以充分利用日志模型。图13.6显示了管道的各个阶段以及如何使用它们。
 
 ![图 13.6](images/Figure13.6.png)
 <center>图 13.6 Fluent Bit的处理管道超级灵活，每个阶段都使用插件模块</center>
@@ -216,7 +173,7 @@ Update the Fluent Bit ConfigMap to use the Kubernetes filter, restart the Daemon
 
 Fluent Bit使用标记来标识日志条目的来源。标签在输入阶段添加，可用于将日志路由到其他阶段。在此配置中，日志文件名用作标记，前缀为kube。匹配规则将所有带kube标记的条目路由到输出阶段，因此每个日志都被打印出来，但输入阶段只读取timcheck日志文件，因此这些是您看到的唯一日志条目。
 
-您并不是真的想过滤输入文件——这只是一种快速入门的方法，不会让您被日志条目淹没。最好是读取所有输入，然后根据标记路由日志，这样就只存储感兴趣的条目。Fluent Bit内置了对Kubernetes的支持，它有一个过滤器，可以用元数据丰富日志条目，以识别创建它的Pod。过滤器还可以配置为每个包含名称空间和Pod名称的日志构建自定义标记;使用它，您可以更改管道，以便只有来自test名称空间的日志被写入标准输出。
+您并不是真的想过滤输入文件——这只是一种快速入门的方法，不会让您被日志条目淹没。最好是读取所有输入，然后根据标记路由日志，这样就只存储感兴趣的条目。Fluent Bit内置了对Kubernetes的支持，它有一个过滤器，可以用元数据丰富日志条目，以识别创建它的Pod。过滤器还可以配置为每个包含命名空间和Pod名称的日志构建自定义标记;使用它，您可以更改管道，以便只有来自test命名空间的日志被写入标准输出。
 
 现在试试吧
 更新Fluent Bit ConfigMap以使用Kubernetes过滤器，重新启动DaemonSet以应用配置更改，然后从timecheck应用程序中打印最新的日志以查看过滤器的功能。
@@ -251,7 +208,7 @@ The output configuration will be different because that’s how you configure th
 
 这个的Fluent Bit配置有点棘手。Kubernetes过滤器可以开箱即用地获取Pod的所有元数据，但是为路由构建自定义标记需要一些精细的正则表达式。这都在前面练习中部署的ConfigMap中的配置文件中，但我不打算重点讨论它，因为我真的不喜欢正则表达式。这也没有必要——设置是完全通用的，所以你可以将输入、过滤器和解析器配置插入到你自己的集群中，它将适用于你的应用程序，无需任何更改。
 
-输出配置将有所不同，因为这是您配置目标的方式。在插入日志存储和搜索组件之前，我们将研究Fluent Bit的另一个特性——将日志条目路由到不同的输出。输入配置中的正则表达式为kube.namespace.container_name.pod_name格式的条目设置了一个自定义标记，可以在匹配中使用该标记根据名称空间或pod名称对日志进行不同的路由。清单13.2显示了具有多个目的地的更新输出配置。
+输出配置将有所不同，因为这是您配置目标的方式。在插入日志存储和搜索组件之前，我们将研究Fluent Bit的另一个特性——将日志条目路由到不同的输出。输入配置中的正则表达式为kube.namespace.container_name.pod_name格式的条目设置了一个自定义标记，可以在匹配中使用该标记根据命名空间或pod名称对日志进行不同的路由。清单13.2显示了具有多个目的地的更新输出配置。
 
 > Listing 13.2 fluentbit-config-match-multiple.yaml, routing to multiple outputs
 
@@ -270,7 +227,7 @@ Fluent Bit supports many output plugins, from plain TCP to Postgres and cloud se
 TRY IT NOW
 Update the configuration to use multiple outputs, and print the logs from the Fluent Bit Pod.
 
-Fluent Bit支持许多输出插件，从普通TCP到Postgres和云服务，如Azure Log Analytics。到目前为止，我们使用的是标准输出流，它只是将日志条目中继到控制台。counter插件是一个简单的输出，它只打印已经收集了多少日志条目。部署新配置时，您将继续看到来自test名称空间的日志行，还将看到来自dev名称空间的日志条目计数。
+Fluent Bit支持许多输出插件，从普通TCP到Postgres和云服务，如Azure Log Analytics。到目前为止，我们使用的是标准输出流，它只是将日志条目中继到控制台。counter插件是一个简单的输出，它只打印已经收集了多少日志条目。部署新配置时，您将继续看到来自test命名空间的日志行，还将看到来自dev命名空间的日志条目计数。
 
 现在试试吧
 更新配置以使用多个输出，并从Fluent Bit Pod打印日志。
@@ -292,7 +249,7 @@ The counter in this exercise isn’t especially useful, but it’s there to show
 ![图 13.8](images/Figure13.8.png)
 <center>图 13.8 Different outputs in Fluent Bit can reshape the data—the counter just shows a count</center>
 
-本练习中的计数器并不是特别有用，但它可以向您展示管道早期部分的复杂位可以使管道后面的路由更容易。图13.8显示了不同名称空间中的日志有不同的输出，可以在输出阶段中使用匹配规则进行配置。应该很清楚如何在Kubernetes编写的简单日志文件之上插入复杂的日志系统。Fluent Bit中的数据管道允许您丰富日志条目并将它们路由到不同的输出。如果你想使用的输出不被Fluent Bit支持，那么你可以切换到父项目Fluentd，它有一个更大的插件集(包括MongoDB和AWS S3)——管道阶段和配置非常相似。我们将使用Elasticsearch进行存储，它非常适合进行高性能搜索，并且易于与Fluent Bit集成。
+本练习中的计数器并不是特别有用，但它可以向您展示管道早期部分的复杂位可以使管道后面的路由更容易。图13.8显示了不同命名空间中的日志有不同的输出，可以在输出阶段中使用匹配规则进行配置。应该很清楚如何在Kubernetes编写的简单日志文件之上插入复杂的日志系统。Fluent Bit中的数据管道允许您丰富日志条目并将它们路由到不同的输出。如果你想使用的输出不被Fluent Bit支持，那么你可以切换到父项目Fluentd，它有一个更大的插件集(包括MongoDB和AWS S3)——管道阶段和配置非常相似。我们将使用Elasticsearch进行存储，它非常适合进行高性能搜索，并且易于与Fluent Bit集成。
 
 ![图 13.8](images/Figure13.8.png)
 <center>图13.8在Fluent Bit中不同的输出可以重塑数据-计数器只显示一个计数</center>
@@ -336,7 +293,7 @@ Elasticsearch和Kibana的基本部署分别使用一个Pod，如图13.9所示。
 ![图 13.9](images/Figure13.9.png)
 <center>图 13.9运行Elasticsearch和服务，使Kibana和Fluent Bit可以使用REST API</center>
 
-Fluent Bit有一个Elasticsearch输出插件，它使用Elasticsearch REST API为每个日志条目创建一个文档。该插件需要配置Elasticsearch服务器的域名，您可以选择指定应该在其中创建文档的索引。这允许您使用多个输出阶段从不同索引中的不同名称空间隔离日志条目。清单13.3将日志条目与test名称空间中的Pods和Kubernetes系统Pods分开。
+Fluent Bit有一个Elasticsearch输出插件，它使用Elasticsearch REST API为每个日志条目创建一个文档。该插件需要配置Elasticsearch服务器的域名，您可以选择指定应该在其中创建文档的索引。这允许您使用多个输出阶段从不同索引中的不同命名空间隔离日志条目。清单13.3将日志条目与test命名空间中的Pods和Kubernetes系统Pods分开。
 
 > Listing 13.3 fluentbit-config-elasticsearch.yaml, storing logs in Elasticsearch indexes
 
@@ -357,7 +314,7 @@ If there are log entries that don’t match any output rules, they are discarded
 TRY IT NOW
 Update the Fluent Bit configuration to send logs to Elasticsearch, and then connect to Kibana and set up a search over the test index.
 
-如果有不匹配任何输出规则的日志项，它们将被丢弃。部署这个更新后的配置时，Kubernetes系统日志和test名称空间日志保存在Elasticsearch中，但不保存来自dev名称空间的日志。
+如果有不匹配任何输出规则的日志项，它们将被丢弃。部署这个更新后的配置时，Kubernetes系统日志和test命名空间日志保存在Elasticsearch中，但不保存来自dev命名空间的日志。
 
 现在试试吧
 更新Fluent Bit配置以将日志发送到Elasticsearch，然后连接到Kibana并在测试索引上设置搜索。
@@ -392,14 +349,14 @@ I won’t spend too long on Kibana, but one more exercise will show how useful i
 TRY IT NOW
 Deploy the random-number API we’ve used before—the one that crashes after the first use—along with a proxy that caches the response and almost fixes the problem. Try the API, and when you get an error, you can search for the failure ID in Kibana.
 
-这个过程包含一些手动步骤，因为Kibana不是一个可以自动化的好产品。图13.10中的输出显示了正在创建的索引模式。当您完成该练习时，您将拥有一个强大、快速且易于使用的搜索引擎，用于测试名称空间中的所有容器日志。Kibana中的Discover选项卡显示了随时间存储的文档的速率(即日志处理的速率)，您可以向下钻取每个文档以查看日志详细信息。
+这个过程包含一些手动步骤，因为Kibana不是一个可以自动化的好产品。图13.10中的输出显示了正在创建的索引模式。当您完成该练习时，您将拥有一个强大、快速且易于使用的搜索引擎，用于测试命名空间中的所有容器日志。Kibana中的Discover选项卡显示了随时间存储的文档的速率(即日志处理的速率)，您可以向下钻取每个文档以查看日志详细信息。
 
 ![图 13.10](images/Figure13.10.png)
 <center>图13.10设置Fluent Bit将日志发送到Elasticsearch和Kibana，以搜索测试索引</center>
 
 Elasticsearch和Kibana都是成熟的技术，但如果你不熟悉它们，现在是了解Kibana UI的好时机。您将在Discover页面的左侧看到一个字段列表，您可以使用它来过滤日志。这些字段包含所有Kubernetes元数据，因此您可以根据Pod名称、主机节点、容器映像等进行过滤。您可以构建显示按应用程序划分的日志的标题统计信息的仪表板，这对于显示错误日志的突然激增非常有用。您还可以在所有文档中搜索特定的值，当用户从错误消息中提供ID时，这是查找应用程序日志的好方法。
 
-我不会在Kibana上花太多时间，但是再做一个练习就会展示集中式日志记录系统是多么有用。我们将把一个新的应用程序部署到test名称空间中，它的日志将自动由Fluent Bit提取并流到Elasticsearch，而不需要对配置进行任何更改。当应用程序向用户显示错误时，我们可以很容易地在Kibana中追踪到它。
+我不会在Kibana上花太多时间，但是再做一个练习就会展示集中式日志记录系统是多么有用。我们将把一个新的应用程序部署到test命名空间中，它的日志将自动由Fluent Bit提取并流到Elasticsearch，而不需要对配置进行任何更改。当应用程序向用户显示错误时，我们可以很容易地在Kibana中追踪到它。
 
 现在试试吧
 部署我们以前使用过的随机数API(在第一次使用后崩溃的API)，以及缓存响应并几乎修复问题的代理。尝试API，当您得到一个错误时，您可以在Kibana中搜索失败ID。
@@ -602,7 +559,7 @@ Kubernetes期望您的应用程序日志将来自容器的标准输出流。它�
 这就是应用程序日志的全部内容，因此我们可以清理集群，为实验室做好准备。
 
 现在试试吧
-删除本章的名称空间和剩余的Deployment。
+删除本章的命名空间和剩余的Deployment。
 
 ```
 kubectl delete ns -l kiamol=ch13
@@ -620,7 +577,7 @@ In this lab, you play the part of an operator who needs to deploy a new app into
 
 This is a very real-world task where you’ll need all the basic skills of navigating around Kubernetes to find and update all the pieces. My solution is in the usual place on GitHub for you to check: https://github.com/sixeyed/kiamol/blob/master/ch13/lab/README.md.
 
-在本实验中，您将扮演一个操作员的角色，需要将一个新的应用程序部署到使用本章中的日志记录模型的集群中。您需要检查Fluent Bit配置，以找到您应该为应用程序使用的名称空间，然后部署我们之前在书中使用的简单版本网站。以下是这个实验室的部分:
+在本实验中，您将扮演一个操作员的角色，需要将一个新的应用程序部署到使用本章中的日志记录模型的集群中。您需要检查Fluent Bit配置，以找到您应该为应用程序使用的命名空间，然后部署我们之前在书中使用的简单版本网站。以下是这个实验室的部分:
 
 - 首先在lab/logging文件夹中部署日志组件。
 - 将应用程序从vweb文件夹部署到正确的命名空间，以便收集日志，并验证您可以在Kibana中看到日志。
