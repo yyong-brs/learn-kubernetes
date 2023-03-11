@@ -401,21 +401,7 @@ kubectl logs -n kiamol-ch13-test -l app=numbers-api
 
 ## 13.5 了解 Kubernetes 中的日志记录选项
 
-Kubernetes has an expectation that your application logs will come from the container’s standard output streams. It collects and stores all the content from those streams, and that powers the logging model we’ve covered in this chapter. It’s a generic and flexible approach, and the technology stack we’ve used is reliable and performant, but there are inefficiencies along the way. Figure 13.14 shows some of the issues in getting logs from containers into searchable storage.
-
-![图 13.14](images/Figure13.14.png)
-<center>图 13.14 The goal is to get application logs into Elasticsearch, but it takes many steps to get there</center>
-
-You can use alternative architectures that are simpler and have fewer moving pieces. You could write logs directly to Elasticsearch from your application code, or you could run a sidecar in every application Pod that reads from whatever log sink the app uses and pushes entries to Elasticsearch. That would give you a lot more control over thelog data you store, without resorting to regular expressions to parse text strings. Doing this ties you to Elasticsearch (or whichever storage system you use), but that may not be a big concern if that system provides all you need.
-
-A custom logging framework might be appealing for the first app you run on Kubernetes, but as you move more workloads to the cluster, it’s going to restrict you. Requiring apps to log directly to Elasticsearch won’t fit for existing apps that write to operating system logs, and you’ll soon find your logging sidecar isn’t flexible enough and needs tweaking for every new application. The advantage of the Fluentd/Fluent Bit model is that it’s a standard approach with a community behind it; fiddling with regular expressions is much less hassle than writing and maintaining your own log collection and forwarding code.
-
-That’s all for application logs, so we can clear down the cluster to get ready for the lab.
-
-TRY IT NOW
-Remove this chapter’s namespaces and the remaining Deployment.
-
-Kubernetes期望您的应用程序日志将来自容器的标准输出流。它收集并存储来自这些流的所有内容，这为我们在本章中介绍的日志模型提供了动力。这是一种通用而灵活的方法，我们使用的技术堆栈是可靠的和高性能的，但在整个过程中存在效率低下的问题。图13.14显示了将日志从容器中获取到可搜索存储器中的一些问题。
+Kubernetes 期望您的应用程序日志将来自容器的标准输出流。它收集并存储来自这些流的所有内容，这为我们在本章中介绍的日志模型提供了动力。这是一种通用而灵活的方法，我们使用的技术堆栈是可靠的和高性能的，但在整个过程中存在效率低下的问题。图13.14显示了将日志从容器中获取到可搜索存储器中的一些问题。
 
 ![图 13.14](images/Figure13.14.png)
 <center>图 13.14目标是获取应用程序日志到Elasticsearch中，但是需要很多步骤才能实现</center>
@@ -426,8 +412,7 @@ Kubernetes期望您的应用程序日志将来自容器的标准输出流。它�
 
 这就是应用程序日志的全部内容，因此我们可以清理集群，为实验室做好准备。
 
-现在试试吧
-删除本章的命名空间和剩余的Deployment。
+现在试试吧,删除本章的命名空间和剩余的Deployment。
 
 ```
 kubectl delete ns -l kiamol=ch13
