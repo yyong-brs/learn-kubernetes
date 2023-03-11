@@ -421,15 +421,6 @@ kubectl delete all -l kiamol=ch13
 
 ## 13.6 实验室
 
-In this lab, you play the part of an operator who needs to deploy a new app into a cluster that is using the logging model from this chapter. You’ll need to check the Fluent Bit configuration to find the namespace you should use for your app and then deploy the simple versioned website we’ve used before in the book. Here are the parts to this lab:
-
-- Start by deploying the logging components in the lab/logging folder.
-- Deploy the app from the vweb folder to the correct namespace so logs are collected, and verify you can see the logs in Kibana.
-- You’ll see the logs are plain text, so the next step is to update your Deployment to use the correct parser. The app runs on Nginx, and an Nginx parser is already set up for you in the Fluent Bit configuration.
-- When you confirm the new logs in Kibana, you’ll see several for which the status code is 304, which tells the browser to use its cached version of the page. Those logs aren’t interesting, so the final task is to update the Fluent Bit configuration to filter them out.
-
-This is a very real-world task where you’ll need all the basic skills of navigating around Kubernetes to find and update all the pieces. My solution is in the usual place on GitHub for you to check: https://github.com/sixeyed/kiamol/blob/master/ch13/lab/README.md.
-
 在本实验中，您将扮演一个操作员的角色，需要将一个新的应用程序部署到使用本章中的日志记录模型的集群中。您需要检查Fluent Bit配置，以找到您应该为应用程序使用的命名空间，然后部署我们之前在书中使用的简单版本网站。以下是这个实验室的部分:
 
 - 首先在lab/logging文件夹中部署日志组件。
@@ -437,4 +428,4 @@ This is a very real-world task where you’ll need all the basic skills of navig
 - 您将看到日志是纯文本，因此下一步是更新部署以使用正确的解析器。应用程序运行在Nginx上，并且在Fluent Bit配置中已经为你设置了Nginx解析器。
 - 当您在Kibana中确认新日志时，您将看到几个状态代码为304的日志，这告诉浏览器使用页面的缓存版本。这些日志并不有趣，因此最后的任务是更新Fluent Bit配置以过滤掉它们。
 
-这是一个非常现实的任务，你需要在Kubernetes周围导航的所有基本技能来找到和更新所有的碎片。我的解决方案在GitHub上的常见地方，你可以检查:https://github.com/sixeyed/kiamol/blob/master/ch13/lab/README.md。
+这是一个非常现实的任务，你需要在Kubernetes周围导航的所有基本技能来找到和更新所有的碎片。我的解决方案在GitHub上的常见地方，你可以检查:https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch13/lab/README.md。
