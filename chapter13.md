@@ -303,130 +303,93 @@ kubectl get svc numbers-api-proxy -o jsonpath='http://{.status.loadBalancer.ingr
 
 ## 13.4 解析和过滤日志条目
 
-The ideal application would produce structured log data with fields for the severity of the entry and the name of the class writing the output, along with an ID for the type of event and the key data items of the event. You could use the values of those fields in your Fluent Bit pipeline to filter messages, and the fields would be surfaced in Elasticsearch so you can build more precise  queries. Most systems don’t produce logs like that—they just emit text—but if the text uses a known format, then Fluent Bit can parse it into fields as it passes through the pipeline.
-
-The random-number API is a simple example. Log entries are lines of text that look like this: <6>Microsoft.Hosting.Lifetime[0] Now listening on: http://[::]:80.The first part, in angle brackets, is the priority of the message, followed by the name of the class and the event ID in square brackets, and then the actual content of the log. The format is the same for every log entry, so a Fluent Bit parser can split the log into individual fields. You have to use a regular expression for that, and listing 13.4 shows my best  effort, which extracts just the priority field and leaves everything else in the message field.
-
 理想的应用程序应该生成结构化的日志数据，其中包含条目的严重程度字段和写入输出的类的名称，以及事件类型的ID和事件的关键数据项。您可以在Fluent Bit管道中使用这些字段的值来过滤消息，这些字段将在Elasticsearch中显示，以便您可以构建更精确的查询。大多数系统不会产生这样的日志——它们只是发出文本——但如果文本使用已知的格式，那么Fluent Bit可以在它通过管道时将其解析为字段。
 
-随机数API就是一个简单的例子。日志条目是如下所示的文本行:<6>Microsoft.Hosting。生命周期[0]现在监听http://[::]:80.尖括号内的第一部分是消息的优先级，然后是类的名称和方括号内的事件ID，然后是日志的实际内容。每个日志条目的格式都是相同的，因此Fluent Bit解析器可以将日志分解为单独的字段。为此必须使用正则表达式，清单13.4展示了我所做的最大努力，它只提取优先级字段，而将其他所有内容留在消息字段中。
+随机数API就是一个简单的例子。日志条目是如下所示的文本行:<6>Microsoft.Hosting.Lifetime[0] 现在监听http://[::]:80.尖括号内的第一部分是消息的优先级，然后是类的名称和方括号内的事件ID，然后是日志的实际内容。每个日志条目的格式都是相同的，因此Fluent Bit解析器可以将日志分解为单独的字段。为此必须使用正则表达式，清单13.4展示了我所做的最大努力，它只提取优先级字段，而将其他所有内容留在消息字段中。
 
-> Listing 13.4 fluentbit-config-parser.yaml, a custom parser for application logs
+> 清单 13.4 fluentbit-config-parser.yaml, 应用程序日志的自定义解析器
 
 ```
 [PARSER]
-	Name dotnet-syslog # Name of the parser
-	Format regex # Parses with a regular expression
-	Regex ^\<(?<priority>[0-9]+)\>*(?<message>.*)$ # Yuck
+	Name dotnet-syslog # 解析器的名称
+	Format regex # 用正则表达式解析
+	Regex ^\<(?<priority>[0-9]+)\>*(?<message>.*)$ # 令人反感的
 ```
-
-When you deploy this configuration, Fluent Bit will have a new custom parser called dotnet-syslog available to use, but it won’t  apply it to any logs. The pipeline needs to know which log entries should use custom parsers, and Fluent Bit lets you set that up with annotations in your Pods. These act like hints, telling the pipeline to apply a named parser to any logs that have originated from this Pod. Listing 13.5 shows the parser annotation for the random-number API Pod—it’s as simple as that.
 
 部署此配置时，Fluent Bit将有一个新的自定义解析器dotnet-syslog可供使用，但它不会将其应用于任何日志。管道需要知道哪些日志条目应该使用自定义解析器，而Fluent Bit允许您在Pods中使用注释进行设置。它们就像提示一样，告诉管道将命名解析器应用于源自此Pod的任何日志。清单13.5显示了随机数API pod的解析器注释——就是这么简单。
 
-> Listing 13.5 api-with-parser.yaml, Pod spec with a custom Fluent Bit parser
+> 清单 13.5 api-with-parser.yaml, 带有自定义Fluent Bit解析器的Pod规范
 
 ```
-# This is the Pod template in the Deployment spec.
+# 这是部署规范中的Pod模板.
 template:
-  metadata: # Labels are used for selectors and
-	labels: # operations; annotations are often
-	  app: numbers-api # used for integration flags.
+  metadata: # 标签用于选择器
+	labels: # 和操作;
+	  app: numbers-api # 注释通常用于集成标志。
 	annotations:
-	  fluentbit.io/parser: dotnet-syslog # Uses the parser for Pod logs
+	  fluentbit.io/parser: dotnet-syslog # 为Pod日志使用解析器
 ```
-
-Parsers can be much more effective than my custom one, and the Fluent Bit team have some sample parsers in their documentation, including one for Nginx. I’m using Nginx as a proxy for the random-number API, and in the next exercise, we’ll add parsers to each component with annotations and see how structured logging makes for more targeted searching and filtering in Kibana.
-
-TRY IT NOW
-Update the Fluent Bit configuration to add parsers for the random-number app and the Nginx proxy, and then update those deployments to add annotations specifying the parser. Try the app, and check the logs in Kibana.
 
 解析器可以比我的自定义解析器有效得多，Fluent Bit团队在他们的文档中有一些示例解析器，包括一个用于Nginx的解析器。我使用Nginx作为随机数API的代理，在下一个练习中，我们将为每个带有注释的组件添加解析器，并了解结构化日志如何在Kibana中实现更有针对性的搜索和过滤。
 
-现在试试吧
-更新Fluent Bit配置，为随机数应用程序和Nginx代理添加解析器，然后更新这些部署，添加指定解析器的注释。试试这款应用，在Kibana上查看日志。
+现在试试吧,更新Fluent Bit配置，为随机数应用程序和Nginx代理添加解析器，然后更新这些部署，添加指定解析器的注释。试试这款应用，在Kibana上查看日志。
 
 ```
-# update the pipeline configuration:
+# 更新管道配置:
 kubectl apply -f fluentbit/update/fluentbit-config-parser.yaml
 
-# restart Fluent Bit:
+# 重启Fluent Bit:
 kubectl rollout restart ds/fluent-bit -n kiamol-ch13-logging
 kubectl wait --for=condition=ContainersReady pod -l app=fluent-bit -n kiamol-ch13-logging
 
-# update the app Deployments, adding parser annotations:
+# 更新应用部署，添加解析器注释:
 kubectl apply -f numbers/update/
 
-# wait for the API to be ready:
+# 等待API准备就绪:
 kubectl wait --for=condition=ContainersReady pod -l app=numbers-api -n kiamol-ch13-test
 
-# use the API again, and browse to Kibana to see the logs
+# 再次使用API，并浏览到Kibana查看日志
 ```
-
-You can see in figure 13.12 that the promoted fields from the parser are available for Kibana to filter on, without me having to build up my own query. In my screenshot, I’ve filtered to show logs from one Pod that have a priority value of 4 (which is a warn-ing level). When you run this yourself, you’ll see that you can also filter for the API proxy Pod. The log entries include fields for the HTTP request path and the response code, all parsed from Nginx text logs. 
-
-![图 13.12](images/Figure13.12.png)
-<center>图 13.12 Parsed fields from the logs are indexed, so filters and searches are faster and simpler</center>
-
-There’s one final benefit of the centralized logging system with Fluent Bit: the data-processing pipeline is independent of the applications, and it can be a better place to apply filtering. That mythical ideal app would be able to increase or decrease logging levels on the fly, without an application restart. You know from chapter 4, however, that many apps need a Pod restart to pick up the latest configuration changes. That’s not good when you’re troubleshooting a live issue, because it means restarting the affected app if you need to increase the logging level.
-
-Fluent Bit doesn’t support live configuration reloads itself, but restarting the log collector Pods is less invasive than restarting application Pods, and Fluent Bit will pick up where it left off, so you won’t miss any log entries. With this approach, you can log at a more verbose level in your applications and filter in the Fluent Bit pipeline. Listing 13.6 shows a filter that includes logs from the random-number API only if the priority field has a value of 2, 3, or 4—it filters out lower priority entries.
 
 在图13.12中可以看到，Kibana可以对解析器中的提升字段进行筛选，而不需要构建自己的查询。在我的屏幕截图中，我过滤了来自一个Pod的日志，其优先级值为4(这是一个警告级别)。当你自己运行这个程序时，你会看到你还可以过滤API代理Pod。日志条目包括HTTP请求路径和响应代码字段，都是从Nginx文本日志中解析出来的。
 
 ![图 13.12](images/Figure13.12.png)
 <center>图 13.12日志中解析的字段被索引，因此过滤器和搜索更快更简单</center>
 
-使用Fluent Bit的集中式日志记录系统的最后一个好处是:数据处理管道独立于应用程序，它是应用过滤的一个更好的地方。这个神话般的理想应用程序将能够动态地增加或减少日志级别，而不需要重新启动应用程序。然而，从第4章中你知道，许多应用程序需要重新启动Pod来获取最新的配置更改。当你在对一个实时问题进行故障排除时，这并不好，因为这意味着如果你需要提高日志级别，就需要重新启动受影响的应用程序。
+使用 Fluent Bit的集中式日志记录系统的最后一个好处是:数据处理管道独立于应用程序，它是应用过滤的一个更好的地方。这个神话般的理想应用程序将能够动态地增加或减少日志级别，而不需要重新启动应用程序。然而，从第4章中你知道，许多应用程序需要重新启动Pod来获取最新的配置更改。当你在对一个实时问题进行故障排除时，这并不好，因为这意味着如果你需要提高日志级别，就需要重新启动受影响的应用程序。
 
 Fluent Bit本身不支持实时配置重加载，但是重新启动日志采集器Pods比重新启动应用程序Pods具有更小的侵入性，并且Fluent Bit将从中断的地方开始，因此您不会错过任何日志条目。使用这种方法，您可以在应用程序中以更详细的级别记录日志，并在Fluent Bit管道中进行筛选。清单13.6显示了一个过滤器，它只在优先级字段的值为2、3或4时才包含来自随机数API的日志——它过滤掉了优先级较低的条目。
 
-> Listing 13.6 fluentbit-config-grep.yaml, filtering logs based on field values
+> 清单 13.6 fluentbit-config-grep.yaml, 根据字段值过滤日志
 
 ```
 [FILTER]
-	Name grep 			 # grep is a search filter.
+	Name grep 			 # Grep是一个搜索过滤器。
 	Match kube.kiamol-ch13-test.api.numbers-api*
-	Regex priority [234] # Even I can manage this regular
-						 # expression.
+	Regex priority [234] # 连我都能处理这个正则表达式
 ```
-
-More regular expression wrangling here, but you can see why it’s important to have text log entries split into fields that the pipeline can access. The grep filter can include or exclude logs by evaluating a regular expression over a field. When you deploy this updated configuration, the API can happily write log entries at level 6, but they are dropped by Fluent Bit, and only the more important entries will make it to Elasticsearch.
-
-TRY IT NOW
-Deploy the updated configuration so only high-priority logs from the random-number API are saved. Delete the API Pod, and in Kibana, you won’t see any of the startup log entries, but they’re still there in the Pod logs.
-
 这里有更多的正则表达式争论，但是您可以看出为什么将文本日志条目分割为管道可以访问的字段很重要。grep过滤器可以通过计算字段上的正则表达式来包含或排除日志。当您部署这个更新的配置时，API可以愉快地在第6级写入日志条目，但是它们会被Fluent Bit删除，只有更重要的条目才会进入Elasticsearch。
 
-现在试试吧
-部署更新后的配置，以便只保存来自随机数API的高优先级日志。删除API Pod，在Kibana中，你将看不到任何启动日志条目，但它们仍然存在于Pod日志中。
+现在试试吧，部署更新后的配置，以便只保存来自随机数API的高优先级日志。删除API Pod，在Kibana中，你将看不到任何启动日志条目，但它们仍然存在于Pod日志中。
 
 ```
-# apply the grep filter from listing 13.6:
+# 应用清单13.6中的grep筛选器:
 kubectl apply -f fluentbit/update/fluentbit-config-grep.yaml
 
 kubectl rollout restart ds/fluent-bit -n kiamol-ch13-logging
 
-# delete the old API pod so we get a fresh set of logs:
+# 删除旧的API pod，这样我们就得到了一组新的日志:
 kubectl delete pods -n kiamol-ch13-test -l app=numbers-api
 
 kubectl wait --for=condition=ContainersReady pod -l app=numbers-api -n kiamol-ch13-test
 
-# use the API, and refresh until you see a failure
+# 使用API，并刷新，直到看到失败
 
-# print the logs from the Pod:
+# 从 pod里打印日志:
 kubectl logs -n kiamol-ch13-test -l app=numbers-api
 
-# now browse to Kibana, and filter to show the API Pod logs
+# 现在浏览到Kibana，并过滤显示API Pod日志
 ```
-
-This exercise shows you how Fluent Bit can filter out logs effectively, forwarding only log entries you care about to the target output. It also shows that the lower level logging hasn’t disappeared—the raw container logs are all available to see with kubectl.
-It’s only the subsequent log processing that stops them from going to Elasticsearch. In a real troubleshooting scenario, you may be able to use Kibana to identify the Pod causing the problem and then drill down with kubectl, as shown in figure 13.13.
-
-![图 13.13](images/Figure13.13.png)
-<center>图 13.13 Filtering log entries in Fluent Bit saves on storage, and you can easily change the filter</center>
-
-There’s plenty more to Fluent Bit than we’ve covered in these simple pipelines: you can modify log contents, throttle the rate of incoming logs, and even run custom scripts triggered by log entries. But we’ve covered all the main features you’re likely to need, and we’ll wrap up by looking at the collect-and-forward logging model compared to other options.
 
 本练习向您展示了Fluent Bit如何有效地过滤日志，只将您关心的日志项转发到目标输出。它还显示较低级别的日志记录并没有消失——使用kubectl可以查看原始容器日志。
 只是后续的日志处理阻止了他们使用Elasticsearch。在实际的故障排除场景中，您可以使用Kibana来识别导致问题的Pod，然后使用kubectl进行深入分析，如图13.13所示。
