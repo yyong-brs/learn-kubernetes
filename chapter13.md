@@ -206,145 +206,100 @@ kubectl logs -l app=fluent-bit -n kiamol-ch13-logging --tail 2
 
 ## 13.3 向 Elasticsearch 发送日志
 
-Elasticsearch is a production-grade open source database. It stores items as documents in collections called indexes. It’s a very different storage model from a relational database because it doesn’t support a fixed schema for every document in an index—each data item can have its own set of fields. That works nicely for centralized logging where the log items from different systems will have different fields. Elasticsearch runs as a single component with a REST API to insert and query data. A companion product called Kibana provides a very usable frontend to query Elasticsearch. You can run both components in Kubernetes in the same shared logging namespace as Fluent Bit.
+Elasticsearch 是一个生产级开源数据库。它将数据项作为文档存储在称为索引的集合中。这是一种与关系数据库非常不同的存储模型，因为它不支持索引中每个文档的固定模式——每个数据项可以有自己的一组字段。这很适合集中式日志记录，其中来自不同系统的日志项将具有不同的字段。Elasticsearch作为一个单独的组件运行，带有一个用于插入和查询数据的REST API。一个名为Kibana的配套产品提供了一个非常有用的Elasticsearch查询前端。您可以在与Fluent Bit相同的共享日志命名空间中运行Kubernetes中的两个组件。
 
-TRY IT NOW
-Deploy Elasticsearch and Kibana—the storage and frontend components of the logging system.
-
-Elasticsearch是一个生产级开源数据库。它将项作为文档存储在称为索引的集合中。这是一种与关系数据库非常不同的存储模型，因为它不支持索引中每个文档的固定模式——每个数据项可以有自己的一组字段。这很适合集中式日志记录，其中来自不同系统的日志项将具有不同的字段。Elasticsearch作为一个单独的组件运行，带有一个用于插入和查询数据的REST API。一个名为Kibana的配套产品提供了一个非常有用的Elasticsearch查询前端。您可以在与Fluent Bit相同的共享日志命名空间中运行Kubernetes中的两个组件。
-
-现在试试吧
-部署Elasticsearch和kibana—日志系统的存储和前端组件。
+现在试试吧，部署Elasticsearch和kibana—日志系统的存储和前端组件。
 
 ```
-# create the Elasticsearch deployment, and wait for the Pod:
+# 创建Elasticsearch部署，并等待Pod:
 kubectl apply -f elasticsearch/
 
 kubectl wait --for=condition=ContainersReady pod -l app=elasticsearch -n kiamol-ch13-logging
 
-# create the Kibana deployment, and wait for it to start:
+# 创建Kibana部署，并等待它启动:
 kubectl apply -f kibana/
 
 kubectl wait --for=condition=ContainersReady pod -l app=kibana -n kiamol-ch13-logging
 
-# get the URL for Kibana:
+# 获取Kibana的URL:
 kubectl get svc kibana -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:5601' -n kiamol-ch13-logging
 ```
 
-This basic deployment of Elasticsearch and Kibana uses a single Pod for each, as you see in figure 13.9. Logs are important, so you’ll want to model for high availability in production. Kibana is a stateless component so you can increase the replica count to increase reliability. Elasticsearch works nicely as a StatefulSet across multiple Pods using persistent storage, or you can use a managed Elasticsearch service in the cloud. When you have Kibana running, you can browse to the URL. We’ll be using it in the next exercise.
-
-![图 13.9](images/Figure13.9.png)
-<center>图 13.9 Running Elasticsearch with a Service so Kibana and Fluent Bit can use the REST API</center>
-
-Fluent Bit has an Elasticsearch output plugin that creates a document for each log entry using the Elasticsearch REST API. The plugin needs to be configured with the domain name of the Elasticsearch server, and you can optionally specify the index where documents should be created. That lets you isolate log entries from different namespaces in different indexes, using multiple output stages. Listing 13.3 separates log entries from Pods in the test namespace and Kubernetes system Pods.
-
-Elasticsearch和Kibana的基本部署分别使用一个Pod，如图13.9所示。日志很重要，因此您需要在生产环境中为高可用性建模。Kibana是一个无状态组件，因此可以通过增加副本数量来提高可靠性。Elasticsearch作为一个StatefulSet在多个使用持久存储的pod中工作得很好，或者你可以在云中使用托管Elasticsearch服务。当您运行Kibana时，您可以浏览到URL。我们将在下一个练习中使用它。
+Elasticsearch 和 Kibana 的基本部署分别使用一个Pod，如图13.9所示。日志很重要，因此您需要在生产环境中为高可用性建模。Kibana 是一个无状态组件，因此可以通过增加副本数量来提高可靠性。Elasticsearch 作为一个 StatefulSet 在多个使用持久存储的pod中工作得很好，或者你可以在云中使用托管Elasticsearch服务。当您运行Kibana时，您可以浏览到URL。我们将在下一个练习中使用它。
 
 ![图 13.9](images/Figure13.9.png)
 <center>图 13.9运行Elasticsearch和服务，使Kibana和Fluent Bit可以使用REST API</center>
 
 Fluent Bit有一个Elasticsearch输出插件，它使用Elasticsearch REST API为每个日志条目创建一个文档。该插件需要配置Elasticsearch服务器的域名，您可以选择指定应该在其中创建文档的索引。这允许您使用多个输出阶段从不同索引中的不同命名空间隔离日志条目。清单13.3将日志条目与test命名空间中的Pods和Kubernetes系统Pods分开。
 
-> Listing 13.3 fluentbit-config-elasticsearch.yaml, storing logs in Elasticsearch indexes
+> 清单 13.3 fluentbit-config-elasticsearch.yaml, 将日志存储在Elasticsearch索引中
 
 ```
 [OUTPUT]
-	Name es # Logs from the test namespace
-	Match kube.kiamol-ch13-test.* # are routed to Elasticsearch
-	Host elasticsearch # and created as documents in
-	Index test # the "test" index.
+	Name es # 来自test 命名空间的日志
+	Match kube.kiamol-ch13-test.* # 被路由到Elasticsearch，
+	Host elasticsearch # 并在“test”索引中作为文档创建。
+	Index test 
 [OUTPUT]
-	Name es # System logs are created in
-	Match kube.kube-system.* # the "sys" index in the same
-	Host elasticsearch # Elasticsearch server.
+	Name es # 系统日志创建在
+	Match kube.kube-system.* # 同一Elasticsearch服务器
+	Host elasticsearch # 的“sys”索引中。
 ```
-
-If there are log entries that don’t match any output rules, they are discarded. When you deploy this updated configuration, the Kubernetes system logs and the test namespace logs are saved in Elasticsearch, but the logs from the dev namespace aren’t saved.
-
-TRY IT NOW
-Update the Fluent Bit configuration to send logs to Elasticsearch, and then connect to Kibana and set up a search over the test index.
 
 如果有不匹配任何输出规则的日志项，它们将被丢弃。部署这个更新后的配置时，Kubernetes系统日志和test命名空间日志保存在Elasticsearch中，但不保存来自dev命名空间的日志。
 
-现在试试吧
-更新Fluent Bit配置以将日志发送到Elasticsearch，然后连接到Kibana并在测试索引上设置搜索。
+现在试试吧，更新Fluent Bit配置以将日志发送到Elasticsearch，然后连接到Kibana并在测试索引上设置搜索。
 
 ```
-# deploy the updated configuration from listing 13.3
+# 部署清单13.3中的更新配置
 kubectl apply -f fluentbit/update/fluentbit-config-elasticsearch.yaml
 
-# update Fluent Bit, and wait for it to restart
+# 更新Fluent Bit，并等待它重新启动
 kubectl rollout restart ds/fluent-bit -n kiamol-ch13-logging
 
 kubectl wait --for=condition=ContainersReady pod -l app=fluent-bit -n kiamol-ch13-logging
 
-# now browse to Kibana and set up the search:
-# - click Discover on the left navigation panel
-# - create a new index pattern
-# - enter "test" as the index pattern
-# - in the next step, select @timestamp as the time filter field
-# - click Create Index Pattern
-# - click Discover again on the left navigation panel to see the logs
+# 现在浏览到Kibana并设置搜索:
+# - 单击左侧导航面板上的“发现”
+# - 创建一个新的索引模式
+# - 输入“test”作为索引模式
+# - 在下一步中，选择@timestamp作为时间筛选字段
+# - 单击创建索引模式
+# - 再次单击左侧导航面板上的Discover查看日志
 ```
-
-This process contains a few manual steps because Kibana isn’t a great product to automate. My output in figure 13.10 shows the index pattern being created. When you finish that exercise, you’ll have a powerful, fast, and easy-to-use search engine for all the container logs in the test namespace. The Discover tab in Kibana shows you the rate of documents stored over time—which is the rate that logs are processed—and you can drill down into each document to see the log details.
-
-![图 13.10](images/Figure13.10.png)
-<center>图 13.10 Setting up Fluent Bit to send logs to Elasticsearch and Kibana to search the test index</center>
-
-Elasticsearch and Kibana are well-established technologies but if you’re new to them, now is a good time to look around the Kibana UI. You’ll see a list of fields on the left of the Discover page that you can use to filter the logs. Those fields contain all the Kubernetes metadata, so you can filter by Pod name, host node, container image, and more. You can build dashboards that show headline statistics for logs split by application, which would be useful to show a sudden spike in error logs. You can also search for specific values across all documents, which is a good way to find application logs when a user gives you the ID from an error message.
-
-I won’t spend too long on Kibana, but one more exercise will show how useful it is to have a centralized logging system. We’ll  deploy a new application into the test namespace, and its logs will automatically get picked up by Fluent Bit and flow through to Elasticsearch without any changes to configuration. When the app shows an error to the user, we can track that down easily in Kibana.
-
-TRY IT NOW
-Deploy the random-number API we’ve used before—the one that crashes after the first use—along with a proxy that caches the response and almost fixes the problem. Try the API, and when you get an error, you can search for the failure ID in Kibana.
 
 这个过程包含一些手动步骤，因为Kibana不是一个可以自动化的好产品。图13.10中的输出显示了正在创建的索引模式。当您完成该练习时，您将拥有一个强大、快速且易于使用的搜索引擎，用于测试命名空间中的所有容器日志。Kibana中的Discover选项卡显示了随时间存储的文档的速率(即日志处理的速率)，您可以向下钻取每个文档以查看日志详细信息。
 
 ![图 13.10](images/Figure13.10.png)
-<center>图13.10设置Fluent Bit将日志发送到Elasticsearch和Kibana，以搜索测试索引</center>
+<center>图13.10 设置Fluent Bit将日志发送到Elasticsearch和Kibana，以搜索测试索引</center>
 
-Elasticsearch和Kibana都是成熟的技术，但如果你不熟悉它们，现在是了解Kibana UI的好时机。您将在Discover页面的左侧看到一个字段列表，您可以使用它来过滤日志。这些字段包含所有Kubernetes元数据，因此您可以根据Pod名称、主机节点、容器映像等进行过滤。您可以构建显示按应用程序划分的日志的标题统计信息的仪表板，这对于显示错误日志的突然激增非常有用。您还可以在所有文档中搜索特定的值，当用户从错误消息中提供ID时，这是查找应用程序日志的好方法。
+Elasticsearch 和 Kibana 都是成熟的技术，但如果你不熟悉它们，现在是了解Kibana UI的好时机。您将在 Discover 页面的左侧看到一个字段列表，您可以使用它来过滤日志。这些字段包含所有Kubernetes元数据，因此您可以根据Pod名称、主机节点、容器镜像等进行过滤。您可以构建显示按应用程序划分的日志的标题统计信息的仪表板，这对于显示错误日志的突然激增非常有用。您还可以在所有文档中搜索特定的值，当用户从错误消息中提供ID时，这是查找应用程序日志的好方法。
 
 我不会在Kibana上花太多时间，但是再做一个练习就会展示集中式日志记录系统是多么有用。我们将把一个新的应用程序部署到test命名空间中，它的日志将自动由Fluent Bit提取并流到Elasticsearch，而不需要对配置进行任何更改。当应用程序向用户显示错误时，我们可以很容易地在Kibana中追踪到它。
 
-现在试试吧
-部署我们以前使用过的随机数API(在第一次使用后崩溃的API)，以及缓存响应并几乎修复问题的代理。尝试API，当您得到一个错误时，您可以在Kibana中搜索失败ID。
+现在试试吧，部署我们以前使用过的随机数API(在第一次使用后崩溃的API)，以及缓存响应并几乎修复问题的代理。尝试API，当您得到一个错误时，您可以在Kibana中搜索失败ID。
 
 ```
-# deploy the API and proxy:
+# 部署API和代理:
 kubectl apply -f numbers/
 
-# wait for the app to start up:
+# 等待应用程序启动:
 kubectl wait --for=condition=ContainersReady pod -l app=numbers-api -n kiamol-ch13-test
 
-# get the URL to use the API via the proxy:
+# 通过代理获取使用API的URL:
 kubectl get svc numbers-api-proxy -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080/rng' -n kiamol-ch13-test
 
-# browse to the API, wait 30 seconds, and refresh until you get an error
-# browse to Kibana, and enter this query in the search bar:
+# 浏览到API，等待30秒，然后刷新，直到出现错误
+# browse到Kibana，并在搜索栏中输入这个查询:
 # kubernetes.labels.app:numbers-api AND log:<failure-ID-from-the-API>
 ```
-
-My output in figure 13.11 is tiny, but you can see what’s happening: I got a failure ID from the API, and I’ve pasted that into the search bar for Kibana, which returns a single match. The log entry contains all the information I need to investigate the Pod if I need to. Kibana also has a useful option to display documents before and after a match, which I could use to show the log entries surrounding the failure log.
-
-![图 13.11](images/Figure13.11.png)
-<center>图 13.11 The logging system in action—tracking down failures from user-facing error messages</center>
-
-Searchable, centralized logging removes a lot of the friction from troubleshooting, with the bonus that these components are all  open source so you can run the same logging stack in every environment. Using the same diagnostic tools in the development and test environments that you use in production should help product teams understand the level of logging that’s useful and improve the quality of the system logs. Good quality logging is important, but it seldom ranks highly in a product backlog,
-
-
-so in some applications, you’re going to be stuck with logs that aren’t very useful. Fluent Bit has a couple additional features that can help there, too.
 
 我在图13.11中的输出很小，但您可以看到发生了什么:我从API获得了一个失败ID，并将其粘贴到Kibana的搜索栏中，该搜索栏返回一个匹配项。日志条目中包含了我需要调查Pod所需的所有信息。Kibana还有一个有用的选项，可以在匹配前后显示文档，我可以使用它来显示围绕失败日志的日志条目。
 
 ![图 13.11](images/Figure13.11.png)
-<center>图 13.11日志系统在操作中跟踪用户面对的错误消息中的失败</center>
+<center>图 13.11 日志系统在操作中跟踪用户面对的错误消息中的失败</center>
 
-可搜索的集中式日志记录消除了故障排除中的许多摩擦，而且这些组件都是开源的，因此您可以在每个环境中运行相同的日志记录堆栈。在开发和测试环境中使用与在生产环境中使用的相同的诊断工具，可以帮助产品团队理解有用的日志级别，并提高系统日志的质量。高质量的日志记录很重要，但它在产品待办事项列表中很少排名靠前，
-
-
-所以在一些应用中，你会遇到一些用处不大的日志。Fluent Bit还有一些额外的特性可以提供帮助。
+可搜索的集中式日志记录消除了故障排除中的许多摩擦，而且这些组件都是开源的，因此您可以在每个环境中运行相同的日志记录堆栈。在开发和测试环境中使用与在生产环境中使用的相同的诊断工具，可以帮助产品团队理解有用的日志级别，并提高系统日志的质量。高质量的日志记录很重要，但它在产品待办事项列表中很少排名靠前，所以在一些应用中，你会遇到一些用处不大的日志。Fluent Bit还有一些额外的特性可以提供帮助。
 
 ## 13.4 解析和过滤日志条目
 
