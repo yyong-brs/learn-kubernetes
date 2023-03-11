@@ -98,110 +98,71 @@ exit
 
 ## 13.2 使用 Fluentd 收集节点日志
 
-Fluentd is a CNCF project, so it has a sound foundation behind it and is a mature and popular product. Alternative log collection components exist, but Fluentd is a good choice because it has a powerful processing pipeline to manipulate and filter log entries as well as a pluggable architecture, so it can forward logs to different storage systems. It also comes in two variants: the full Fluentd is fast and efficient and has more than 1,000 plugins, but we’ll be using the minimal alternative, called Fluent Bit.
+Fluentd 是 CNCF 项目，有很好的基础，是一个成熟的、受欢迎的产品。存在其他日志收集组件，但 Fluentd 是一个很好的选择，因为它具有强大的处理管道来操作和过滤日志条目，以及可插入的体系结构，因此它可以将日志转发到不同的存储系统。它也有两种变体:完整的 Fluentd 快速高效，有1000多个插件，但我们将使用最小的替代品，称为 Fluent Bit。
 
-Fluent Bit was originally developed as a lightweight version of Fluentd for embedded applications like IoT devices, but it has all the functionality you need for log aggregation in a full Kubernetes cluster. Every node will run a log collector, so it makes sense to keep the impact of that component small, and Fluent Bit happily runs in a few tens of megabytes of memory. The Fluent Bit architecture in Kubernetes is straightforward: a DaemonSet runs a collector Pod on every node, which uses a HostPath volume mount to access the log files, just like in the sleep example we’ve used. Fluent Bit supports different outputs, so we’ll start simple and just log to the console in the Fluent Bit Pod.
+Fluent Bit 最初是作为 Fluentd 的轻量级版本开发的，用于 IoT 设备等嵌入式应用程序，但它具有在完整的 Kubernetes 集群中进行日志聚合所需的所有功能。每个节点都将运行一个日志采集器，因此保持该组件的影响较小是有意义的，而且Fluent Bit只占用几十兆的内存。Kubernetes 中的 Fluent Bit 架构很简单:DaemonSet 在每个节点上运行一个收集器Pod，它使用 HostPath 卷挂载来访问日志文件，就像在我们使用的睡眠示例中一样。Fluent Bit 支持不同的输出，所以我们将从简单的开始，只是登录到 Fluent Bit Pod 的控制台。
 
-TRY IT NOW
-Deploy Fluent Bit with a configuration set up to read the timecheck log files and write them to the standard output stream of the Fluent Bit container.
-
-Fluentd是CNCF项目，有很好的基础，是一个成熟的、受欢迎的产品。存在其他日志收集组件，但Fluentd是一个很好的选择，因为它具有强大的处理管道来操作和过滤日志条目，以及可插入的体系结构，因此它可以将日志转发到不同的存储系统。它也有两种变体:完整的Fluentd快速高效，有1000多个插件，但我们将使用最小的替代品，称为Fluent Bit。
-
-Fluent Bit最初是作为Fluentd的轻量级版本开发的，用于IoT设备等嵌入式应用程序，但它具有在完整的Kubernetes集群中进行日志聚合所需的所有功能。每个节点都将运行一个日志采集器，因此保持该组件的影响较小是有意义的，而且Fluent Bit只占用几十兆的内存。Kubernetes中的Fluent Bit架构很简单:DaemonSet在每个节点上运行一个收集器Pod，它使用HostPath卷挂载来访问日志文件，就像在我们使用的睡眠示例中一样。Fluent Bit支持不同的输出，所以我们将从简单的开始，只是登录到Fluent Bit Pod的控制台。
-
-现在试试吧
-部署Fluent Bit，配置为读取时间检查日志文件并将其写入Fluent Bit容器的标准输出流。
+现在试试吧，部署Fluent Bit，配置为读取时间检查日志文件并将其写入Fluent Bit容器的标准输出流。
 
 ```
-# deploy the DaemonSet and ConfigMap:
+# 部署 DaemonSet and ConfigMap:
 kubectl apply -f fluentbit/
 
-# wait for Fluent Bit to start up:
+# 等待 Pod 就緒:
 kubectl wait --for=condition=ContainersReady pod -l app=fluent-bit -n kiamol-ch13-logging
 
-# check the logs of the Fluent Bit Pod:
+# 检查 Fluent Bit Pod 日志:
 kubectl logs -l app=fluent-bit -n kiamol-ch13-logging --tail 2
 ```
 
-My output is shown in figure 13.5, where you can see the logs from the timecheck containers being surfaced in the Fluent Bit container. The Pods creating the log entries are in different namespaces, but Fluent Bit reads them from the files on the node.
-The content is the raw JSON plus a more precise timestamp, which Fluent Bit adds to each log entry.
+我的输出如图 13.5所示，其中您可以看到来自 timecheck 容器的日志被显示在Fluent Bit容器中。创建日志条目的 pod 位于不同的命名空间中，但是Fluent Bit从节点上的文件中读取它们。内容是原始JSON加上更精确的时间戳，Fluent Bit将其添加到每个日志条目中。
 
 ![图 13.5](images/Figure13.5.png)
-<center>图 13.5 A very basic Fluent Bit configuration can still aggregate log entries from multiple Pods</center>
+<center>图13.5 一个非常基本的 Fluent Bit配置仍然可以聚合来自多个pod的日志条目 </center>
 
-There’s nothing in the DaemonSet spec for Fluent Bit that you haven’t already seen. I’m using a separate namespace for logging because you typically want it to run as a shared service used by all the applications running on the cluster, and a namespace is a good way to isolate all the objects. It’s simple to run the Fluent Bit Pods—the complexity comes in configuring the log-processing pipeline, and we’ll need to dive into that to get the most out of the logging model. Figure 13.6 shows the stages of the pipeline and how you can use them.
-
-![图 13.6](images/Figure13.6.png)
-<center>图 13.6 Fluent Bit’s processing pipeline is super flexible and uses plugin modules for every stage</center>
-
-We’re currently running a simple configuration with three stages: the input stage reads log files, the parser stage deconstructs the JSON log entries, and the output stage writes each log as a separate line to the standard output stream in the Fluent Bit container. The JSON parser is standard for all container logs and isn’t very interesting, so we’ll focus on the input and output configuration in listing 13.1.
-
-我的输出如图13.5所示，其中您可以看到来自timecheck容器的日志被显示在Fluent Bit容器中。创建日志条目的pod位于不同的命名空间中，但是Fluent Bit从节点上的文件中读取它们。
-内容是原始JSON加上更精确的时间戳，Fluent Bit将其添加到每个日志条目中。
-
-![图 13.5](images/Figure13.5.png)
-<center>图13.5一个非常基本的Fluent Bit配置仍然可以聚合来自多个pod </center>的日志条目
-
-在Fluent Bit的DaemonSet规范中，您已经看到了所有内容。我使用单独的命名空间进行日志记录，因为您通常希望它作为集群上运行的所有应用程序所使用的共享服务运行，而命名空间是隔离所有对象的好方法。运行Fluent Bit pod很简单——复杂之处在于配置日志处理管道，我们需要深入研究这一点，以充分利用日志模型。图13.6显示了管道的各个阶段以及如何使用它们。
+在 Fluent Bit 的 DaemonSet spec 中，您已经看到了所有内容。我使用单独的命名空间进行日志记录，因为您通常希望它作为集群上运行的所有应用程序所使用的共享服务运行，而命名空间是隔离所有对象的好方法。运行Fluent Bit pod很简单——复杂之处在于配置日志处理管道，我们需要深入研究这一点，以充分利用日志模型。图13.6显示了管道的各个阶段以及如何使用它们。
 
 ![图 13.6](images/Figure13.6.png)
 <center>图 13.6 Fluent Bit的处理管道超级灵活，每个阶段都使用插件模块</center>
 
 我们目前正在运行一个简单的配置，有三个阶段:输入阶段读取日志文件，解析器阶段分解JSON日志条目，输出阶段将每个日志作为单独的行写入Fluent Bit容器中的标准输出流。JSON解析器是所有容器日志的标准，并不是很有趣，因此我们将重点关注清单13.1中的输入和输出配置。
 
-> Listing 13.1 fluentbit-config.yaml, a simple Fluent Bit pipeline
+> 清单 13.1 fluentbit-config.yaml, 一个简单的 Fluent Bit 管道
 
 ```
 [INPUT]
-	Name tail # Reads from the end of a file
-	Tag kube.* # Uses a prefix for the tag
+	Name tail # 从文件末尾读取
+	Tag kube.* # 为标记使用前缀
 	Path /var/log/containers/timecheck*.log
-	Parser docker # Parses the JSON container logs
-	Refresh_Interval 10 # Sets the frequency to check the file list
+	Parser docker # 解析JSON容器日志
+	Refresh_Interval 10 # 设置检查文件列表的频率
 [OUTPUT]
-	Name stdout # Writes to standard out
-	Format json_lines # Formats each log as a line
-	Match kube.* # Writes logs with a kube tag prefix
+	Name stdout # 写入标准输出
+	Format json_lines # 将每个日志格式化为一行
+	Match kube.* # 写入带有kube标记前缀的日志
 ```
 
-Fluent Bit uses tags to identify the source of a log entry. The tag is added at the input stage and can be used to route logs to other stages. In this configuration, the log file name is used as the tag, prefixed with kube. The match rule routes all the kube tagged entries to the output stage so every log is printed out, but the input stage reads only the timecheck log files, so those are the only log entries you see.
-
-You don’t really want to filter the input files—that’s just a quick way to get started without flooding you with log entries. It’s better to read all the input and then route logs based on tags, so you store only the entries you’re interested in. Fluent Bit has built-in support for Kubernetes with a filter that can enrich log entries with metadata to identify the Pod that created it. The filter can also be configured to build a custom tag for each log that includes the namespace and Pod name; using that, you can alter the  pipeline so only the logs from the test namespace are written to standard out.
-
-TRY IT NOW
-Update the Fluent Bit ConfigMap to use the Kubernetes filter, restart the DaemonSet to apply the configuration change, and then print the latest log from the timecheck app to see what the filter does.
-
-Fluent Bit使用标记来标识日志条目的来源。标签在输入阶段添加，可用于将日志路由到其他阶段。在此配置中，日志文件名用作标记，前缀为kube。匹配规则将所有带kube标记的条目路由到输出阶段，因此每个日志都被打印出来，但输入阶段只读取timcheck日志文件，因此这些是您看到的唯一日志条目。
+Fluent Bit 使用标记来标识日志条目的来源。标签在输入阶段添加，可用于将日志路由到其他阶段。在此配置中，日志文件名用作标记，前缀为kube。匹配规则将所有带kube标记的条目路由到输出阶段，因此每个日志都被打印出来，但输入阶段只读取timcheck日志文件，因此这些是您看到的唯一日志条目。
 
 您并不是真的想过滤输入文件——这只是一种快速入门的方法，不会让您被日志条目淹没。最好是读取所有输入，然后根据标记路由日志，这样就只存储感兴趣的条目。Fluent Bit内置了对Kubernetes的支持，它有一个过滤器，可以用元数据丰富日志条目，以识别创建它的Pod。过滤器还可以配置为每个包含命名空间和Pod名称的日志构建自定义标记;使用它，您可以更改管道，以便只有来自test命名空间的日志被写入标准输出。
 
-现在试试吧
-更新Fluent Bit ConfigMap以使用Kubernetes过滤器，重新启动DaemonSet以应用配置更改，然后从timecheck应用程序中打印最新的日志以查看过滤器的功能。
+现在试试吧,更新Fluent Bit ConfigMap以使用Kubernetes过滤器，重新启动DaemonSet以应用配置更改，然后从timecheck应用程序中打印最新的日志以查看过滤器的功能。
 
 ```
-# update the data pipeline configuration files:
+# 更新数据管道配置文件:
 kubectl apply -f fluentbit/update/fluentbit-config-match.yaml
 
-# restart the DaemonSet so a new Pod gets the changed configuration:
+# 重新启动DaemonSet，使一个新的Pod获得更改后的配置:
 kubectl rollout restart ds/fluent-bit -n kiamol-ch13-logging
 
-# wait for the new logging Pod:
+# 等待新的记录Pod:
 kubectl wait --for=condition=ContainersReady pod -l app=fluent-bit -n kiamol-ch13-logging
 
-# print the last log entry:
+# 打印最后一个日志条目:
 kubectl logs -l app=fluent-bit -n kiamol-ch13-logging --tail 1
 ```
 
-You can see from my output in figure 13.7 that a lot more data is coming through Fluent Bit—the log entry is the same, but it’s  been enriched with the details of the source of the log. The Kubernetes filter fetches all that data from the API server, which gives you the additional context you really need when you’re analyzing logs to track down issues. Seeing the image hash for the container will let you check the software version with complete certainty.
-
-![图13.7.png](images/Figure13.7.png)
-<center>图 13.7 Filters enrich log entries—the single log message now has 14 additional metadata fields</center>
-
-The Fluent Bit configuration for this is a little bit tricky. The Kubernetes filter works out of the box to fetch all the Pod metadata, but building a custom tag for routing needs some fiddly regular expressions. That’s all in the configuration files in the ConfigMap you deployed in the previous exercise, but I’m not going to focus on it because I really dislike regular expressions. There’s also no need—the setup is completely generic, so you can plug the input, filter, and parser configurations into your own cluster, and it  will work for your apps without any changes. 
-
-The output configuration will be different because that’s how you configure the targets. We’ll look at one more feature of Fluent Bit before we plug in the log storage and search components—routing log entries to different outputs. The regular expression in the input configuration sets a custom tag for entries in the format kube.namespace.container_name.pod_name, and that can be used in matches to route logs differently based on their namespace or pod name. Listing 13.2 shows an updated output  configuration with multiple destinations.
-
-您可以从图13.7中的输出中看到，更多的数据来自Fluent bit—日志条目是相同的，但添加了日志源的详细信息。Kubernetes过滤器从API服务器获取所有数据，这为您在分析日志以跟踪问题时提供了真正需要的额外上下文。查看容器的映像散列可以让您完全确定地检查软件版本。
+您可以从图13.7中的输出中看到，更多的数据来自Fluent bit—日志条目是相同的，但添加了日志源的详细信息。Kubernetes过滤器从API server 获取所有数据，这为您在分析日志以跟踪问题时提供了真正需要的额外上下文。查看容器的镜像散列可以让您完全确定地检查软件版本。
 
 ![图13.7.png](images/Figure13.7.png)
 <center>图13.7过滤器丰富了日志条目——单个日志消息现在有14个额外的元数据字段</center>
@@ -210,46 +171,35 @@ The output configuration will be different because that’s how you configure th
 
 输出配置将有所不同，因为这是您配置目标的方式。在插入日志存储和搜索组件之前，我们将研究Fluent Bit的另一个特性——将日志条目路由到不同的输出。输入配置中的正则表达式为kube.namespace.container_name.pod_name格式的条目设置了一个自定义标记，可以在匹配中使用该标记根据命名空间或pod名称对日志进行不同的路由。清单13.2显示了具有多个目的地的更新输出配置。
 
-> Listing 13.2 fluentbit-config-match-multiple.yaml, routing to multiple outputs
+> 清单 13.2 fluentbit-config-match-multiple.yaml, 路由到多个输出
 
 ```
 [OUTPUT]
-	Name stdout # The standard out plugin will
-	Format json_lines # print only log entries where
-	Match kube.kiamol-ch13-test.* # the namespace is test.
+	Name stdout # 标准的out插件将
+	Format json_lines # 只打印命名空间为
+	Match kube.kiamol-ch13-test.* # test的日志条目。
 [OUTPUT]
-	Name counter # The counter prints a count of
-	Match kube.kiamol-ch13-dev.* # logs from the dev namespace.
+	Name counter # 计数器打印来自
+	Match kube.kiamol-ch13-dev.* # dev名称空间的日志计数。
 ```
-
-Fluent Bit supports many output plugins, from plain TCP to Postgres and cloud services like Azure Log Analytics. We’ve used the standard output stream so far, which just relays log entries to the console. The counter plugin is a simple output that just prints how many log entries have been collected. When you deploy the new configuration, you’ll continue to see the log lines from the test namespace, and you’ll also see a count of log entries from the dev namespace.
-
-TRY IT NOW
-Update the configuration to use multiple outputs, and print the logs from the Fluent Bit Pod.
 
 Fluent Bit支持许多输出插件，从普通TCP到Postgres和云服务，如Azure Log Analytics。到目前为止，我们使用的是标准输出流，它只是将日志条目中继到控制台。counter插件是一个简单的输出，它只打印已经收集了多少日志条目。部署新配置时，您将继续看到来自test命名空间的日志行，还将看到来自dev命名空间的日志条目计数。
 
-现在试试吧
-更新配置以使用多个输出，并从Fluent Bit Pod打印日志。
+现在试试吧,更新配置以使用多个输出，并从Fluent Bit Pod打印日志。
 
 ```
-# update the configuration and restart Fluent Bit:
+# 更新配置并重新启动Fluent Bit:
 kubectl apply -f fluentbit/update/fluentbit-config-match-multiple.yaml
 
 kubectl rollout restart ds/fluent-bit -n kiamol-ch13-logging
 
 kubectl wait --for=condition=ContainersReady pod -l app=fluent-bit -n kiamol-ch13-logging
 
-# print the last two log lines:
+# 打印最后两行日志:
 kubectl logs -l app=fluent-bit -n kiamol-ch13-logging --tail 2
 ```
 
-The counter in this exercise isn’t especially useful, but it’s there to show you that the complex bits in the early part of the pipeline make for easy routing later in the pipeline. Figure 13.8 shows I have different output for logs in different namespaces, and I can configure that purely using match rules in the output stages. It should be clear how you can plug a sophisticated logging system on top of the simple log files that Kubernetes writes. The data pipeline in Fluent Bit lets you enrich log entries and route them to different outputs. If the output you want to use isn’t supported by Fluent Bit, then you can switch to the parent Fluentd project, which has a larger set of plugins (including MongoDB and AWS S3)—the pipeline stages and configuration are very similar. We’ll be using Elasticsearch for storage, which is perfect for high-performance search and simple to integrate with Fluent Bit.
-
-![图 13.8](images/Figure13.8.png)
-<center>图 13.8 Different outputs in Fluent Bit can reshape the data—the counter just shows a count</center>
-
-本练习中的计数器并不是特别有用，但它可以向您展示管道早期部分的复杂位可以使管道后面的路由更容易。图13.8显示了不同命名空间中的日志有不同的输出，可以在输出阶段中使用匹配规则进行配置。应该很清楚如何在Kubernetes编写的简单日志文件之上插入复杂的日志系统。Fluent Bit中的数据管道允许您丰富日志条目并将它们路由到不同的输出。如果你想使用的输出不被Fluent Bit支持，那么你可以切换到父项目Fluentd，它有一个更大的插件集(包括MongoDB和AWS S3)——管道阶段和配置非常相似。我们将使用Elasticsearch进行存储，它非常适合进行高性能搜索，并且易于与Fluent Bit集成。
+本练习中的计数器并不是特别有用，但它可以向您展示管道早期部分的复杂可以使管道后面的路由更容易。图13.8显示了不同命名空间中的日志有不同的输出，可以在输出阶段中使用匹配规则进行配置。应该很清楚如何在Kubernetes编写的简单日志文件之上插入复杂的日志系统。Fluent Bit中的数据管道允许您丰富日志条目并将它们路由到不同的输出。如果你想使用的输出不被Fluent Bit支持，那么你可以切换到父项目Fluentd，它有一个更大的插件集(包括MongoDB和AWS S3)——管道阶段和配置非常相似。我们将使用Elasticsearch进行存储，它非常适合进行高性能搜索，并且易于与Fluent Bit集成。
 
 ![图 13.8](images/Figure13.8.png)
 <center>图13.8在Fluent Bit中不同的输出可以重塑数据-计数器只显示一个计数</center>
