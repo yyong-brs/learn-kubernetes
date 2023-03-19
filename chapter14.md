@@ -26,26 +26,14 @@ Deploy Prometheus in a dedicated monitoring namespace, config-ured to find apps 
 ```
 # switch to this chapter’s folder:
 cd ch14
+
 # create the Prometheus Deployment and ConfigMap:
 kubectl apply -f prometheus/
+
 # wait for Prometheus to start:
 kubectl wait --for=condition=ContainersReady pod -l app=prometheus -n
 kiamol-ch14-monitoring
-Prometheus connects to the Kubernetes API
-to find all the Pods to monitor.
-App 1
-Prometheus
-App 2
-On a regular schedule, Prometheus collects metrics from an HTTP endpoint on the Pod.
-It uses the Pod’s IP address, so the requests don’t go via a Service.
-The metrics endpoint on the Pod could be
-served by the application container or by
-a sidecar container.
-Figure 14.1
-Prometheus uses a pull model to collect metrics, automatically finding targets.
-334
-CHAPTER 14
-Monitoring applications and Kubernetes with Prometheus
+
 # get the URL for the web UI:
 kubectl get svc prometheus -o jsonpath='http://{.status.loadBalancer
 .ingress[0].*}:9090' -n kiamol-ch14-monitoring
@@ -63,14 +51,14 @@ Configuring Prometheus to find targets in Kubernetes is fairly straightforward, 
 
 ```
 scrape_configs: # This is the YAML inside the ConfigMap.
-- job_name: 'test-pods' # Used for test apps
-kubernetes_sd_configs: # Finds targets from the Kubernetes API
-- role: pod # Searches for Pods
-relabel_configs: # Applies these filtering rules
-- source_labels:
-- __meta_kubernetes_namespace
-action: keep # Includes Pods only where the namespace
-regex: kiamol-ch14-test # is the test namespace for this chapter
+   - job_name: 'test-pods' # Used for test apps
+     kubernetes_sd_configs: # Finds targets from the Kubernetes API
+     - role: pod # Searches for Pods
+     relabel_configs: # Applies these filtering rules
+     - source_labels:
+       - __meta_kubernetes_namespace
+       action: keep # Includes Pods only where the namespace
+       regex: kiamol-ch14-test # is the test namespace for this chapter
 ```
 
 It’s the relabel_configs section that needs explanation. Prometheus stores metrics with labels, which are key-value pairs that identify the source system and other relevant information. You’ll use labels in queries to select or aggregate metrics, and you can also use them to filter or modify metrics before they are stored in Prometheus. This is relabeling, and conceptually, it’s similar to the data pipeline in Fluent Bit—it’s your chance to discard data you don’t want and reshape the data you do want. Regular expressions rear their unnecessarily complicated heads in Prometheus, too, but it’s rare that you need to make changes. The pipeline you set up in the relabeling phase should be generic enough to work for all your apps. The full pipeline in the configuration file applies the following rules:
@@ -155,9 +143,10 @@ Convention-based discovery is great because it removes a lot of repetitive confi
 
 ```
 - source_labels: # This is a relabel configuration in the test-pods job.
-- __meta_kubernetes_pod_annotationpresent_prometheus_io_path
-- __meta_kubernetes_pod_annotation_prometheus_io_path
+  - __meta_kubernetes_pod_annotationpresent_prometheus_io_path
+  - __meta_kubernetes_pod_annotation_prometheus_io_path
 regex: true;(.*) # If the Pod has an annotation named prometheus.io/path . . .
+
 target_label: __metrics_path__ # sets the target path from the annotation.
 ```
 
@@ -167,11 +156,11 @@ This is way less complicated than it looks. The rule says: if the Pod has an ann
 
 ```
 template: # This is the pod spec in the Deployment.
-metadata:
-labels:
-app: apod-api # Used as the job label in Prometheus
-annotations:
-prometheus.io/path: "/actuator/prometheus" # Sets the metrics path
+   metadata:
+     labels:
+       app: apod-api # Used as the job label in Prometheus
+     annotations:
+       prometheus.io/path: "/actuator/prometheus" # Sets the metrics path
 ```
 The complexity is centralized in the Prometheus configuration, and it’s really easy for application manifests to specify overrides. The relabeling rules aren’t so complex when you work with them a little more, and you’re usually following exactly the same pattern. The full Prometheus configuration includes similar rules for apps to override the metrics port and to opt out of scraping altogether.
 
