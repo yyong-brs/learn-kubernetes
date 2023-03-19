@@ -195,3 +195,17 @@
     - 13.5 [了解 Kubernetes 中的日志记录选项](./chapter13.md#135-了解-kubernetes-中的日志记录选项)
 
     - 13.6 [实验室](./chapter13.md#136-实验室)
+
+  - 第十四章 [使用 Fluentd 和 Elasticsearch 集中化日志](./chapter14.md)
+
+    - 14.1 [Kubernetes 如何存储日志条目](./chapter14.md#141-kubernetes-如何存储日志条目)
+
+    - 14.2 [使用 Fluentd 收集节点日志](./chapter14.md#142-使用-fluentd-收集节点日志)
+
+    - 14.3 [向 Elasticsearch 发送日志](./chapter14.md#143-向-elasticsearch-发送日志)
+
+    - 14.4 [解析和过滤日志条目](./chapter14.md#144-解析和过滤日志条目)
+
+    - 14.5 [了解 Kubernetes 中的日志记录选项](./chapter14.md#145-了解-kubernetes-中的日志记录选项)
+
+    - 14.6 [实验室](./chapter14.md#146-实验室)
