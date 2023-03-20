@@ -334,10 +334,15 @@ Components don’t need to have native support for Prometheus and provide their 
 
 组件不需要对Prometheus提供本地支持，并提供自己的度量端点以包含在监视系统中。Prometheus有自己的生态系统——除了可以用来向自己的应用程序添加指标的客户端库之外，一整套导出器可以为第三方应用程序提取和发布指标。我们可以使用导出器为代理和数据库组件添加缺少的指标。
 
-## 14.3 Monitoring third-party apps with metrics exporters
+## 14.3 通过 metrics exporters 来监控第三方应用
+
 Most applications record metrics in some way, but older apps won’t collect and expose them in Prometheus format. Exporters are separate applications that understand how the target app does its monitoring and can convert those metrics to Prometheus format. Kubernetes provides the perfect way to run an exporter alongside every instance of an application using a sidecar container. This is the adapter pattern we covered in chapter 7.
 
 Nginx and Postgres both have exporters available that we can run as sidecars to improve the monitoring dashboard for the to-do app. The Nginx exporter reads from a status page on the Nginx server and converts the data to Prometheus format. Remember that all the containers in a Pod share the network namespace, so the exporter container can access the Nginx container at the localhost address. The exporter provides its own HTTP endpoint for metrics on a custom port, so the full Pod spec includes the sidecar container and an annotation to specify the metrics port. Listing 14.5 shows the key parts.
+
+大多数应用程序都以某种方式记录指标，但较老的应用程序不会以Prometheus格式收集和公开它们。出口商是独立的应用程序，了解目标应用程序如何进行监视，并可以将这些指标转换为Prometheus格式。Kubernetes提供了完美的方式来运行一个出口国与应用程序的每个实例使用双轮马车容器。这就是我们在第7章中介绍的适配器模式。
+
+Nginx和Postgres都有可用的导出器，我们可以作为sidecars来运行，以改善待办应用程序的监控仪表板。Nginx导出器从Nginx服务器上的状态页面读取数据，并将数据转换为Prometheus格式。记住，Pod中的所有容器都共享网络命名空间，因此导出容器可以在本地主机地址访问Nginx容器。导出器为自定义端口上的指标提供了自己的HTTP端点，因此完整的Pod规范包括sidecar容器和指定指标端口的注释。清单14.5显示了关键部分。
 
 > Listing 14.5 proxy-with-exporter.yaml, adding a metrics exporter container
 
@@ -366,6 +371,11 @@ The scrape exclusion has been removed, so when you deploy this update, Prometheu
 TRY IT NOW 
 Update the proxy Deployment to add the exporter sidecar, and load an updated dashboard into the Grafana ConfigMap.
 
+排除刮擦已经被移除，所以当你部署这个更新，普罗米修斯将刮擦端口9113上的Nginx Pod，在那里出口商正在监听。所有的Nginx指标将由Prometheus存储，Grafana仪表板可以更新为代理添加一行。在本章中，我们不打算讨论Prometheus查询语言(PromQL)或构建Grafana仪表板——仪表板可以从JSON文件导入，并且有一个更新的仪表板可以部署。
+
+现在试试吧
+更新代理部署以添加导出器侧车，并将更新后的仪表板加载到Grafana ConfigMap中。
+
 ```
 # add the proxy sidecar:
 kubectl apply -f todo-list/update/proxy-with-exporter.yaml
@@ -393,6 +403,18 @@ There’s one more component to add to the to-do list dashboard: the Postgres da
 TRY IT NOW 
 Update the database Deployment spec, adding the Postgres exporter as a sidecar container. Then update the to-do list dashboard with a new row to show database performance.
 
+Nginx导出器没有提供大量的信息，但基本的细节都在那里。你可以在图14.8中看到，我们得到了HTTP请求的数量，以及Nginx如何处理连接请求的底层分解。即使使用这个简单的仪表板，你也可以看到Nginx正在处理的流量和web应用程序正在处理的流量之间的相关性，这表明代理没有缓存响应，而是对每个请求都调用web应用程序。
+
+如果能从Nginx得到更多的信息就好了——比如响应中HTTP状态码的分解——但是导出者只能从源系统中转可用的信息，这对Nginx来说并不多。其他导出器提供更多细节，但您需要集中您的仪表板，以便显示关键指标。超过12个左右的可视化和仪表板变得势不可挡，而且，如果它不能一眼传达有用的信息，那么它就没有做得很好。
+
+还有一个组件要添加到待办事项列表仪表板中:Postgres数据库。Postgres将各种有用的信息存储在数据库中的表和函数中，导出器运行查询来支持其metrics端点。Postgres导出器的设置遵循我们在Nginx中看到的相同模式。在这种情况下，sidecar被配置为访问本地主机上的Postgres，使用与Postgres容器用于admin密码相同的Kubernetes Secret。我们将对应用程序仪表板进行最后的更新，以显示来自导出器的关键数据库指标。
+
+![图14.8](./images/Figure14.8.png)
+<center>图14.8使用导出器收集代理指标为仪表板添加了另一层细节. </center>
+
+现在试试吧
+更新数据库部署规范，添加Postgres导出器作为侧车容器。然后用新行更新待办事项列表仪表板以显示数据库性能。
+
 ```
 # add the exporter sidecar to Postgres:
 kubectl apply -f todo-list/update/db-with-exporter.yaml
@@ -416,6 +438,18 @@ The blackbox exporter can run in a sidecar and make TCP or HTTP requests to your
 
 TRY IT NOW 
 Deploy the random-number API with a blackbox exporter and the simplest possible Grafana dashboard. You can break the API by using it repeatedly and then reset it so it works again, and the dashboard tracks the status.
+
+在图14.9中，我缩小并向下滚动，这样您就可以看到新的可视化效果，但是在全屏模式下，整个仪表板都是赏心悦目的。一个页面显示了代理的流量，应用程序的工作强度，用户实际在做什么，以及数据库内部发生了什么。您可以在自己的应用程序中使用客户端库和导出器获得相同级别的细节，而这只需要几天的努力。
+
+![图14.9](./images/Figure14.9.png)
+<center> Figure14.9 数据库导出器记录有关数据活动的度量，这将向仪表板添加详细信息. </center>
+
+出口商在那里为没有普罗米修斯支持的应用程序添加指标。如果您的目标是将一组现有的应用程序转移到Kubernetes上，那么您可能没有一个奢侈的开发团队来添加自定义指标。对于这些应用程序，您可以使用Prometheus黑盒导出器，这是一种极端的方法，即有监控总比没有好。
+
+黑盒导出器可以在sidecar中运行，向应用程序容器发出TCP或HTTP请求，并提供一个基本的度量端点来说明应用程序是否启动。这种方法类似于在Pod规范中添加容器探测，除了黑盒导出器仅供参考。如果应用程序不适合Kubernetes的自我修复机制，你可以运行一个仪表板来显示应用程序的状态，比如我们在本书中使用的随机数API。
+
+现在试试吧
+使用黑盒导出器和最简单的Grafana仪表板部署随机数API。您可以通过重复使用API来破坏它，然后重置它，使其重新工作，仪表板跟踪状态。
 
 ```
 # deploy the API to the test namespace:
@@ -443,7 +477,17 @@ Now we have dashboards for three different apps that have different levels of de
 ![图14.10](./images/Figure14.10.png)
 <center>Figure14.10 Even a simple dashboard is useful. This shows the current and historical status of the API. </center>
 
-## 14.4 Monitoring containers and Kubernetes objects
+随机数API不支持Prometheus，但是运行黑盒导出器作为sidecar容器可以基本了解应用程序状态。图14.10显示了一个大部分为空的仪表板，但这两个可视化显示了应用程序是否健康，以及应用程序在不健康和被重置之间切换时状态的历史趋势。
+
+随机数API的Pod规范遵循与待办应用中的Nginx和Postgres类似的模式:黑盒导出器被配置为一个额外的容器，并指定暴露指标的端口。Pod注释自定义度量URL的路径，因此当Prometheus从sidecar中抓取度量时，它调用黑盒导出器，该导出器检查API是否响应HTTP请求。
+
+现在我们有三个不同的应用程序的仪表板，它们有不同的细节级别，因为应用程序组件与它们收集的数据不一致。但是所有的组件都有一个共同点:它们都在容器中运行
+
+![图14.10](./images/Figure14.10.png)
+<center>图14.10即使是一个简单的仪表盘也是有用的。这显示了API的当前和历史状态。 </center>
+
+## 14.4 监控容器以及 kubernetes 对象
+
 Prometheus integrates with Kubernetes for service discovery, but it doesn’t collect any metrics from the API. You can get metrics about Kubernetes objects and container activity from two additional components: cAdvisor, a Google open source project, and kube-state-metrics, which is part of the wider Kubernetes organization on GitHub. Both run as containers in the cluster, but they collect data from different sources. cAdvisor collects metrics from the container runtime, so it runs as a DaemonSet with a Pod on each node to report on that node’s containers. kube-state-metrics queries the Kubernetes API so it can run as a Deployment with a single replica on any node.
 
 TRY IT NOW 
