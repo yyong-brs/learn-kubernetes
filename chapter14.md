@@ -493,6 +493,11 @@ Prometheus integrates with Kubernetes for service discovery, but it doesn’t co
 TRY IT NOW 
 Deploy the metric collectors for cAdvisor and kube-state-metrics,and update the Prometheus configuration to include them as scrape targets.
 
+Prometheus与Kubernetes集成用于服务发现，但它不从API收集任何指标。你可以从另外两个组件获得关于Kubernetes对象和容器活动的指标:cAdvisor(谷歌开源项目)和kube-state-metrics (Kubernetes组织的一部分)。两者都作为集群中的容器运行，但它们从不同的来源收集数据。cAdvisor从容器运行时收集度量，因此它作为一个DaemonSet运行，每个节点上都有一个Pod，以报告该节点的容器。kube-state-metrics查询Kubernetes API，因此它可以作为部署运行，在任何节点上都有一个副本。
+
+现在试试吧
+为cAdvisor和kube-state-metrics部署度量收集器，并更新Prometheus配置以将它们包括为抓取目标。
+
 ```
 # deploy cAdvisor and kube-state-metrics:
 kubectl apply -f kube/
@@ -514,6 +519,10 @@ jsonpath='http://{.status.loadBalancer.ingress[0].*}:9090/-/reload'
 In this exercise, you’ll see that Prometheus is collecting thousands of new metrics. The raw data includes the compute resources used by every container and the status of every Pod. My output is shown in figure 14.11. When you run this exercise, you can check the Targets page in the Prometheus UI to confirm that the new targets are being scraped. Prometheus doesn’t automatically reload configuration, so in the exercise, there’s a delay to give Kubernetes time to propagate the ConfigMap update, and the curl command forces a configuration reload in Prometheus.
 
 The updated Prometheus configuration you just deployed includes two new job definitions, shown in listing 14.6. kube-state-metrics is specified as a static target using the full DNS name of the Service. A single Pod collects all of the metrics so there’s no loadbalancing issue here. cAdvisor uses Kubernetes service discovery to find every Pod in the DaemonSet, which would present one target for each node in a multinode cluster.
+
+在本练习中，您将看到Prometheus正在收集数以千计的新度量。原始数据包括每个容器使用的计算资源和每个Pod的状态。我的输出如图14.11所示。当您运行这个练习时，您可以检查Prometheus UI中的Targets页面，以确认新的目标正在被抓取。Prometheus不会自动重新加载配置，因此在练习中，会有一个延迟，让Kubernetes有时间传播ConfigMap更新，并且curl命令强制Prometheus重新加载配置。
+
+刚刚部署的更新后的Prometheus配置包括两个新的作业定义，如清单14.6所示。kube-state-metrics使用服务的完整DNS名称指定为静态目标。一个Pod收集所有的指标，所以这里不存在负载平衡问题。cAdvisor使用Kubernetes服务发现来查找DaemonSet中的每个Pod，这将为多节点集群中的每个节点提供一个目标。
 
 > Listing 14.6 prometheus-config-kube.yaml, new scrape targets in Prometheus
 
@@ -542,6 +551,14 @@ Now we have the opposite problem from the random-number dashboard: there’s far
 TRY IT NOW 
 Deploy a dashboard for key cluster metrics and with an update to Grafana so it loads the new dashboard.
 
+![图14.11](./images/Figure14.11.png)
+<center>图14.11新指标显示集群和容器级别的活动. </center>
+
+现在我们遇到了与随机数仪表板相反的问题:新指标中有太多信息，所以平台仪表板需要高度选择性，如果它想要有用的话。我准备了一个示例仪表板，这是一个很好的开始。它包括集群的当前资源使用情况和所有可用资源数量，以及按名称空间划分的一些高级分解和节点运行状况的警告指示器。
+
+现在试试吧
+为关键集群指标部署一个仪表板，并对Grafana进行更新，以便它加载新的仪表板。
+
 ```
 # create the dashboard ConfigMap and update Grafana:
 kubectl apply -f grafana/update/kube/
@@ -567,6 +584,18 @@ Platform metrics have another use: adding detail to application dashboards where
 TRY IT NOW 
 Update the dashboard for the random-number API to add metrics from the platform. This is just a Grafana update; there are no changes to the app itself or to Prometheus.
 
+这是另一个用于大屏幕的仪表板，因此图14.12中的屏幕截图并不能准确地显示它。当您运行这个练习时，您可以更仔细地检查它。上面一行显示内存使用情况，中间一行显示CPU使用情况，下面一行显示Pod容器的状态。
+
+![图14.12](./images/Figure14.12.png)
+<center>图14.12另一个小截图—在您自己的集群中运行练习以查看完整的大小. </center>
+
+像这样的平台指示板级别相当低——它实际上只是显示您的集群是否接近饱和点。支持这个仪表板的查询将更有用，可以作为警报，在资源使用失控时发出警告。Kubernetes的压力指示器在那里很有用。内存压力和进程压力值显示在仪表板中，还有一个磁盘压力指示器。这些值很重要，因为如果节点受到计算压力，它可以终止Pod容器。这些都是值得注意的良好指标，因为如果您达到了这个阶段，您可能需要呼叫某人来看护集群恢复正常。
+
+平台指标还有另一个用途:在应用程序本身无法提供足够详细指标的情况下，为应用程序仪表板添加细节。平台仪表板显示整个集群中聚合的计算资源使用情况，但cAdvisor在容器级别上收集它。kube-state-metrics也是如此，您可以过滤特定工作负载的指标，以便向应用程序仪表板添加平台信息。我们将在本章中进行最后一次仪表板更新，将平台的详细信息添加到随机数应用程序中。
+
+现在试试吧
+为随机数API更新仪表板，以添加来自平台的指标。这只是一个Grafana更新;应用程序本身和普罗米修斯都没有变化。
+
 ```
 # update the dashboard:
 kubectl apply -f grafana/update/grafana-dashboard-numbers-api-v2.yaml
@@ -586,6 +615,15 @@ There’s a lot more to monitoring that I won’t cover here, but now you have a
 <center>Figure14.13 Augmenting basic health stats with container and Pod metrics adds correlation. </center>
 
 We’ll wrap up the chapter by looking at the full architecture of Prometheus in Kubernetes and digging into which pieces need custom work and where the effort needs to go.
+
+如图14.13所示，仪表板仍然是基本的，但至少我们现在有了一些细节，可以帮助关联任何问题。如果HTTP状态代码显示为503，我们可以快速查看CPU是否也处于峰值状态。如果Pod标签包含一个应用程序版本(这是应该的)，我们可以确定哪个版本的应用程序遇到了问题。
+
+关于监控，还有很多我不会在这里介绍的内容，但是现在您已经对Kubernetes和Prometheus如何协同工作有了一个坚实的基础。您缺少的主要部分是在服务器级收集指标和配置警报。服务器指标提供磁盘和网络使用情况等数据。您可以通过直接在节点上运行导出器来收集它们(对于Linux服务器使用Node export，对于Windows服务器使用Windows export)，并使用服务发现将节点添加为抓取目标。Prometheus有一个复杂的警报系统，它使用PromQL查询定义警报规则。您可以配置警报，以便当规则被触发时，Prometheus将发送电子邮件、创建Slack消息或通过PagerDuty发送通知。
+
+![图14.13](./images/Figure14.13.png)
+<center>图14.13使用容器和Pod指标增强基本运行状况统计可以增加相关性. </center>
+
+我们将通过查看《Kubernetes》中普罗米修斯的完整架构来结束本章，并深入研究哪些部分需要定制工作以及需要在哪里努力。
 
 ## 14.5 Understanding the investment you make in monitoring
 When you step outside of core Kubernetes and into the ecosystem, you need to under- stand whether the project you take a dependency on will still exist in five years, or one year, or by the time the chapter you’re writing makes it to the printing press. I’ve been careful in this book to include only those ecosystem components that are open source, are heavily used, and have an established history and governance model. The monitoring architecture in figure 14.14 uses components that all meet those criteria.
