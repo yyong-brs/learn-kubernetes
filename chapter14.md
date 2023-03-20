@@ -1,167 +1,119 @@
 # 第十四章 使用 Prometheus 监控应用程序和 Kubernetes
 
-Monitoring is the companion to logging: your monitoring system tells you something is wrong, and then you can dig into the logs to find out the details. Like logging, you want to have a centralized system to collect and visualize metrics about all your application components. An established approach for monitoring in Kuber-netes uses another CNCF project: Prometheus, which is a server application that collects and stores metrics. In this chapter, you’ll learn how to deploy a shared monitoring system in Kubernetes with dashboards that show the health of individ-ual applications and the cluster as a whole.
+监控是日志的伙伴:监视系统告诉您某些地方出了问题，然后您可以深入日志以找出详细信息。与日志记录一样，您希望有一个集中的系统来收集和可视化关于所有应用程序组件的指标。Kubernetes中已建立的监控方法使用另一个CNCF项目:Prometheus，这是一个收集和存储指标的服务器应用程序。在本章中，您将学习如何在Kubernetes中部署一个共享监控系统，使用 dashboard 面板显示单个应用程序和整个集群的健康状况。
 
-Prometheus runs on many platforms, but it’s particularly well suited to Kuber-netes. You run Prometheus in a Pod that has access to the Kubernetes API server,and then Prometheus queries the API to find all the targets it needs to monitor.
-
-When you deploy new apps, you don’t need to make any setup changes—Prometheus discovers them automatically and starts collecting metrics. Kubernetes apps are par-ticularly well suited to Prometheus, too. You’ll see in this chapter how to make good use of the sidecar pattern, so every app can provide some metrics to Prometheus, even if the application itself isn’t Prometheus-ready.
-
-监控是日志记录的伙伴:监视系统告诉您某些地方出了问题，然后您可以深入日志以找出详细信息。与日志记录一样，您希望有一个集中的系统来收集和可视化关于所有应用程序组件的指标。Kuber-netes中已建立的监控方法使用另一个CNCF项目:Prometheus，这是一个收集和存储指标的服务器应用程序。在本章中，您将学习如何在Kubernetes中部署一个共享监控系统，使用指示板显示单个应用程序和整个集群的健康状况。
-
-Prometheus在许多平台上运行，但它特别适合Kuber-netes。您可以在一个Pod中运行Prometheus，该Pod可以访问Kubernetes API服务器，然后Prometheus查询API以找到它需要监视的所有目标。
+Prometheus 在许多平台上运行，但它特别适合Kubernetes。您可以在一个Pod中运行Prometheus，该Pod可以访问Kubernetes API服务器，然后Prometheus查询API以找到它需要监视的所有目标。
 
 当你部署新的应用程序时，你不需要做任何设置更改——prometheus会自动发现它们并开始收集指标。Kubernetes的应用程序也特别适合Prometheus。在本章中，你将看到如何很好地利用sidecar模式，因此每个应用程序都可以为Prometheus提供一些指标，即使应用程序本身还没有准备好。
 
 ## 14.1 Prometheus 如何监控 Kubernetes 的工作负载
 
-Metrics in Prometheus are completely generic: each component you want to moni-tor has an HTTP endpoint, which returns all the values that are important to that component. A web server includes metrics for the number of requests it serves, and a Kubernetes node includes metrics for how much memory is available. Pro-metheus doesn’t care what’s in the metrics; it just stores everything the component returns. What’s important to Prometheus is a list of targets it needs to collect from.
-
-Figure 14.1 shows how that works in Kubernetes, using Prometheus’s built-in service discovery.
-
-![图14.1](./images/Figure14.1.png)
-<center>图 14.1 Prometheus uses a pull model to collect metrics, automatically finding targets </center>
-
-The focus in this chapter is getting Prometheus working nicely with Kubernetes, to give you a dynamic monitoring system that keeps working as your cluster expands with more nodes running more applications. I won’t go into much detail on how you add monitoring to your applications or what metrics you should recordappendix B in the ebook is the chapter “Adding Observability with Containerized Monitoring” from Learn Docker in a Month of Lunches, which will give you that additional detail.
-
-We’ll start by getting Prometheus up and running. The Prometheus server is a sin-gle component that takes care of service discovery and metrics collection and storage,and it has a basic web UI that you can use to check the status of the system and run simple queries.
-
-TRY IT NOW
-Deploy Prometheus in a dedicated monitoring namespace, config-ured to find apps in a test namespace (the test namespace doesn’t exist yet).
-
-Prometheus 中的度量完全是通用的:您想要监视的每个组件都有一个HTTP端点，该端点返回对该组件重要的所有值。web服务器包含它所服务的请求数量的指标，Kubernetes节点包含可用内存数量的指标。Pro-metheus并不关心度量标准中的内容;它只存储组件返回的所有内容。对普罗米修斯来说，重要的是它需要收集的目标列表。
+Prometheus 中的度量完全是通用的:您想要监视的每个组件都有一个HTTP端点，该端点返回对该组件重要的所有值。web服务器包含它所服务的请求数量的指标，Kubernetes节点包含可用内存数量的指标。Prometheus并不关心度量标准中的内容;它只存储组件返回的所有内容。对普罗米修斯来说，重要的是它需要收集的目标列表。
 
 图14.1显示了如何使用Prometheus的内置服务发现在Kubernetes中工作。
 
 ![图14.1](./images/Figure14.1.png)
 <center>图14.1普罗米修斯使用拉模型收集指标，自动找到目标</center>
 
-本章的重点是让Prometheus与Kubernetes很好地合作，为您提供一个动态监控系统，当您的集群扩展到更多的节点，运行更多的应用程序时，该系统仍能保持工作。我不会详细介绍如何在应用程序中添加监控，或者应该记录哪些指标，电子书的附录B是《Learn Docker in a Month of lunch》中的“添加可观察性与容器化监控”一章，它将为您提供额外的细节。
+本章的重点是让 Prometheus 与 Kubernetes 很好地合作，为您提供一个动态监控系统，当您的集群扩展到更多的节点，运行更多的应用程序时，该系统仍能保持工作。我不会详细介绍如何在应用程序中添加监控，或者应该记录哪些指标，电子书的附录B是《Learn Docker in a Month of lunch》中的“添加可观察性与容器化监控”一章，它将为您提供额外的细节。
 
 我们将从启动普罗米修斯开始。Prometheus服务器是一个单独的组件，负责服务发现、指标收集和存储，它有一个基本的web UI，您可以使用它来检查系统的状态并运行简单的查询。
 
-现在试试吧
-将Prometheus部署在专用的监视名称空间中，配置为在测试名称空间中查找应用程序(测试名称空间还不存在)。
+现在试试吧，将Prometheus部署在专用的监视命名空间中，配置为在 test 命名空间中查找应用程序(test 命名空间还不存在)。
 
 ```
-# switch to this chapter’s folder:
+# 切换到章节目录:
 cd ch14
 
-# create the Prometheus Deployment and ConfigMap:
+# 创建 Prometheus Deployment and ConfigMap:
 kubectl apply -f prometheus/
 
-# wait for Prometheus to start:
-kubectl wait --for=condition=ContainersReady pod -l app=prometheus -n
-kiamol-ch14-monitoring
+# 等待 Prometheus to start:
+kubectl wait --for=condition=ContainersReady pod -l app=prometheus -n kiamol-ch14-monitoring
 
-# get the URL for the web UI:
-kubectl get svc prometheus -o jsonpath='http://{.status.loadBalancer
-.ingress[0].*}:9090' -n kiamol-ch14-monitoring
-# browse to the UI, and look at the /targets page
+# 获取 web UI 地址:
+kubectl get svc prometheus -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:9090' -n kiamol-ch14-monitoring
+# 访问 UI, 查看 /targets page
 ```
 
-Prometheus calls metrics collection scraping. When you browse to the Prometheus UI,you’ll see there are no scrape targets, although there is a category called testpods, which lists zero targets. Figure 14.2 shows my output. The test-pods name comes from the Prometheus configuration you deployed in a ConfigMap, which the Pod reads from.
+Prometheus 称 metrics 收集为 scraping。当您访问 Prometheus UI 时，您将看到没有抓取目标，尽管有一个名为 testpods 的类别，它列出了零目标。图14.2显示了我的输出。test-pods 的名称来自您在ConfigMap中部署的Prometheus配置，Pod从中读取该配置。
 
 ![图14.2](./images/Figure14.2.png)
-<center>Figure 14.2 No targets yet, but Prometheus will keep checking the Kubernetes API for new Pods. </center>
+<center>图14.2 目前还没有目标，但Prometheus将继续检查Kubernetes API以寻找新的pod </center>
 
-Configuring Prometheus to find targets in Kubernetes is fairly straightforward, although the terminology is confusing at first. Prometheus uses jobs to define a related set of targets to scrape, which could be multiple components of an application. The scrape configuration can be as simple as a static list of domain names, which Prometheus polls to grab the metrics, or it can use dynamic service discovery.Listing 14.1 shows Prometheus the beginning of the test-pods job configuration, which uses the Kubernetes API for service discovery.
+配置 Prometheus 以在 Kubernetes 中寻找目标是相当简单的，尽管术语一开始令人困惑。Prometheus 使用作业来定义一组相关的目标，这些目标可以是应用程序的多个组件。抓取配置可以简单到一个静态域名列表(Prometheus轮询该列表以获取指标)，也可以使用动态服务发现。清单14.1 向 Prometheus 展示了test-pods作业配置的开头，它使用Kubernetes API进行服务发现。
 
-普罗米修斯称度量收集为刮取。当您浏览到Prometheus UI时，您将看到没有抓取目标，尽管有一个名为testpods的类别，它列出了零目标。图14.2显示了我的输出。test-pods的名称来自您在ConfigMap中部署的Prometheus配置，Pod从中读取该配置。
-
-![图14.2](./images/Figure14.2.png)
-<center>图14.2目前还没有目标，但Prometheus将继续检查Kubernetes API以寻找新的pod </center>
-
-配置Prometheus以在Kubernetes中寻找目标是相当简单的，尽管术语一开始令人困惑。Prometheus使用作业来定义一组相关的目标，这些目标可以是应用程序的多个组件。抓取配置可以简单到一个静态域名列表(Prometheus轮询该列表以获取指标)，也可以使用动态服务发现。清单14.1向Prometheus展示了test-pods作业配置的开头，它使用Kubernetes API进行服务发现。
-
-> Listing 14.1 prometheus-config.yaml, scrape configuration with Kubernetes
+> 清单 14.1 prometheus-config.yaml, 使用Kubernetes scrape 配置
 
 ```
-scrape_configs: # This is the YAML inside the ConfigMap.
-   - job_name: 'test-pods' # Used for test apps
-     kubernetes_sd_configs: # Finds targets from the Kubernetes API
-     - role: pod # Searches for Pods
-     relabel_configs: # Applies these filtering rules
+scrape_configs: # 这是 configmap 中的 yaml.
+   - job_name: 'test-pods' # 用于 test apps
+     kubernetes_sd_configs: # 从 kubernetes API 查找目标
+     - role: pod # 搜寻 Pods
+     relabel_configs: # 应用这些过滤规则
      - source_labels:
        - __meta_kubernetes_namespace
-       action: keep # Includes Pods only where the namespace
-       regex: kiamol-ch14-test # is the test namespace for this chapter
+       action: keep # 只包含本章测试命名空间的 pods
+       regex: kiamol-ch14-test 
 ```
 
-It’s the relabel_configs section that needs explanation. Prometheus stores metrics with labels, which are key-value pairs that identify the source system and other relevant information. You’ll use labels in queries to select or aggregate metrics, and you can also use them to filter or modify metrics before they are stored in Prometheus. This is relabeling, and conceptually, it’s similar to the data pipeline in Fluent Bit—it’s your chance to discard data you don’t want and reshape the data you do want. Regular expressions rear their unnecessarily complicated heads in Prometheus, too, but it’s rare that you need to make changes. The pipeline you set up in the relabeling phase should be generic enough to work for all your apps. The full pipeline in the configuration file applies the following rules:
+需要解释的是 relabel_configs 部分。Prometheus使用标签存储度量，标签是标识源系统和其他相关信息的键值对。您将在查询中使用标签来选择或聚合指标，还可以在将指标存储到Prometheus之前使用它们来过滤或修改指标。这是重新标签，从概念上讲，它类似于Fluent bit中的数据管道——您有机会丢弃不想要的数据并重新塑造您想要的数据。正则表达式在 Prometheus 中也出现了不必要的复杂问题，但很少需要进行更改。你在重新标签阶段设置的管道应该足够通用，适用于所有应用程序。配置文件中的全管道应用如下规则:
 
-- Include Pods only from the namespace kiamol-ch14-test.
-- Use the Pod name as the value of the Prometheus instance label.
-- Use the app label in the Pod metadata as the value of the Prometheus job label.
-- Use optional annotations in the Pod metadata to configure the scrape target.
+- 只包含命名空间 kiamol-ch14-test 中的Pods。
+- 使用 Pod 名称作为Prometheus实例标签的值。
+- 使用 Pod 元数据中的app标签作为Prometheus作业标签的值。
+- 在 Pod 元数据中使用可选注解配置抓取目标。
 
-This approach is convention-driven—as long as your apps are modeled to suit the rules, they’ll automatically be picked up as monitoring targets. Prometheus uses the rules to find Pods that match, and for each target, it collects metrics by making an HTTP GET request to the /metrics path. Prometheus needs to know which network port to use, so the Pod spec needs to explicitly include the container port. That’s a good practice anyway because it helps to document your application’s setup. Let’s deploy a simple app to the test namespace and see what Prometheus does with it.
+这种方法是由约定驱动的——只要您的应用程序被建模以适应规则，它们就会自动被选为监视目标。Prometheus使用规则来查找匹配的Pods，对于每个目标，它通过向/metrics路径发出HTTP GET请求来收集指标。Prometheus需要知道使用哪个网络端口，因此Pod规范需要显式地包括容器端口。这是一个很好的实践，因为它有助于记录应用程序的设置。让我们将一个简单的应用程序部署到test命名空间，看看Prometheus用它做了什么。
 
-TRY IT NOW 
-Deploy the timecheck application to the test namespace. The spec matches all the Prometheus scrape rules, so the new Pod should be found and added as a scrape target.
-
-需要解释的是relabel_configs部分。Prometheus使用标签存储度量，标签是标识源系统和其他相关信息的键值对。您将在查询中使用标签来选择或聚合指标，还可以在将指标存储到Prometheus之前使用它们来过滤或修改指标。这是重新标签，从概念上讲，它类似于Fluent bit中的数据管道——您有机会丢弃不想要的数据并重新塑造您想要的数据。正则表达式在Prometheus中也出现了不必要的复杂问题，但很少需要进行更改。你在重新标签阶段设置的管道应该足够通用，适用于所有应用程序。配置文件中的全管道应用如下规则:
-
-- 只包含命名空间kiamol-ch14-test中的Pods。
-- 使用Pod名称作为Prometheus实例标签的值。
-- 使用Pod元数据中的app标签作为Prometheus作业标签的值。
-- 在Pod元数据中使用可选注解配置抓取目标。
-
-这种方法是由约定驱动的——只要您的应用程序被建模以适应规则，它们就会自动被选为监视目标。Prometheus使用规则来查找匹配的Pods，对于每个目标，它通过向/metrics路径发出HTTP GET请求来收集指标。Prometheus需要知道使用哪个网络端口，因此Pod规范需要显式地包括容器端口。这是一个很好的实践，因为它有助于记录应用程序的设置。让我们将一个简单的应用程序部署到test名称空间，看看Prometheus用它做了什么。
-
-现在试试吧
-将时间检查应用程序部署到测试名称空间。该规格匹配所有的普罗米修斯刮擦规则，所以新的Pod应该被找到并添加为刮擦目标。
+现在试试吧，将时间检查应用程序部署到测试命名空间。该规格匹配所有的普罗米修斯 scrape 规则，所以新的Pod应该被找到并添加为 scrape目标。
 
 ```
-# create the test namespace and the timecheck Deployment:
+# 创建 test namespace 以及 timecheck Deployment:
 kubectl apply -f timecheck/
-# wait for the app to start:
-kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n
-kiamol-ch14-test
-# refresh the target list in the Prometheus UI, and confirm the
-# timecheck Pod is listed, then browse to the /graph page, select
-# timecheck_total from the dropdown list, and click Execute
+# 等待 app 启动:
+kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n kiamol-ch14-test
+
+# 刷新Prometheus界面中的 target 列表，并确认
+# timecheck Pod，然后浏览到/graph页面，选择
+# timecheck_total，然后单击“执行”
 ```
 
-My output is shown in figure 14.3, where I’ve opened two browser windows so you can see what happened when the app was deployed. Prometheus saw the timecheck Pod being created, and it matched all the rules in the relabel stage, so it was added as a target. The Prometheus configuration is set to scrape targets every 30 seconds. The timecheck app has a /metrics endpoint,which returns a count for how many timecheck logs it has written. When I queried that metric in Prometheus, the app had written 22 log entries.
+我的输出如图14.3所示，其中我打开了两个浏览器窗口，以便您可以看到部署应用程序时发生了什么。普罗米修斯看到时间检查Pod被创建，它符合重新标记阶段的所有规则，所以它被添加为目标。普罗米修斯配置设置为每30秒检查一次目标。时间检查应用程序有一个/metrics端点，它返回它写了多少时间检查日志的计数。当我在Prometheus中查询该指标时，应用程序已经写入了22个日志条目。
 
 ![图14.3](./images/Figure14.3.png)
-<center>Figure 14.3 Deploying an app to the test namespace—Prometheus finds it and starts collecting metrics. </center>
-
-You should realize two important things here: the application itself needs to provide the metrics because Prometheus is just a collector, and those metrics represent the activity for one instance of the application. The timecheck app isn’t a web application—it’s just a background process—so there’s no Service directing traffic to it. Prometheus gets the Pod IP address when it queries the Kubernetes API, and it makes the HTTP request directly to the Pod. You can configure Prometheus to query Services, too, but then you’d get a target that is a load balancer across multiple Pods, and you want Prometheus to scrape each Pod independently.
-
-You’ll use the metrics in Prometheus to power dashboards showing the overall health of your apps, and you may aggregate across all the Pods to get the headline values. You need to be able to drill down, too, to see if there are differences between the Pods. That will help you identify if some instances are performing badly, and that will feed back into your health checks.We can scale up the timecheck app to see the importance of collecting at the individual Pod level.
-
-TRY IT NOW 
-Add another replica to the timecheck app. It’s a new Pod that matches the Prometheus rules, so it will be discovered and added as another scrape target.
-
-我的输出如图14.3所示，其中我打开了两个浏览器窗口，以便您可以看到部署应用程序时发生了什么。普罗米修斯看到时间检查Pod被创建，它符合重新标记阶段的所有规则，所以它被添加为目标。普罗米修斯配置设置为每30秒刮一次目标。时间检查应用程序有一个/metrics端点，它返回它写了多少时间检查日志的计数。当我在Prometheus中查询该指标时，应用程序已经写入了22个日志条目。
-
-![图14.3](./images/Figure14.3.png)
-<center>图14.3将应用程序部署到测试名称空间- prometheus找到它并开始收集指标. </center>
+<center>图14.3 将应用程序部署到测试命名空间- prometheus找到它并开始收集指标. </center>
 
 这里您应该认识到两个重要的事情:应用程序本身需要提供度量，因为Prometheus只是一个收集器，而那些度量代表应用程序实例的活动。时间检查应用程序不是一个web应用程序——它只是一个后台进程——所以没有服务将流量导向它。普罗米修斯在查询Kubernetes API时获得Pod的IP地址，并直接向Pod发出HTTP请求。您也可以配置Prometheus来查询Services，但是这样您就会得到一个目标，它是跨多个Pod的负载均衡器，并且您希望Prometheus独立地抓取每个Pod。
 
 你可以使用Prometheus中的指标来增强仪表板，显示应用程序的整体健康状况，你可以汇总所有pod来获得标题值。您还需要能够向下钻取，以查看pod之间是否有差异。这将帮助您确定某些实例是否执行不良，并将反馈到您的运行状况检查中。我们可以放大时间检查应用程序，看看在单个Pod级别收集的重要性。
 
-现在试试吧
-添加另一个副本到时间检查应用程序。这是一个新的Pod，符合普罗米修斯规则，所以它将被发现并添加为另一个刮擦目标。
+现在试试吧，添加另一个副本到时间检查应用程序。这是一个新的Pod，符合普罗米修斯规则，所以它将被发现并添加为另一个 scrape 目标。
 
 ```
-# scale the Deployment to add another Pod:
+# 缩放部署以添加另一个Pod:
 kubectl scale deploy/timecheck --replicas 2 -n kiamol-ch14-test
-# wait for the new Pod to spin up:
-kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n
-kiamol-ch14-test
-# back in Prometheus, check the target list, and in the graph page,
-# execute queries for timecheck_total and dotnet_total_memory_bytes
+# 等待新的 pod 启动:
+kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n kiamol-ch14-test
+# 回到普罗米修斯，检查 target 列表，在 graph 页面，
+# 执行timecheck_total和dotnet_total_memory_bytes的查询
 ```
+You’ll see in this exercise that Prometheus finds the new Pod and starts scraping it. Both Pods record the same metrics, and the Pod name is set as a label on each metric. The query for the timecheck_total metric now returns two results—one for each Pod—and you can see in figure 14.4 that one Pod has done a lot more work than the other.
+
+The timecheck counter is a metric that is explicitly captured in the application code. Most languages have a Prometheus client library, which you can plug into your build. The libraries let you capture application-specific details like this, and they also collect generic information about the application run time. This is a .NET application, and the Prometheus client library records run-time details, like the amount of memory and CPU in use and the number of threads running. In the next section,we’ll run a distributed application where every component exposes Prometheus metrics, and we’ll see how useful an application dashboard is when it includes run-time performance as well as application details.
+
+在这个练习中，你会看到普罗米修斯发现了新的 pod，并开始采集它。两个Pod记录相同的指标，Pod名称被设置为每个指标上的标签。对timecheck_total指标的查询现在返回两个结果——每个Pod一个结果——在图14.4中可以看到，一个Pod比另一个Pod完成了更多的工作。
+
+
+![图14.4](./images/Figure14.4.png)
+<center>图14.4 每个实例都记录自己的指标，因此您需要从每个Pod收集数据。 </center>
+
+时间检查计数器是在应用程序代码中显式捕获的度量。大多数语言都有一个Prometheus客户端库，您可以将其插入到您的构建中。这些库允许您像这样捕获特定于应用程序的细节，它们还收集有关应用程序运行时的一般信息。这是一个.net应用程序，Prometheus客户端库记录运行时细节，比如正在使用的内存和CPU数量以及正在运行的线程数量。在下一节中，我们将运行一个分布式应用程序，其中每个组件都公开Prometheus指标，我们将看到当应用程序仪表板包括运行时性能和应用程序详细信息时，它是多么有用。
 
 ## 14.2 监视使用 Prometheus 客户端库构建的应用程序
 
 Appendix B in the ebook walks through adding metrics to an app that shows a picture from NASA’s Astronomy Photo of the Day (APOD) service. The components of that app are in Java, Go, and Node.js, and they each use a Prometheus client library to expose run-time and application metrics. This chapter includes Kubernetes manifests for the app that deploy to the test namespace, so all the application Pods will be discovered by Prometheus.
 
-![图14.4](./images/Figure14.4.png)
-<center>Figure 14.4 Every instance records its own metrics so you need to collect from every Pod. </center>
 
 TRY IT NOW 
 Deploy the APOD app to the test namespace, and confirm that the three components of the app are added as Prometheus targets.
