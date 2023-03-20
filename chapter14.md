@@ -625,7 +625,8 @@ We’ll wrap up the chapter by looking at the full architecture of Prometheus in
 
 我们将通过查看《Kubernetes》中普罗米修斯的完整架构来结束本章，并深入研究哪些部分需要定制工作以及需要在哪里努力。
 
-## 14.5 Understanding the investment you make in monitoring
+## 14.5 了解您在监控方面所做的投资
+
 When you step outside of core Kubernetes and into the ecosystem, you need to under- stand whether the project you take a dependency on will still exist in five years, or one year, or by the time the chapter you’re writing makes it to the printing press. I’ve been careful in this book to include only those ecosystem components that are open source, are heavily used, and have an established history and governance model. The monitoring architecture in figure 14.14 uses components that all meet those criteria.
 
 I make that point because the move to Prometheus will involve development work. You need to record interesting metrics for your applications to make your dashboards truly useful. You should feel confident about making that investment because Prometheus is the most popular tool for monitoring containerized applications, and the project was the second to graduate in the CNCF—after Kubernetes itself. There’s also work underway to take the Prometheus metric format into an open standard (called
@@ -642,6 +643,22 @@ That’s all for monitoring now, so we can clear down the cluster to get ready f
 TRY IT NOW 
 Delete the namespaces for this chapter, and the objects created in the system namespace.
 
+当你走出核心Kubernetes，进入生态系统时，你需要了解你所依赖的项目是否在五年后，或一年后，或在你所写的章节付印时仍然存在。在这本书中，我一直很小心地只包括那些开源的、被大量使用的、具有既定历史和治理模型的生态系统组件。图14.14中的监视体系结构使用了全部满足这些标准的组件。
+
+我提出这一点是因为迁移到普罗米修斯将涉及开发工作。您需要为您的应用程序记录有趣的指标，以使您的仪表板真正有用。您应该对投资有信心，因为Prometheus是监视容器应用程序最流行的工具，并且该项目是cncf继Kubernetes之后第二个毕业的项目。目前正在进行的工作是将普罗米修斯公制格式引入一个开放标准(称为普罗米修斯公制)
+
+![图14.14](./images/Figure14.14.png)
+<center>图14.14监控不是免费的——它需要开发并依赖于开源项目. </center>
+
+OpenMetrics)，因此其他工具将能够读取以Prometheus格式公开的应用程序指标。
+
+你在这些指标中包含什么将取决于你的应用程序的性质，但是一个好的通用方法是遵循谷歌网站可靠性工程实践的指导方针。在应用指标中添加四个黄金信号通常非常简单:延迟、流量、错误和饱和度。(电子书的附录B介绍了这些在《普罗米修斯》中的样子。)但真正的价值来自于从用户体验的角度考虑应用程序性能。一个显示数据库中磁盘使用率很高的图表并不能告诉你太多东西，但是如果你能看到有很大比例的用户因为你网站的结帐页面加载时间太长而没有完成购买，这是值得了解的。
+
+监控到此结束，我们可以清理集群为实验室做准备了。
+
+现在试试吧
+删除本章的命名空间，以及system命名空间下创建的对象。
+
 ```
 kubectl delete ns -l kiamol=ch14
 kubectl delete all -n kube-system -l kiamol=ch14
@@ -654,3 +671,11 @@ Another investigative lab for this chapter. In the lab folder, there’s a set o
 - The Prometheus configuration will tell you which namespace you need to use for Elasticsearch and the annotation you need for the metrics path.
 - You should include a version label in your Elasticsearch Pod spec, so Prometheus will pick that up and add it to the metric labels.
 You’ll need to hunt around the documentation for Prometheus to get started, and that should show you the way. My solution is on GitHub for you to check in the usual place: <https://github.com/sixeyed/kiamol/blob/master/ch14/lab/README.md>.
+
+本章的另一个调查实验室。在lab文件夹中，有一组清单，用于稍微简单一点的Prometheus部署和Elasticsearch的基本部署。我们的目标是运行Elasticsearch，并将度量流到Prometheus中。以下是细节:
+
+- Elasticsearch不提供自己的指标，所以你需要找到一个组件来为你做这件事。
+- Prometheus配置将告诉您需要为Elasticsearch使用哪个名称空间，以及您需要为度量路径使用注释。
+- 你应该在你的Elasticsearch Pod规格中包含一个版本标签，这样Prometheus就会把它添加到度量标签中。
+
+您需要搜索Prometheus的文档才能开始，它应该会为您指明方向。我的解决方案在GitHub上，你可以在通常的地方检查:<https://github.com/sixeyed/kiamol/blob/master/ch14/lab/README.md>。
