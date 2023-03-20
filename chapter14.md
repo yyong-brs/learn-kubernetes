@@ -112,179 +112,125 @@ The timecheck counter is a metric that is explicitly captured in the application
 
 ## 14.2 监视使用 Prometheus 客户端库构建的应用程序
 
-Appendix B in the ebook walks through adding metrics to an app that shows a picture from NASA’s Astronomy Photo of the Day (APOD) service. The components of that app are in Java, Go, and Node.js, and they each use a Prometheus client library to expose run-time and application metrics. This chapter includes Kubernetes manifests for the app that deploy to the test namespace, so all the application Pods will be discovered by Prometheus.
+电子书的附录B介绍了如何向一个应用程序添加指标，该应用程序显示了来自NASA“每日天文照片”(APOD)服务的图片。该应用程序的组件在Java、Go和Node.js中，它们都使用Prometheus客户端库来公开运行时和应用程序指标。本章包括部署到test 命名空间的应用程序的Kubernetes清单，因此所有应用程序Pods将被Prometheus发现。
 
-
-TRY IT NOW 
-Deploy the APOD app to the test namespace, and confirm that the three components of the app are added as Prometheus targets.
-
-电子书的附录B介绍了如何向一个应用程序添加指标，该应用程序显示了来自NASA“每日天文照片”(APOD)服务的图片。该应用程序的组件在Java、Go和Node.js中，它们都使用Prometheus客户端库来公开运行时和应用程序指标。本章包括部署到test名称空间的应用程序的Kubernetes清单，因此所有应用程序Pods将被Prometheus发现。
-
-![图14.4](./images/Figure14.4.png)
-<center>图14.4每个实例都记录自己的度量，因此您需要从每个Pod收集。</center>
-
-现在试试吧
-将APOD应用程序部署到测试名称空间，并确认应用程序的三个组件被添加为Prometheus目标。
+现在试试吧，将APOD应用程序部署到测试命名空间，并确认应用程序的三个组件被添加为Prometheus目标。
 
 ```
-# deploy the app:
+# 部署 app:
 kubectl apply -f apod/
-# wait for the main component to start:
-kubectl wait --for=condition=ContainersReady pod -l app=apod-api -n
-kiamol-ch14-test
-# get the app URL:
-kubectl get svc apod-web -o
-jsonpath='http://{.status.loadBalancer.ingress[0].*}:8014' -n
-kiamol-ch14-test
-# browse to the app, and then refresh the Prometheus targets
+# 等待启动成功:
+kubectl wait --for=condition=ContainersReady pod -l app=apod-api -n kiamol-ch14-test
+# 获取 app URL:
+kubectl get svc apod-web -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:8014' -n kiamol-ch14-test
+
+# 访问 app, 然后刷新 Prometheus targets 界面
 ```
 
-You can see my output in figure 14.5, with a very pleasant image of something called Lynds Dark Nebula 1251. The application is working as expected, and Prometheushas discovered all of the new Pods. Within 30 seconds of deploying the app, you
-
-![图14.5](./images/Figure14.5.png)
-<center>Figure 14.5 The APOD components all have Services, but they are still scraped at the Pod level. </center>
-
-should see that the state of all of the new targets is up, which means Prometheus has successfully scraped them.
-
-I have two additional important things to point out in this exercise. First, the Pod specs all include a container port, which states that the application container is listening on port 80, and that’s how Prometheus finds the target to scrape. The Service for the web UI actually listens on port 8014, but Prometheus goes directly to the Pod port. Second, the API target isn’t using the standard /metrics path, because the Java client library uses a different path. I’ve used an annotation in the Pod spec to state the correct path.
-
-Convention-based discovery is great because it removes a lot of repetitive configuration and the potential for mistakes, but not every app will fit with the conventions.The relabeling pipeline we’re using in Prometheus gives us a nice balance. The default values will work for any apps that meet the convention, but any that don’t can override the defaults with annotations. Listing 14.2 shows how the override is configured to set the path to the metrics.
-
-你可以在图14.5中看到我的输出，其中有一个非常令人愉快的图像，叫做林德斯暗星云1251。应用程序如预期的那样运行，普罗米修斯已经发现了所有新的pod。在部署应用程序的30秒内，你
+你可以在图 14.5 中看到我的输出，其中有一个非常令人愉快的图像，叫做林德斯暗星云1251。应用程序如预期的那样运行，普罗米修斯已经发现了所有新的pod。在部署应用程序的30秒内，你应该会看到所有新目标的状态都是正常的，这意味着普罗米修斯已经成功地抓取了它们。
 
 ![图14.5](./images/Figure14.5.png)
 <center>图14.5 APOD组件都有服务，但它们仍然在Pod级别被抓取</center>
 
-应该会看到所有新目标的状态都是正常的，这意味着普罗米修斯已经成功地抓取了它们。
-
 在这个练习中，我还有两件重要的事情要指出。首先，Pod规范都包括一个容器端口，它说明应用程序容器正在监听端口80，这就是Prometheus找到要抓取的目标的方法。web UI的Service实际上监听端口8014，但是Prometheus直接访问Pod端口。其次，API目标没有使用标准/度量路径，因为Java客户机库使用不同的路径。我在Pod规范中使用了注释来说明正确的路径。
 
-基于约定的发现很棒，因为它消除了大量重复的配置和潜在的错误，但并不是每个应用都符合约定。我们在《普罗米修斯》中使用的重标签管道为我们提供了一个很好的平衡。默认值适用于任何符合约定的应用程序，但任何不符合约定的应用程序都可以用注释覆盖默认值。清单14.2显示了如何配置覆盖以设置度量的路径。
+基于约定的发现很棒，因为它消除了大量重复的配置和潜在的错误，但并不是每个应用都符合约定。我们在普罗米修斯中使用的重标签管道为我们提供了一个很好的平衡。默认值适用于任何符合约定的应用程序，但任何不符合约定的应用程序都可以用注释覆盖默认值。清单14.2显示了如何配置覆盖以设置度量的路径。
 
-> Listing 14.2 prometheus-config.yaml, using annotations to override default values
+> 清单 14.2 prometheus-config.yaml, 使用 annotations 覆盖默认值
 
 ```
-- source_labels: # This is a relabel configuration in the test-pods job.
+- source_labels: # 这个是 test-pods job 中的 relabel 配置.
   - __meta_kubernetes_pod_annotationpresent_prometheus_io_path
   - __meta_kubernetes_pod_annotation_prometheus_io_path
-regex: true;(.*) # If the Pod has an annotation named prometheus.io/path . . .
+regex: true;(.*) # 如果 pod 具有一个名为 prometheus.io/path 的 annotation
 
-target_label: __metrics_path__ # sets the target path from the annotation.
+target_label: __metrics_path__ #从 annotation 中获取设置 target path
 ```
 
 This is way less complicated than it looks. The rule says: if the Pod has an annotation called prometheus.io/path, then use the value of that annotation as the metrics path. Prometheus does it all with labels, so every Pod annotation becomes a label with the name meta_kubernetes_pod_annotation_<annotation-name>, and there’s an accompanying label called meta_kubernetes_pod_annotationpresent_<annotation-name>, which you can use to check if the annotation exists. Any apps that use a custom metrics path need to add the annotation. Listing 14.3 shows that for the APOD API.
 
-这远没有看起来那么复杂。规则是这样的:如果豆荚有一个叫普罗米修斯的注释。Io /path，然后使用该注释的值作为度量路径。Prometheus使用标签来完成这一切，因此每个Pod注释都成为一个名称为meta_kubernetes_pod_annotation_<annotation-name>的标签，并且有一个附带的标签名为meta_kubernetes_pod_annotationpresent_<annotation-name>，您可以使用它来检查注释是否存在。任何使用自定义指标路径的应用程序都需要添加注释。清单14.3显示了APOD API。
+这远没有看起来那么复杂。规则是这样的:如果 pod 有一个叫 prometheus.io/path 注释，然后就使用该注释的值作为度量路径。Prometheus使用标签来完成这一切，因此每个Pod注释都成为一个名称为meta_kubernetes_pod_annotation_<annotation-name>的标签，并且有一个附带的标签名为meta_kubernetes_pod_annotationpresent_<annotation-name>，您可以使用它来检查注释是否存在。任何使用自定义指标路径的应用程序都需要添加注释。清单14.3显示了APOD API。
 
-> Listing 14.3 api.yaml, the path annotation in the API spec
+> Listing 14.3 api.yaml,  path annotation
 
 ```
-template: # This is the pod spec in the Deployment.
+template: # 这是 deployment 的 pod spec 配置
    metadata:
      labels:
-       app: apod-api # Used as the job label in Prometheus
+       app: apod-api # 在 prometheus 中用作 job 标签
      annotations:
-       prometheus.io/path: "/actuator/prometheus" # Sets the metrics path
+       prometheus.io/path: "/actuator/prometheus" # 设置 metrics path
 ```
-The complexity is centralized in the Prometheus configuration, and it’s really easy for application manifests to specify overrides. The relabeling rules aren’t so complex when you work with them a little more, and you’re usually following exactly the same pattern. The full Prometheus configuration includes similar rules for apps to override the metrics port and to opt out of scraping altogether.
 
-While you’ve been reading this, Prometheus has been busily scraping the timecheck and APOD apps. Take a look at the metrics on the Graph page of the Prometheus UI to see around 200 metrics being collected. The UI is great for running queries and quickly seeing the results, but you can’t use it to build a dashboard showing all the key metrics for your app in a single screen. For that you can use Grafana, another open source project in the container ecosystem, which comes recommended by the Prometheus team.
-
-TRY IT NOW 
-Deploy Grafana with ConfigMaps that set up the connection to Prometheus, and include a dashboard for the APOD app.
-
-复杂性集中在Prometheus配置中，应用程序清单非常容易指定覆盖。当您多使用一些重新标记规则时，它们就不那么复杂了，并且通常遵循完全相同的模式。完整的Prometheus配置包括类似的规则，应用程序可以覆盖指标端口，并选择完全退出抓取。
+复杂性集中在 Prometheus 配置中，应用程序清单非常容易指定覆盖。当您多使用一些重新标记规则时，它们就不那么复杂了，并且通常遵循完全相同的模式。完整的Prometheus配置包括类似的规则，应用程序可以覆盖指标端口，并选择完全退出抓取。
 
 当你在读这篇文章的时候，普罗米修斯一直在忙着抓取时间支票和APOD应用程序。看看Prometheus UI的Graph页面上的指标，可以看到大约有200个指标正在被收集。UI非常适合运行查询并快速查看结果，但你不能用它来构建一个仪表板，在一个屏幕上显示应用程序的所有关键指标。为此，您可以使用Grafana，它是容器生态系统中的另一个开源项目，由Prometheus团队推荐。
 
-现在试试吧
-使用ConfigMaps部署Grafana，它建立了与Prometheus的连接，并包括APOD应用程序的仪表板。
+现在试试吧，使用ConfigMaps部署Grafana，它建立了与Prometheus的连接，并包括APOD应用程序的仪表板。
 
 ```
-# deploy Grafana in the monitoring namespace:
+# 在监控命名空间中部署Grafana:
 kubectl apply -f grafana/
-# wait for it to start up:
+# 等待启动:
 kubectl wait --for=condition=ContainersReady pod -l app=grafana -n
 kiamol-ch14-monitoring
-# get the URL for the dashboard:
-kubectl get svc grafana -o
-jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000/d/kb5nhJA
-Zk' -n kiamol-ch14-monitoring
-# browse to the URL; log in with username kiamol and password kiamol
+# 获取 dashboard url:
+kubectl get svc grafana -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000/d/kb5nhJAZk' -n kiamol-ch14-monitoring
+
+# 浏览到URL;使用用户名kiamol和密码kiamol登录
 ```
 
-The dashboard shown in figure 14.6 is tiny, but it gives you an idea of how you can transform raw metrics into an informative view of system activity. Each visualization in
-
-![图14.6](./images/Figure14.6.png)
-<center>Figure14.6 Application dashboards give a quick insight into performance. The graphs are all powered from Prometheus metrics. </center>
-
-the dashboard is powered by a Prometheus query, which Grafana runs in the background. There’s a row for each component, and that includes a mixture of run-time metrics—processor and memory usage—and application metrics—HTTP requests and cache usage.
-
-Dashboards like this will be a joint effort that cuts across the organization. The support team will set the requirements for what they need to see, and the application development and operations teams ensure the app captures the data and the dashboard shows it. Just like the logging system we looked at in chapter 13, this is a solution built from lightweight open source components, so developers can run the same monitoring system on their laptops that runs in production. That helps with performance testing and debugging in development and test.
-
-Moving to centralized monitoring with Prometheus will require development effort,but it can be an incremental process where you start with basic metrics and add to them as teams start to come up with more requirements. I’ve added Prometheus support to the to-do list app for this chapter, and it took about a dozen lines of code. There’s a simple dashboard for the app ready to use in Grafana, so when you deploy the app, you’ll be able to see the starting point for a dashboard that will improve with future releases.
-
-TRY IT NOW 
-Run the to-do list app with metrics enabled, and use the app to produce some metrics. There’s already a dashboard in Grafana to visualize the metrics.
-
-图14.6所示的仪表板很小，但它让您了解了如何将原始指标转换为系统活动的信息视图。中的每个可视化
+图14.6所示的仪表板很小，但它让您了解了如何将原始指标转换为系统活动的信息视图。仪表板由Prometheus查询驱动，Grafana在后台运行该查询。每个组件都有一行，其中包括运行时指标(处理器和内存使用)和应用程序指标(http请求和缓存使用)的混合。
 
 ![图14.6](./images/Figure14.6.png)
 <center>图14.6应用程序仪表板提供了对性能的快速洞察。这些图表都是由Prometheus metrics提供的</center>
-
-仪表板由Prometheus查询驱动，Grafana在后台运行该查询。每个组件都有一行，其中包括运行时指标(处理器和内存使用)和应用程序指标(http请求和缓存使用)的混合。
 
 像这样的仪表板将是贯穿整个组织的共同努力。支持团队将设置他们需要看到的需求，应用程序开发和运营团队确保应用程序捕获数据并在仪表板上显示它。就像我们在第13章中看到的日志系统一样，这是一个由轻量级开源组件构建的解决方案，因此开发人员可以在他们的笔记本电脑上运行与在生产环境中运行的相同的监控系统。这有助于在开发和测试中进行性能测试和调试。
 
 使用Prometheus转移到集中监视将需要开发工作，但是它可以是一个增量过程，您从基本的度量开始，并随着团队开始提出更多的需求而添加它们。我在本章的待办事项列表应用程序中添加了对普罗米修斯的支持，这大约花了十几行代码。在Grafana中有一个简单的应用程序仪表板，所以当你部署应用程序时，你将能够看到一个仪表板的起点，它将在未来的版本中得到改进。
 
-现在试试吧
-运行启用指标的待办事项列表应用程序，并使用该应用程序生成一些指标。在Grafana中已经有一个仪表盘来可视化指标。
+现在试试吧,运行启用指标的待办事项列表应用程序，并使用该应用程序生成一些指标。在Grafana中已经有一个仪表盘来可视化指标。
 
 ```
-# deploy the app:
+# 部署 app:
 kubectl apply -f todo-list/
-# wait for it to start:
+
+# 等待启动:
 kubectl wait --for=condition=ContainersReady pod -l app=todo-web -n
 kiamol-ch14-test
-# browse to the app, and insert an item
-# then run some load in with a script - on Windows:
+
+# 访问应用，插入待办项
+# 然后在 windows 中运行脚本:
 .\loadgen.ps1
-# OR on macOS/Linux:
+# 或者 macOS/Linux:
 chmod +x ./loadgen.sh && ./loadgen.sh
-# get the URL for the new dashboard:
-kubectl get svc grafana -o jsonpath='http://{.status.loadBalancer
-.ingress[0].*}:3000/d/Eh0VF3iGz' -n kiamol-ch14-monitoring
-# browse to the dashboard
+
+# 获取新的 dashboard 地址:
+kubectl get svc grafana -o jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000/d/Eh0VF3iGz' -n kiamol-ch14-monitoring
+
+# 浏览 dashboard
 ```
-
-There’s not much in that dashboard, but it’s a lot more information than no dashboard at all. It tells you how much CPU and memory the app is using inside the container, the rate at which tasks are being created, and the average response time for HTTP requests. You can see my output in figure 14.7 where I’ve added some tasks and sent some traffic in with the load generation script.
-
-![图14.7](./images/Figure14.7.png)
-<center>Figure14.7 A simple dashboard powered by the Prometheus client library and a few lines of code </center>
-
-All of those metrics are coming from the to-do application Pod. There are two other components to the app in this release: a Postgres database for storage and an Nginx proxy. Neither of those components has native support for Prometheus, so they’re excluded from the target list. Otherwise, Prometheus would keep trying to scrape metrics and failing. It’s the job of whoever models the application to know that a component doesn’t expose metrics and to specify that it should be excluded. Listing 14.4 shows that done with a simple annotation.
 
 仪表板上没有太多东西，但它比没有仪表板的信息要多得多。它告诉你应用程序在容器内使用了多少CPU和内存，创建任务的速率，以及HTTP请求的平均响应时间。您可以在图14.7中看到我的输出，其中我添加了一些任务，并使用负载生成脚本发送了一些流量。
 
 ![图14.7](./images/Figure14.7.png)
-<center>图14.7一个由Prometheus客户端库和几行代码驱动的简单仪表板 </center>
+<center>图14.7 一个由 Prometheus 客户端库和几行代码驱动的简单仪表板 </center>
 
 所有这些指标都来自待办事项应用程序Pod。在这个版本中，应用程序还有另外两个组件:一个用于存储的Postgres数据库和一个Nginx代理。这两个组件都没有对Prometheus的本地支持，因此它们被排除在目标列表之外。否则，普罗米修斯将继续尝试着获取度量标准并失败。对应用程序进行建模的人员的工作是了解一个组件不公开指标，并指定应该排除它。清单14.4显示了使用一个简单注释完成的操作。
 
-> Listing 14.4 proxy.yaml, a Pod spec that excludes itself from monitoring
+> 清单 14.4 proxy.yaml, 一个 pod spec 排除 监控
 
 ```
-template: # This is the Pod spec in the Deployment.
+template: # 这是 deployment pod spec 配置
    metadata:
      labels:
        app: todo-proxy
-     annotations: # Excludes the target in Prometheus
+     annotations: # 排除 target
        prometheus.io/scrape: "false"
 ```
 Components don’t need to have native support for Prometheus and provide their own metrics endpoint to be included in your monitoring system. Prometheus has its own ecosystem—in addition to client libraries that you can use to add metrics to your own applications, a whole set of exporters can extract and publish metrics for third-party applications. We can use exporters to add the missing metrics for the proxy and database components.
 
-组件不需要对Prometheus提供本地支持，并提供自己的度量端点以包含在监视系统中。Prometheus有自己的生态系统——除了可以用来向自己的应用程序添加指标的客户端库之外，一整套导出器可以为第三方应用程序提取和发布指标。我们可以使用导出器为代理和数据库组件添加缺少的指标。
+组件不需要对Prometheus提供本地支持，并提供自己的度量端点以包含在监视系统中。Prometheus有自己的生态系统——除了可以用来向自己的应用程序添加指标的客户端库之外，一整套 exporter 可以为第三方应用程序提取和发布指标。我们可以使用 exporter 为代理和数据库组件添加缺少的指标。
 
 ## 14.3 通过 metrics exporters 来监控第三方应用
 
