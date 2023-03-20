@@ -1,4 +1,4 @@
-# 第十四章 Monitor applications and Kubernates with Prometheus
+# 第十四章 使用 Prometheus 监控应用程序和 Kubernetes
 
 Monitoring is the companion to logging: your monitoring system tells you something is wrong, and then you can dig into the logs to find out the details. Like logging, you want to have a centralized system to collect and visualize metrics about all your application components. An established approach for monitoring in Kuber-netes uses another CNCF project: Prometheus, which is a server application that collects and stores metrics. In this chapter, you’ll learn how to deploy a shared monitoring system in Kubernetes with dashboards that show the health of individ-ual applications and the cluster as a whole.
 
@@ -6,15 +6,20 @@ Prometheus runs on many platforms, but it’s particularly well suited to Kuber-
 
 When you deploy new apps, you don’t need to make any setup changes—Prometheus discovers them automatically and starts collecting metrics. Kubernetes apps are par-ticularly well suited to Prometheus, too. You’ll see in this chapter how to make good use of the sidecar pattern, so every app can provide some metrics to Prometheus, even if the application itself isn’t Prometheus-ready.
 
-## 14.1 How Prometheus monitors Kubernetes workloads
+监控是日志记录的伙伴:监视系统告诉您某些地方出了问题，然后您可以深入日志以找出详细信息。与日志记录一样，您希望有一个集中的系统来收集和可视化关于所有应用程序组件的指标。Kuber-netes中已建立的监控方法使用另一个CNCF项目:Prometheus，这是一个收集和存储指标的服务器应用程序。在本章中，您将学习如何在Kubernetes中部署一个共享监控系统，使用指示板显示单个应用程序和整个集群的健康状况。
+
+Prometheus在许多平台上运行，但它特别适合Kuber-netes。您可以在一个Pod中运行Prometheus，该Pod可以访问Kubernetes API服务器，然后Prometheus查询API以找到它需要监视的所有目标。
+
+当你部署新的应用程序时，你不需要做任何设置更改——prometheus会自动发现它们并开始收集指标。Kubernetes的应用程序也特别适合Prometheus。在本章中，你将看到如何很好地利用sidecar模式，因此每个应用程序都可以为Prometheus提供一些指标，即使应用程序本身还没有准备好。
+
+## 14.1 Prometheus 如何监控 Kubernetes 的工作负载
 
 Metrics in Prometheus are completely generic: each component you want to moni-tor has an HTTP endpoint, which returns all the values that are important to that component. A web server includes metrics for the number of requests it serves, and a Kubernetes node includes metrics for how much memory is available. Pro-metheus doesn’t care what’s in the metrics; it just stores everything the component returns. What’s important to Prometheus is a list of targets it needs to collect from.
 
-Figure 14.1 shows how that works in Kubernetes, using Prometheus’s built-in service
-discovery.
+Figure 14.1 shows how that works in Kubernetes, using Prometheus’s built-in service discovery.
 
-![Figure14.1](./images/Figure14.1.png)
-<center>Figure 14.1 Prometheus uses a pull model to collect metrics, automatically finding targets </center>
+![图14.1](./images/Figure14.1.png)
+<center>图 14.1 Prometheus uses a pull model to collect metrics, automatically finding targets </center>
 
 The focus in this chapter is getting Prometheus working nicely with Kubernetes, to give you a dynamic monitoring system that keeps working as your cluster expands with more nodes running more applications. I won’t go into much detail on how you add monitoring to your applications or what metrics you should recordappendix B in the ebook is the chapter “Adding Observability with Containerized Monitoring” from Learn Docker in a Month of Lunches, which will give you that additional detail.
 
@@ -22,6 +27,20 @@ We’ll start by getting Prometheus up and running. The Prometheus server is a s
 
 TRY IT NOW
 Deploy Prometheus in a dedicated monitoring namespace, config-ured to find apps in a test namespace (the test namespace doesn’t exist yet).
+
+Prometheus 中的度量完全是通用的:您想要监视的每个组件都有一个HTTP端点，该端点返回对该组件重要的所有值。web服务器包含它所服务的请求数量的指标，Kubernetes节点包含可用内存数量的指标。Pro-metheus并不关心度量标准中的内容;它只存储组件返回的所有内容。对普罗米修斯来说，重要的是它需要收集的目标列表。
+
+图14.1显示了如何使用Prometheus的内置服务发现在Kubernetes中工作。
+
+![图14.1](./images/Figure14.1.png)
+<center>图14.1普罗米修斯使用拉模型收集指标，自动找到目标</center>
+
+本章的重点是让Prometheus与Kubernetes很好地合作，为您提供一个动态监控系统，当您的集群扩展到更多的节点，运行更多的应用程序时，该系统仍能保持工作。我不会详细介绍如何在应用程序中添加监控，或者应该记录哪些指标，电子书的附录B是《Learn Docker in a Month of lunch》中的“添加可观察性与容器化监控”一章，它将为您提供额外的细节。
+
+我们将从启动普罗米修斯开始。Prometheus服务器是一个单独的组件，负责服务发现、指标收集和存储，它有一个基本的web UI，您可以使用它来检查系统的状态并运行简单的查询。
+
+现在试试吧
+将Prometheus部署在专用的监视名称空间中，配置为在测试名称空间中查找应用程序(测试名称空间还不存在)。
 
 ```
 # switch to this chapter’s folder:
@@ -42,10 +61,17 @@ kubectl get svc prometheus -o jsonpath='http://{.status.loadBalancer
 
 Prometheus calls metrics collection scraping. When you browse to the Prometheus UI,you’ll see there are no scrape targets, although there is a category called testpods, which lists zero targets. Figure 14.2 shows my output. The test-pods name comes from the Prometheus configuration you deployed in a ConfigMap, which the Pod reads from.
 
-![Figure14.2](./images/Figure14.2.png)
+![图14.2](./images/Figure14.2.png)
 <center>Figure 14.2 No targets yet, but Prometheus will keep checking the Kubernetes API for new Pods. </center>
 
 Configuring Prometheus to find targets in Kubernetes is fairly straightforward, although the terminology is confusing at first. Prometheus uses jobs to define a related set of targets to scrape, which could be multiple components of an application. The scrape configuration can be as simple as a static list of domain names, which Prometheus polls to grab the metrics, or it can use dynamic service discovery.Listing 14.1 shows Prometheus the beginning of the test-pods job configuration, which uses the Kubernetes API for service discovery.
+
+普罗米修斯称度量收集为刮取。当您浏览到Prometheus UI时，您将看到没有抓取目标，尽管有一个名为testpods的类别，它列出了零目标。图14.2显示了我的输出。test-pods的名称来自您在ConfigMap中部署的Prometheus配置，Pod从中读取该配置。
+
+![图14.2](./images/Figure14.2.png)
+<center>图14.2目前还没有目标，但Prometheus将继续检查Kubernetes API以寻找新的pod </center>
+
+配置Prometheus以在Kubernetes中寻找目标是相当简单的，尽管术语一开始令人困惑。Prometheus使用作业来定义一组相关的目标，这些目标可以是应用程序的多个组件。抓取配置可以简单到一个静态域名列表(Prometheus轮询该列表以获取指标)，也可以使用动态服务发现。清单14.1向Prometheus展示了test-pods作业配置的开头，它使用Kubernetes API进行服务发现。
 
 > Listing 14.1 prometheus-config.yaml, scrape configuration with Kubernetes
 
@@ -73,6 +99,18 @@ This approach is convention-driven—as long as your apps are modeled to suit th
 TRY IT NOW 
 Deploy the timecheck application to the test namespace. The spec matches all the Prometheus scrape rules, so the new Pod should be found and added as a scrape target.
 
+需要解释的是relabel_configs部分。Prometheus使用标签存储度量，标签是标识源系统和其他相关信息的键值对。您将在查询中使用标签来选择或聚合指标，还可以在将指标存储到Prometheus之前使用它们来过滤或修改指标。这是重新标签，从概念上讲，它类似于Fluent bit中的数据管道——您有机会丢弃不想要的数据并重新塑造您想要的数据。正则表达式在Prometheus中也出现了不必要的复杂问题，但很少需要进行更改。你在重新标签阶段设置的管道应该足够通用，适用于所有应用程序。配置文件中的全管道应用如下规则:
+
+- 只包含命名空间kiamol-ch14-test中的Pods。
+- 使用Pod名称作为Prometheus实例标签的值。
+- 使用Pod元数据中的app标签作为Prometheus作业标签的值。
+- 在Pod元数据中使用可选注解配置抓取目标。
+
+这种方法是由约定驱动的——只要您的应用程序被建模以适应规则，它们就会自动被选为监视目标。Prometheus使用规则来查找匹配的Pods，对于每个目标，它通过向/metrics路径发出HTTP GET请求来收集指标。Prometheus需要知道使用哪个网络端口，因此Pod规范需要显式地包括容器端口。这是一个很好的实践，因为它有助于记录应用程序的设置。让我们将一个简单的应用程序部署到test名称空间，看看Prometheus用它做了什么。
+
+现在试试吧
+将时间检查应用程序部署到测试名称空间。该规格匹配所有的普罗米修斯刮擦规则，所以新的Pod应该被找到并添加为刮擦目标。
+
 ```
 # create the test namespace and the timecheck Deployment:
 kubectl apply -f timecheck/
@@ -86,7 +124,7 @@ kiamol-ch14-test
 
 My output is shown in figure 14.3, where I’ve opened two browser windows so you can see what happened when the app was deployed. Prometheus saw the timecheck Pod being created, and it matched all the rules in the relabel stage, so it was added as a target. The Prometheus configuration is set to scrape targets every 30 seconds. The timecheck app has a /metrics endpoint,which returns a count for how many timecheck logs it has written. When I queried that metric in Prometheus, the app had written 22 log entries.
 
-![Figure14.3](./images/Figure14.3.png)
+![图14.3](./images/Figure14.3.png)
 <center>Figure 14.3 Deploying an app to the test namespace—Prometheus finds it and starts collecting metrics. </center>
 
 You should realize two important things here: the application itself needs to provide the metrics because Prometheus is just a collector, and those metrics represent the activity for one instance of the application. The timecheck app isn’t a web application—it’s just a background process—so there’s no Service directing traffic to it. Prometheus gets the Pod IP address when it queries the Kubernetes API, and it makes the HTTP request directly to the Pod. You can configure Prometheus to query Services, too, but then you’d get a target that is a load balancer across multiple Pods, and you want Prometheus to scrape each Pod independently.
@@ -95,6 +133,18 @@ You’ll use the metrics in Prometheus to power dashboards showing the overall h
 
 TRY IT NOW 
 Add another replica to the timecheck app. It’s a new Pod that matches the Prometheus rules, so it will be discovered and added as another scrape target.
+
+我的输出如图14.3所示，其中我打开了两个浏览器窗口，以便您可以看到部署应用程序时发生了什么。普罗米修斯看到时间检查Pod被创建，它符合重新标记阶段的所有规则，所以它被添加为目标。普罗米修斯配置设置为每30秒刮一次目标。时间检查应用程序有一个/metrics端点，它返回它写了多少时间检查日志的计数。当我在Prometheus中查询该指标时，应用程序已经写入了22个日志条目。
+
+![图14.3](./images/Figure14.3.png)
+<center>图14.3将应用程序部署到测试名称空间- prometheus找到它并开始收集指标. </center>
+
+这里您应该认识到两个重要的事情:应用程序本身需要提供度量，因为Prometheus只是一个收集器，而那些度量代表应用程序实例的活动。时间检查应用程序不是一个web应用程序——它只是一个后台进程——所以没有服务将流量导向它。普罗米修斯在查询Kubernetes API时获得Pod的IP地址，并直接向Pod发出HTTP请求。您也可以配置Prometheus来查询Services，但是这样您就会得到一个目标，它是跨多个Pod的负载均衡器，并且您希望Prometheus独立地抓取每个Pod。
+
+你可以使用Prometheus中的指标来增强仪表板，显示应用程序的整体健康状况，你可以汇总所有pod来获得标题值。您还需要能够向下钻取，以查看pod之间是否有差异。这将帮助您确定某些实例是否执行不良，并将反馈到您的运行状况检查中。我们可以放大时间检查应用程序，看看在单个Pod级别收集的重要性。
+
+现在试试吧
+添加另一个副本到时间检查应用程序。这是一个新的Pod，符合普罗米修斯规则，所以它将被发现并添加为另一个刮擦目标。
 
 ```
 # scale the Deployment to add another Pod:
@@ -107,9 +157,10 @@ kiamol-ch14-test
 ```
 
 ## 14.2 Monitoring apps built with Prometheus client libraries
+
 Appendix B in the ebook walks through adding metrics to an app that shows a picture from NASA’s Astronomy Photo of the Day (APOD) service. The components of that app are in Java, Go, and Node.js, and they each use a Prometheus client library to expose run-time and application metrics. This chapter includes Kubernetes manifests for the app that deploy to the test namespace, so all the application Pods will be discovered by Prometheus.
 
-![Figure14.4](./images/Figure14.4.png)
+![图14.4](./images/Figure14.4.png)
 <center>Figure 14.4 Every instance records its own metrics so you need to collect from every Pod. </center>
 
 TRY IT NOW 
@@ -130,7 +181,7 @@ kiamol-ch14-test
 
 You can see my output in figure 14.5, with a very pleasant image of something called Lynds Dark Nebula 1251. The application is working as expected, and Prometheushas discovered all of the new Pods. Within 30 seconds of deploying the app, you
 
-![Figure14.5](./images/Figure14.5.png)
+![图14.5](./images/Figure14.5.png)
 <center>Figure 14.5 The APOD components all have Services, but they are still scraped at the Pod level. </center>
 
 should see that the state of all of the new targets is up, which means Prometheus has successfully scraped them.
@@ -184,7 +235,7 @@ Zk' -n kiamol-ch14-monitoring
 
 The dashboard shown in figure 14.6 is tiny, but it gives you an idea of how you can transform raw metrics into an informative view of system activity. Each visualization in
 
-![Figure14.6](./images/Figure14.6.png)
+![图14.6](./images/Figure14.6.png)
 <center>Figure14.6 Application dashboards give a quick insight into performance. The graphs are all powered from Prometheus metrics. </center>
 
 the dashboard is powered by a Prometheus query, which Grafana runs in the background. There’s a row for each component, and that includes a mixture of run-time metrics—processor and memory usage—and application metrics—HTTP requests and cache usage.
@@ -215,7 +266,7 @@ kubectl get svc grafana -o jsonpath='http://{.status.loadBalancer
 
 There’s not much in that dashboard, but it’s a lot more information than no dashboard at all. It tells you how much CPU and memory the app is using inside the container, the rate at which tasks are being created, and the average response time for HTTP requests. You can see my output in figure 14.7 where I’ve added some tasks and sent some traffic in with the load generation script.
 
-![Figure14.7](./images/Figure14.7.png)
+![图14.7](./images/Figure14.7.png)
 <center>Figure14.7 A simple dashboard powered by the Prometheus client library and a few lines of code </center>
 
 All of those metrics are coming from the to-do application Pod. There are two other components to the app in this release: a Postgres database for storage and an Nginx proxy. Neither of those components has native support for Prometheus, so they’re excluded from the target list. Otherwise, Prometheus would keep trying to scrape metrics and failing. It’s the job of whoever models the application to know that a component doesn’t expose metrics and to specify that it should be excluded. Listing 14.4 shows that done with a simple annotation.
@@ -285,7 +336,7 @@ It would be nice to get a bit more information from Nginx—like the breakdown o
 
 There’s one more component to add to the to-do list dashboard: the Postgres database. Postgres stores all sorts of useful information in tables and functions inside the database, and the exporter runs queries to power its metrics endpoint. The setup for the Postgres exporter follows the same pattern we’ve seen in Nginx. In this case, the sidecar is configured to access Postgres on localhost, using the same Kubernetes Secret that the Postgres container uses for the admin password. We’ll make a final update to the application dashboard to show the key database metrics from the exporter.
 
-![Figure14.8](./images/Figure14.8.png)
+![图14.8](./images/Figure14.8.png)
 <center>Figure14.8 Collecting proxy metrics with an exporter adds another level of detail to the dashboard. </center>
 
 TRY IT NOW 
@@ -305,7 +356,7 @@ kubectl rollout restart deploy grafana -n kiamol-ch14-monitoring
 ```
 I’ve zoomed out and scrolled down in figure 14.9 so you can see the new visualizations, but the whole dashboard is a joy to behold in full-screen mode. A single page shows you how much traffic is coming to the proxy, how hard the app is working and what users are actually doing, and what’s happening inside the database. You can get the same level of detail in your own apps with client libraries and exporters, and you’re looking at just a few days’ effort.
 
-![Figure14.9](./images/Figure14.9.png)
+![图14.9](./images/Figure14.9.png)
 <center>Figure14.9 The database exporter records metrics about data activity, which add detail to the dashboard. </center>
 
 Exporters are there to add metrics to apps that don’t have Prometheus support. If your goal is to move a set of existing applications onto Kubernetes, then you may not have the luxury of a development team to add custom metrics. For those apps, you can use the Prometheus blackbox exporter, taking to the extreme the approach that some monitoring is better than none.
@@ -338,7 +389,7 @@ The Pod spec for the random-number API follows a similar pattern to Nginx and Po
 
 Now we have dashboards for three different apps that have different levels of detail, because the application components aren’t consistent with the data they collect. But all the components have something in common: they’re all running in containers
 
-![Figure14.10](./images/Figure14.10.png)
+![图14.10](./images/Figure14.10.png)
 <center>Figure14.10 Even a simple dashboard is useful. This shows the current and historical status of the API. </center>
 
 ## 14.4 Monitoring containers and Kubernetes objects
@@ -388,7 +439,7 @@ relabel_configs: # Pods, by namespace and label.
 action: keep
 regex: kube-system;true;cadvisor
 ```
-![Figure14.11](./images/Figure14.11.png)
+![图14.11](./images/Figure14.11.png)
 <center>Figure14.11 New metrics show activity at the cluster and container levels. </center>
 
 Now we have the opposite problem from the random-number dashboard: there’s far too much information in the new metrics, so the platform dashboard will need to be highly selective if it’s going to be useful. I have a sample dashboard prepared that is a good starter. It includes current resource usage and all available resource quantities for the cluster, together with some high-level breakdowns by namespace and warning indicators for the health of the nodes.
@@ -411,7 +462,7 @@ mk' -n kiamol-ch14-monitoring
 
 This is another dashboard that is meant for the big screen, so the screenshot in figure 14.12 doesn’t do it justice. When you run the exercise, you can examine it more closely. The top row shows memory usage, the middle row displays CPU usage, and the bottom row shows the status of Pod containers.
 
-![Figure14.12](./images/Figure14.12.png)
+![图14.12](./images/Figure14.12.png)
 <center>Figure14.12 Another tiny screenshot—run the exercise in your own cluster to see it full size. </center>
 
 A platform dashboard like this is pretty low level—it’s really just showing you if your cluster is near its saturation point. The queries that power this dashboard will be more useful as alerts, warning you if resource usage is getting out of hand. Kubernetes has pressure indicators that are useful there. The memory pressure and process pressure values are shown in the dashboard, as well as a disk pressure indicator. Those values are significant because if a node comes under compute pressure, it can terminate Pod containers. Those would be good metrics to alert on because if you reach that stage, you probably need to page someone to come and nurse the cluster back to health.
@@ -436,7 +487,7 @@ As shown in figure 14.13, the dashboard is still basic, but at least we now have
 
 There’s a lot more to monitoring that I won’t cover here, but now you have a solid grounding in how Kubernetes and Prometheus work together. The main pieces you’re missing are collecting metrics at the server level and configuring alerts. Server metrics supply data like disk and network usage. You collect them by running exporters directly on the nodes (using the Node Exporter for Linux servers and the Windows Exporter for Windows servers), and you use service discovery to add the nodes as scrape targets. Prometheus has a sophisticated alerting system that uses PromQL queries to define alerting rules. You configure alerts so that when rules are triggered, Prometheus will send emails, create Slack messages, or send a notification through PagerDuty.
 
-![Figure14.13](./images/Figure14.13.png)
+![图14.13](./images/Figure14.13.png)
 <center>Figure14.13 Augmenting basic health stats with container and Pod metrics adds correlation. </center>
 
 We’ll wrap up the chapter by looking at the full architecture of Prometheus in Kubernetes and digging into which pieces need custom work and where the effort needs to go.
@@ -446,7 +497,7 @@ When you step outside of core Kubernetes and into the ecosystem, you need to und
 
 I make that point because the move to Prometheus will involve development work. You need to record interesting metrics for your applications to make your dashboards truly useful. You should feel confident about making that investment because Prometheus is the most popular tool for monitoring containerized applications, and the project was the second to graduate in the CNCF—after Kubernetes itself. There’s also work underway to take the Prometheus metric format into an open standard (called
 
-![Figure14.14](./images/Figure14.14.png)
+![图14.14](./images/Figure14.14.png)
 <center>Figure14.14 Monitoring doesn’t come for free—it needs development and dependencies on opensource projects. </center>
 
 OpenMetrics), so other tools will be able to read application metrics exposed in the Prometheus format.
