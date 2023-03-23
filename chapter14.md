@@ -466,17 +466,11 @@ kubectl delete all -n kube-system -l kiamol=ch14
 ```
 
 ## 14.6 实验室
-Another investigative lab for this chapter. In the lab folder, there’s a set of manifests for a slightly simpler deployment of Prometheus and a basic deployment of Elasticsearch. The goal is to run Elasticsearch with metrics flowing into Prometheus. Here are the details:
 
-- Elasticsearch doesn’t provide its own metrics, so you’ll need to find a component that does that for you.
-- The Prometheus configuration will tell you which namespace you need to use for Elasticsearch and the annotation you need for the metrics path.
-- You should include a version label in your Elasticsearch Pod spec, so Prometheus will pick that up and add it to the metric labels.
-You’ll need to hunt around the documentation for Prometheus to get started, and that should show you the way. My solution is on GitHub for you to check in the usual place: <https://github.com/sixeyed/kiamol/blob/master/ch14/lab/README.md>.
-
-本章的另一个调查实验室。在lab文件夹中，有一组清单，用于稍微简单一点的Prometheus部署和Elasticsearch的基本部署。我们的目标是运行Elasticsearch，并将度量流到Prometheus中。以下是细节:
+本章的另一个调查实验室。在lab文件夹中，有一组清单，用于稍微简单一点的Prometheus部署和Elasticsearch的基本部署。我们的目标是运行Elasticsearch，并将度量流入到Prometheus中。以下是细节:
 
 - Elasticsearch不提供自己的指标，所以你需要找到一个组件来为你做这件事。
-- Prometheus配置将告诉您需要为Elasticsearch使用哪个名称空间，以及您需要为度量路径使用注释。
-- 你应该在你的Elasticsearch Pod规格中包含一个版本标签，这样Prometheus就会把它添加到度量标签中。
+- Prometheus 配置将告诉您需要为Elasticsearch使用哪个命名空间，以及您需要为度量路径使用注释。
+- 你应该在你的Elasticsearch Pod spec 中包含一个版本标签，这样 Prometheus 就会把它添加到度量标签中。
 
-您需要搜索Prometheus的文档才能开始，它应该会为您指明方向。我的解决方案在GitHub上，你可以在通常的地方检查:<https://github.com/sixeyed/kiamol/blob/master/ch14/lab/README.md>。
+您需要搜索Prometheus的文档才能开始，它应该会为您指明方向。我的解决方案在GitHub上，你可以在通常的地方检查: https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch14/lab/README.md。
