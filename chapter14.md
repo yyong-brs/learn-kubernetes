@@ -447,37 +447,18 @@ kiamol-ch14-monitoring
 
 ## 14.5 了解您在监控方面所做的投资
 
-When you step outside of core Kubernetes and into the ecosystem, you need to under- stand whether the project you take a dependency on will still exist in five years, or one year, or by the time the chapter you’re writing makes it to the printing press. I’ve been careful in this book to include only those ecosystem components that are open source, are heavily used, and have an established history and governance model. The monitoring architecture in figure 14.14 uses components that all meet those criteria.
-
-I make that point because the move to Prometheus will involve development work. You need to record interesting metrics for your applications to make your dashboards truly useful. You should feel confident about making that investment because Prometheus is the most popular tool for monitoring containerized applications, and the project was the second to graduate in the CNCF—after Kubernetes itself. There’s also work underway to take the Prometheus metric format into an open standard (called
+当你走出核心 Kubernetes，进入生态系统时，你需要了解你所依赖的项目是否在五年后，或一年后，或在你所写的章节付印时仍然存在。在这本书中，我一直很小心地只包括那些开源的、被大量使用的、具有既定历史和治理模型的生态系统组件。图14.14中的监视体系结构使用了全部满足这些标准的组件。
 
 ![图14.14](./images/Figure14.14.png)
-<center>Figure14.14 Monitoring doesn’t come for free—it needs development and dependencies on opensource projects. </center>
+<center>图14.14 监控不是免费的——它需要开发并依赖于开源项目. </center>
 
-OpenMetrics), so other tools will be able to read application metrics exposed in the Prometheus format.
-
-What you include in those metrics will depend on the nature of your applications, but a good general approach is to follow the guidelines from Google’s Site Reliability Engineering practice. It’s usually pretty simple to add the four golden signals to your app metrics: latency, traffic, errors, and saturation. (Appendix B in the ebook walks through how those look in Prometheus.) But the real value comes when you think about application performance from the user experience perspective. A graph that shows heavy disk usage in your database doesn’t tell you much, but if you can see that a high percentage of users don’t complete a purchase because your website’s check- out page takes too long to load, that’s worth knowing.
-
-That’s all for monitoring now, so we can clear down the cluster to get ready for the lab.
-
-TRY IT NOW 
-Delete the namespaces for this chapter, and the objects created in the system namespace.
-
-当你走出核心Kubernetes，进入生态系统时，你需要了解你所依赖的项目是否在五年后，或一年后，或在你所写的章节付印时仍然存在。在这本书中，我一直很小心地只包括那些开源的、被大量使用的、具有既定历史和治理模型的生态系统组件。图14.14中的监视体系结构使用了全部满足这些标准的组件。
-
-我提出这一点是因为迁移到普罗米修斯将涉及开发工作。您需要为您的应用程序记录有趣的指标，以使您的仪表板真正有用。您应该对投资有信心，因为Prometheus是监视容器应用程序最流行的工具，并且该项目是cncf继Kubernetes之后第二个毕业的项目。目前正在进行的工作是将普罗米修斯公制格式引入一个开放标准(称为普罗米修斯公制)
-
-![图14.14](./images/Figure14.14.png)
-<center>图14.14监控不是免费的——它需要开发并依赖于开源项目. </center>
-
-OpenMetrics)，因此其他工具将能够读取以Prometheus格式公开的应用程序指标。
+我提出这一点是因为迁移到普罗米修斯将涉及开发工作。您需要为您的应用程序记录有趣的指标，以使您的仪表板真正有用。您应该对投资有信心，因为Prometheus是监视容器应用程序最流行的工具，并且该项目是cncf继Kubernetes之后第二个毕业的项目。目前正在进行的工作是将Prometheus度量格式引入一个开放标准(称为OpenMetrics)，这样其他工具将能够读取以Prometheus格式公开的应用程序度量。
 
 你在这些指标中包含什么将取决于你的应用程序的性质，但是一个好的通用方法是遵循谷歌网站可靠性工程实践的指导方针。在应用指标中添加四个黄金信号通常非常简单:延迟、流量、错误和饱和度。(电子书的附录B介绍了这些在《普罗米修斯》中的样子。)但真正的价值来自于从用户体验的角度考虑应用程序性能。一个显示数据库中磁盘使用率很高的图表并不能告诉你太多东西，但是如果你能看到有很大比例的用户因为你网站的结帐页面加载时间太长而没有完成购买，这是值得了解的。
 
 监控到此结束，我们可以清理集群为实验室做准备了。
 
-现在试试吧
-删除本章的命名空间，以及system命名空间下创建的对象。
+现在试试吧,删除本章的命名空间，以及system命名空间下创建的对象。
 
 ```
 kubectl delete ns -l kiamol=ch14
