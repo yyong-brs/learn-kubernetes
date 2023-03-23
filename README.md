@@ -196,16 +196,16 @@
 
     - 13.6 [实验室](./chapter13.md#136-实验室)
 
-  - 第十四章 [使用 Fluentd 和 Elasticsearch 集中化日志](./chapter14.md)
+  - 第十四章 [使用 Prometheus 监控应用程序和 Kubernetes](./chapter14.md)
 
-    - 14.1 [Kubernetes 如何存储日志条目](./chapter14.md#141-kubernetes-如何存储日志条目)
+    - 14.1 [Prometheus 如何监控 Kubernetes 的工作负载](./chapter14.md#141-prometheus-如何监控-kubernetes-的工作负载)
 
-    - 14.2 [使用 Fluentd 收集节点日志](./chapter14.md#142-使用-fluentd-收集节点日志)
+    - 14.2 [监视使用 Prometheus 客户端库构建的应用程序](./chapter14.md#142-监视使用-prometheus-客户端库构建的应用程序)
 
-    - 14.3 [向 Elasticsearch 发送日志](./chapter14.md#143-向-elasticsearch-发送日志)
+    - 14.3 [通过 metrics exporters 来监控第三方应用](./chapter14.md#143-通过-metrics-exporters-来监控第三方应用)
 
-    - 14.4 [解析和过滤日志条目](./chapter14.md#144-解析和过滤日志条目)
+    - 14.4 [监控容器以及 kubernetes 对象](./chapter14.md#144-监控容器以及-kubernetes-对象)
 
-    - 14.5 [了解 Kubernetes 中的日志记录选项](./chapter14.md#145-了解-kubernetes-中的日志记录选项)
+    - 14.5 [了解您在监控方面所做的投资](./chapter14.md#145-了解您在监控方面所做的投资)
 
     - 14.6 [实验室](./chapter14.md#146-实验室)
