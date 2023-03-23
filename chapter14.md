@@ -98,9 +98,6 @@ kubectl wait --for=condition=ContainersReady pod -l app=timecheck -n kiamol-ch14
 # 回到普罗米修斯，检查 target 列表，在 graph 页面，
 # 执行timecheck_total和dotnet_total_memory_bytes的查询
 ```
-You’ll see in this exercise that Prometheus finds the new Pod and starts scraping it. Both Pods record the same metrics, and the Pod name is set as a label on each metric. The query for the timecheck_total metric now returns two results—one for each Pod—and you can see in figure 14.4 that one Pod has done a lot more work than the other.
-
-The timecheck counter is a metric that is explicitly captured in the application code. Most languages have a Prometheus client library, which you can plug into your build. The libraries let you capture application-specific details like this, and they also collect generic information about the application run time. This is a .NET application, and the Prometheus client library records run-time details, like the amount of memory and CPU in use and the number of threads running. In the next section,we’ll run a distributed application where every component exposes Prometheus metrics, and we’ll see how useful an application dashboard is when it includes run-time performance as well as application details.
 
 在这个练习中，你会看到普罗米修斯发现了新的 pod，并开始采集它。两个Pod记录相同的指标，Pod名称被设置为每个指标上的标签。对timecheck_total指标的查询现在返回两个结果——每个Pod一个结果——在图14.4中可以看到，一个Pod比另一个Pod完成了更多的工作。
 
@@ -146,8 +143,6 @@ regex: true;(.*) # 如果 pod 具有一个名为 prometheus.io/path 的 annotati
 
 target_label: __metrics_path__ #从 annotation 中获取设置 target path
 ```
-
-This is way less complicated than it looks. The rule says: if the Pod has an annotation called prometheus.io/path, then use the value of that annotation as the metrics path. Prometheus does it all with labels, so every Pod annotation becomes a label with the name meta_kubernetes_pod_annotation_<annotation-name>, and there’s an accompanying label called meta_kubernetes_pod_annotationpresent_<annotation-name>, which you can use to check if the annotation exists. Any apps that use a custom metrics path need to add the annotation. Listing 14.3 shows that for the APOD API.
 
 这远没有看起来那么复杂。规则是这样的:如果 pod 有一个叫 prometheus.io/path 注释，然后就使用该注释的值作为度量路径。Prometheus使用标签来完成这一切，因此每个Pod注释都成为一个名称为meta_kubernetes_pod_annotation_<annotation-name>的标签，并且有一个附带的标签名为meta_kubernetes_pod_annotationpresent_<annotation-name>，您可以使用它来检查注释是否存在。任何使用自定义指标路径的应用程序都需要添加注释。清单14.3显示了APOD API。
 
@@ -228,7 +223,6 @@ template: # 这是 deployment pod spec 配置
      annotations: # 排除 target
        prometheus.io/scrape: "false"
 ```
-Components don’t need to have native support for Prometheus and provide their own metrics endpoint to be included in your monitoring system. Prometheus has its own ecosystem—in addition to client libraries that you can use to add metrics to your own applications, a whole set of exporters can extract and publish metrics for third-party applications. We can use exporters to add the missing metrics for the proxy and database components.
 
 组件不需要对Prometheus提供本地支持，并提供自己的度量端点以包含在监视系统中。Prometheus有自己的生态系统——除了可以用来向自己的应用程序添加指标的客户端库之外，一整套 exporter 可以为第三方应用程序提取和发布指标。我们可以使用 exporter 为代理和数据库组件添加缺少的指标。
 
@@ -311,17 +305,6 @@ kubectl logs -l app=todo-db -n kiamol-ch14-test -c exporter
 kubectl apply -f grafana/update/grafana-dashboard-todo-list-v3.yaml
 kubectl rollout restart deploy grafana -n kiamol-ch14-monitoring
 ```
-I’ve zoomed out and scrolled down in figure 14.9 so you can see the new visualizations, but the whole dashboard is a joy to behold in full-screen mode. A single page shows you how much traffic is coming to the proxy, how hard the app is working and what users are actually doing, and what’s happening inside the database. You can get the same level of detail in your own apps with client libraries and exporters, and you’re looking at just a few days’ effort.
-
-![图14.9](./images/Figure14.9.png)
-<center>Figure14.9 The database exporter records metrics about data activity, which add detail to the dashboard. </center>
-
-Exporters are there to add metrics to apps that don’t have Prometheus support. If your goal is to move a set of existing applications onto Kubernetes, then you may not have the luxury of a development team to add custom metrics. For those apps, you can use the Prometheus blackbox exporter, taking to the extreme the approach that some monitoring is better than none.
-
-The blackbox exporter can run in a sidecar and make TCP or HTTP requests to your application container as well as provide a basic metrics endpoint to say whether the application is up. This approach is similar to adding container probes to your Pod spec, except that the blackbox exporter is for information only. You can run a dashboard to show the status of an app if it isn’t a good fit for Kubernetes’s self-healing mechanisms, like the random-number API we’ve used in this book.
-
-TRY IT NOW 
-Deploy the random-number API with a blackbox exporter and the simplest possible Grafana dashboard. You can break the API by using it repeatedly and then reset it so it works again, and the dashboard tracks the status.
 
 在图14.9中，我缩小并向下滚动，这样您就可以看到新的可视化效果，但是在全屏模式下，整个仪表板都是赏心悦目的。一个页面显示了代理的流量，应用程序的工作强度，用户实际在做什么，以及数据库内部发生了什么。您可以在自己的应用程序中使用客户端库和 exporter 获得相同级别的细节，而这只需要几天的努力。
 
@@ -364,140 +347,101 @@ monitoring
 
 ## 14.4 监控容器以及 kubernetes 对象
 
-Prometheus integrates with Kubernetes for service discovery, but it doesn’t collect any metrics from the API. You can get metrics about Kubernetes objects and container activity from two additional components: cAdvisor, a Google open source project, and kube-state-metrics, which is part of the wider Kubernetes organization on GitHub. Both run as containers in the cluster, but they collect data from different sources. cAdvisor collects metrics from the container runtime, so it runs as a DaemonSet with a Pod on each node to report on that node’s containers. kube-state-metrics queries the Kubernetes API so it can run as a Deployment with a single replica on any node.
+Prometheus与Kubernetes集成用于服务发现，但它不从API收集任何指标。你可以从另外两个组件获得关于Kubernetes对象和容器活动的指标:cAdvisor(谷歌开源项目)和kube-state-metrics (Kubernetes组织的一部分)。两者都作为集群中的容器运行，但它们从不同的来源收集数据。cAdvisor从容器运行时收集度量，因此它作为一个DaemonSet运行，每个节点上都有一个Pod，以报告该节点的容器。kube-state-metrics查询Kubernetes API，因此它可以作为 Deployment 运行，在任何节点上都有一个副本。
 
-TRY IT NOW 
-Deploy the metric collectors for cAdvisor and kube-state-metrics,and update the Prometheus configuration to include them as scrape targets.
-
-Prometheus与Kubernetes集成用于服务发现，但它不从API收集任何指标。你可以从另外两个组件获得关于Kubernetes对象和容器活动的指标:cAdvisor(谷歌开源项目)和kube-state-metrics (Kubernetes组织的一部分)。两者都作为集群中的容器运行，但它们从不同的来源收集数据。cAdvisor从容器运行时收集度量，因此它作为一个DaemonSet运行，每个节点上都有一个Pod，以报告该节点的容器。kube-state-metrics查询Kubernetes API，因此它可以作为部署运行，在任何节点上都有一个副本。
-
-现在试试吧
-为cAdvisor和kube-state-metrics部署度量收集器，并更新Prometheus配置以将它们包括为抓取目标。
+现在试试吧,为 cAdvisor 和 kube-state-metrics 部署度量收集器，并更新Prometheus配置以将它们包括为抓取目标。
 
 ```
-# deploy cAdvisor and kube-state-metrics:
+# 部署 cAdvisor 和 kube-state-metrics:
 kubectl apply -f kube/
-# wait for cAdvisor to start:
-kubectl wait --for=condition=ContainersReady pod -l app=cadvisor -n
-kube-system
-# update the Prometheus config:
+# 等待 cAdvisor 启动:
+kubectl wait --for=condition=ContainersReady pod -l app=cadvisor -n kube-system
+# 更新 Prometheus config:
 kubectl apply -f prometheus/update/prometheus-config-kube.yaml
-# wait for the ConfigMap to update in the Pod:
+# 等待 ConfigMap 更新生效:
 sleep 30
-# use an HTTP POST to reload the Prometheus configuration:
+# 使用 HTTP POST 请求重新加载 Prometheus 配置:
 curl -X POST $(kubectl get svc prometheus -o
 jsonpath='http://{.status.loadBalancer.ingress[0].*}:9090/-/reload'
 -n kiamol-ch14-monitoring)
-# browse to the Prometheus UI—in the Graph page you’ll see
-# metrics listed covering containers and Kubernetes objects
+
+# 访问 Prometheus UI— 在 Graph 页面你将看到包含 容器以及 kubernetes 对象的 metrics 信息
 ```
 
-In this exercise, you’ll see that Prometheus is collecting thousands of new metrics. The raw data includes the compute resources used by every container and the status of every Pod. My output is shown in figure 14.11. When you run this exercise, you can check the Targets page in the Prometheus UI to confirm that the new targets are being scraped. Prometheus doesn’t automatically reload configuration, so in the exercise, there’s a delay to give Kubernetes time to propagate the ConfigMap update, and the curl command forces a configuration reload in Prometheus.
+在本练习中，您将看到 Prometheus 正在收集数以千计的新度量。原始数据包括每个容器使用的计算资源和每个Pod的状态。我的输出如图14.11所示。当您运行这个练习时，您可以检查Prometheus UI中的Targets页面，以确认新的目标正在被抓取。Prometheus不会自动重新加载配置，因此在练习中，会有一个延迟，让Kubernetes有时间传播ConfigMap更新，并且curl命令强制Prometheus重新加载配置。
 
-The updated Prometheus configuration you just deployed includes two new job definitions, shown in listing 14.6. kube-state-metrics is specified as a static target using the full DNS name of the Service. A single Pod collects all of the metrics so there’s no loadbalancing issue here. cAdvisor uses Kubernetes service discovery to find every Pod in the DaemonSet, which would present one target for each node in a multinode cluster.
-
-在本练习中，您将看到Prometheus正在收集数以千计的新度量。原始数据包括每个容器使用的计算资源和每个Pod的状态。我的输出如图14.11所示。当您运行这个练习时，您可以检查Prometheus UI中的Targets页面，以确认新的目标正在被抓取。Prometheus不会自动重新加载配置，因此在练习中，会有一个延迟，让Kubernetes有时间传播ConfigMap更新，并且curl命令强制Prometheus重新加载配置。
+![图14.11](./images/Figure14.11.png)
+<center>图 14.11 新指标显示集群和容器级别的活动. </center>
 
 刚刚部署的更新后的Prometheus配置包括两个新的作业定义，如清单14.6所示。kube-state-metrics使用服务的完整DNS名称指定为静态目标。一个Pod收集所有的指标，所以这里不存在负载平衡问题。cAdvisor使用Kubernetes服务发现来查找DaemonSet中的每个Pod，这将为多节点集群中的每个节点提供一个目标。
 
-> Listing 14.6 prometheus-config-kube.yaml, new scrape targets in Prometheus
+> 清单 14.6 prometheus-config-kube.yaml,  Prometheus 新的采集 target
 
 ```
-- job_name: 'kube-state-metrics' # Kubernetes metrics use a
-static_configs: # static configuration with DNS.
-- targets:
-- kube-state-metrics.kube-system.svc.cluster.local:8080
-- kube-state-metrics.kube-system.svc.cluster.local:8081
-- job_name: 'cadvisor' # Container metrics use
-kubernetes_sd_configs: # Kubernetes service discovery
-- role: pod # to find all the DaemonSet
-relabel_configs: # Pods, by namespace and label.
-- source_labels:
-- __meta_kubernetes_namespace
-- __meta_kubernetes_pod_labelpresent_app
-- __meta_kubernetes_pod_label_app
-action: keep
-regex: kube-system;true;cadvisor
+- job_name: 'kube-state-metrics'    # Kubernetes metrics 使用静态的 DNS 配置
+  static_configs:                   
+  - targets:
+    - kube-state-metrics.kube-system.svc.cluster.local:8080
+    - kube-state-metrics.kube-system.svc.cluster.local:8081
+
+- job_name: 'cadvisor'              # Container metrics 使用 kubernetes 服务发现
+  kubernetes_sd_configs:            # 来找到所有的 DaemonSet Pods,加上命名空间以及标签参数
+  - role: pod                      
+  relabel_configs:                 
+    - source_labels:
+      - __meta_kubernetes_namespace
+      - __meta_kubernetes_pod_labelpresent_app
+      - __meta_kubernetes_pod_label_app
+    action: keep
+    regex: kube-system;true;cadvisor
 ```
-![图14.11](./images/Figure14.11.png)
-<center>Figure14.11 New metrics show activity at the cluster and container levels. </center>
 
-Now we have the opposite problem from the random-number dashboard: there’s far too much information in the new metrics, so the platform dashboard will need to be highly selective if it’s going to be useful. I have a sample dashboard prepared that is a good starter. It includes current resource usage and all available resource quantities for the cluster, together with some high-level breakdowns by namespace and warning indicators for the health of the nodes.
+现在我们遇到了与随机数仪表板相反的问题:新指标中有太多信息，所以平台仪表板需要高度选择性，如果它想要有用的话。我准备了一个示例仪表板，这是一个很好的开始。它包括集群的当前资源使用情况和所有可用资源数量，以及按命名空间划分的一些高级分解和节点运行状况的警告指示器。
 
-TRY IT NOW 
-Deploy a dashboard for key cluster metrics and with an update to Grafana so it loads the new dashboard.
-
-![图14.11](./images/Figure14.11.png)
-<center>图14.11新指标显示集群和容器级别的活动. </center>
-
-现在我们遇到了与随机数仪表板相反的问题:新指标中有太多信息，所以平台仪表板需要高度选择性，如果它想要有用的话。我准备了一个示例仪表板，这是一个很好的开始。它包括集群的当前资源使用情况和所有可用资源数量，以及按名称空间划分的一些高级分解和节点运行状况的警告指示器。
-
-现在试试吧
-为关键集群指标部署一个仪表板，并对Grafana进行更新，以便它加载新的仪表板。
+现在试试吧，为关键集群指标部署一个仪表板，并对Grafana进行更新，以便它加载新的仪表板。
 
 ```
-# create the dashboard ConfigMap and update Grafana:
+# 创建仪表板ConfigMap并更新Grafana:
 kubectl apply -f grafana/update/kube/
-# wait for Grafana to load:
+# 等待 grafana 加载:
 kubectl wait --for=condition=ContainersReady pod -l app=grafana -n
 kiamol-ch14-monitoring
-# get the URL for the new dashboard:
+# 获取新的 dashboard url:
 kubectl get svc grafana -o
-jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000/d/oWe9aYx
-mk' -n kiamol-ch14-monitoring
-# browse to the dashboard
+jsonpath='http://{.status.loadBalancer.ingress[0].*}:3000/d/oWe9aYxmk' -n kiamol-ch14-monitoring
+
+# 浏览 dashboard
 ```
 
-This is another dashboard that is meant for the big screen, so the screenshot in figure 14.12 doesn’t do it justice. When you run the exercise, you can examine it more closely. The top row shows memory usage, the middle row displays CPU usage, and the bottom row shows the status of Pod containers.
+这是另一个用于大屏幕的仪表板，因此图 14.12 中的屏幕截图并不能准确地显示它。当您运行这个练习时，您可以更仔细地检查它。上面一行显示内存使用情况，中间一行显示CPU使用情况，下面一行显示Pod容器的状态。
 
 ![图14.12](./images/Figure14.12.png)
-<center>Figure14.12 Another tiny screenshot—run the exercise in your own cluster to see it full size. </center>
+<center>图14.12 另一个小截图—在您自己的集群中运行练习以查看完整的大小. </center>
 
-A platform dashboard like this is pretty low level—it’s really just showing you if your cluster is near its saturation point. The queries that power this dashboard will be more useful as alerts, warning you if resource usage is getting out of hand. Kubernetes has pressure indicators that are useful there. The memory pressure and process pressure values are shown in the dashboard, as well as a disk pressure indicator. Those values are significant because if a node comes under compute pressure, it can terminate Pod containers. Those would be good metrics to alert on because if you reach that stage, you probably need to page someone to come and nurse the cluster back to health.
-
-Platform metrics have another use: adding detail to application dashboards where the app itself doesn’t provide detailed enough metrics. The platform dashboard shows compute resource usage aggregated across the whole cluster, but cAdvisor collects it at the container level. It’s the same with kube-state-metrics, where you can filter metrics for a specific workload to add platform information to the application dashboard. We’ll make a final dashboard update in this chapter, adding details from the platform to the random-number app.
-
-TRY IT NOW 
-Update the dashboard for the random-number API to add metrics from the platform. This is just a Grafana update; there are no changes to the app itself or to Prometheus.
-
-这是另一个用于大屏幕的仪表板，因此图14.12中的屏幕截图并不能准确地显示它。当您运行这个练习时，您可以更仔细地检查它。上面一行显示内存使用情况，中间一行显示CPU使用情况，下面一行显示Pod容器的状态。
-
-![图14.12](./images/Figure14.12.png)
-<center>图14.12另一个小截图—在您自己的集群中运行练习以查看完整的大小. </center>
-
-像这样的平台指示板级别相当低——它实际上只是显示您的集群是否接近饱和点。支持这个仪表板的查询将更有用，可以作为警报，在资源使用失控时发出警告。Kubernetes的压力指示器在那里很有用。内存压力和进程压力值显示在仪表板中，还有一个磁盘压力指示器。这些值很重要，因为如果节点受到计算压力，它可以终止Pod容器。这些都是值得注意的良好指标，因为如果您达到了这个阶段，您可能需要呼叫某人来看护集群恢复正常。
+像这样的平台 dashboard 级别相当低——它实际上只是显示您的集群是否接近饱和点。支持这个仪表板的查询将更有用，可以作为警报，在资源使用失控时发出警告。Kubernetes 的压力指示器在那里很有用。内存压力和进程压力值显示在仪表板中，还有一个磁盘压力指示器。这些值很重要，因为如果节点受到计算压力，它可以终止Pod容器。这些都是值得注意的良好指标，因为如果您达到了这个阶段，您可能需要呼叫某人来看护集群恢复正常。
 
 平台指标还有另一个用途:在应用程序本身无法提供足够详细指标的情况下，为应用程序仪表板添加细节。平台仪表板显示整个集群中聚合的计算资源使用情况，但cAdvisor在容器级别上收集它。kube-state-metrics也是如此，您可以过滤特定工作负载的指标，以便向应用程序仪表板添加平台信息。我们将在本章中进行最后一次仪表板更新，将平台的详细信息添加到随机数应用程序中。
 
-现在试试吧
-为随机数API更新仪表板，以添加来自平台的指标。这只是一个Grafana更新;应用程序本身和普罗米修斯都没有变化。
+现在试试吧,为随机数API更新仪表板，以添加来自平台的指标。这只是一个Grafana更新;应用程序本身和普罗米修斯都没有变化。
 
 ```
-# update the dashboard:
+# 更新 dashboard:
 kubectl apply -f grafana/update/grafana-dashboard-numbers-api-v2.yaml
-# restart Grafana so it reloads the dashboard:
+# 重新启动Grafana，让它重新加载仪表板:
 kubectl rollout restart deploy grafana -n kiamol-ch14-monitoring
-# wait for the new Pod to start:
+# 等待 pod 启动:
 kubectl wait --for=condition=ContainersReady pod -l app=grafana -n
 kiamol-ch14-monitoring
-# browse back to the random-number API dashboard
+
+# 浏览随机数API仪表板
 ```
 
-As shown in figure 14.13, the dashboard is still basic, but at least we now have some detail that could help correlate any issues. If the HTTP status code shows as 503, we can quickly see if the CPU is spiking, too. If the Pod labels contain an application version (which they should), we could identify which release of the app was experiencing the problem.
-
-There’s a lot more to monitoring that I won’t cover here, but now you have a solid grounding in how Kubernetes and Prometheus work together. The main pieces you’re missing are collecting metrics at the server level and configuring alerts. Server metrics supply data like disk and network usage. You collect them by running exporters directly on the nodes (using the Node Exporter for Linux servers and the Windows Exporter for Windows servers), and you use service discovery to add the nodes as scrape targets. Prometheus has a sophisticated alerting system that uses PromQL queries to define alerting rules. You configure alerts so that when rules are triggered, Prometheus will send emails, create Slack messages, or send a notification through PagerDuty.
+如图14.13所示，仪表板仍然是基础信息，但至少我们现在有了一些细节，可以帮助关联任何问题。如果HTTP状态代码显示为503，我们可以快速查看CPU是否也处于峰值状态。如果Pod标签包含一个应用程序版本(这是应该的)，我们可以确定哪个版本的应用程序遇到了问题。
 
 ![图14.13](./images/Figure14.13.png)
-<center>Figure14.13 Augmenting basic health stats with container and Pod metrics adds correlation. </center>
+<center>图14.13 使用容器和Pod指标增强基本运行状况统计可以增加相关性. </center>
 
-We’ll wrap up the chapter by looking at the full architecture of Prometheus in Kubernetes and digging into which pieces need custom work and where the effort needs to go.
-
-如图14.13所示，仪表板仍然是基本的，但至少我们现在有了一些细节，可以帮助关联任何问题。如果HTTP状态代码显示为503，我们可以快速查看CPU是否也处于峰值状态。如果Pod标签包含一个应用程序版本(这是应该的)，我们可以确定哪个版本的应用程序遇到了问题。
-
-关于监控，还有很多我不会在这里介绍的内容，但是现在您已经对Kubernetes和Prometheus如何协同工作有了一个坚实的基础。您缺少的主要部分是在服务器级收集指标和配置警报。服务器指标提供磁盘和网络使用情况等数据。您可以通过直接在节点上运行导出器来收集它们(对于Linux服务器使用Node export，对于Windows服务器使用Windows export)，并使用服务发现将节点添加为抓取目标。Prometheus有一个复杂的警报系统，它使用PromQL查询定义警报规则。您可以配置警报，以便当规则被触发时，Prometheus将发送电子邮件、创建Slack消息或通过PagerDuty发送通知。
-
-![图14.13](./images/Figure14.13.png)
-<center>图14.13使用容器和Pod指标增强基本运行状况统计可以增加相关性. </center>
+关于监控，还有很多我不会在这里介绍的内容，但是现在您已经对Kubernetes和Prometheus如何协同工作有了一个坚实的基础。您缺少的主要部分是在服务器级收集指标和配置警报。服务器指标提供磁盘和网络使用情况等数据。您可以通过直接在节点上运行 exporter 来收集它们(对于Linux服务器使用Node export，对于Windows服务器使用Windows export)，并使用服务发现将节点添加为抓取目标。Prometheus 有一个复杂的警报系统，它使用 PromQL 查询定义警报规则。您可以配置警报，以便当规则被触发时，Prometheus 将发送电子邮件、创建Slack消息或通过PagerDuty发送通知。
 
 我们将通过查看《Kubernetes》中普罗米修斯的完整架构来结束本章，并深入研究哪些部分需要定制工作以及需要在哪里努力。
 
