@@ -1,99 +1,96 @@
 # 第十五章 使用 Ingress 管理流入流量
 
-Services bring network traffic into Kubernetes, and you can have multiple LoadBalancer Services with different public IP addresses to make your web apps available to the world. Doing this creates a management headache because it means allocating a new IP address for every application and mapping addresses to apps with your DNS provider. Getting traffic to the right app is a routing problem, but you can manage it inside Kubernetes instead, using Ingress. Ingress uses a set of rules to map domain names and request paths to applications, so you can have a single IP address for your whole cluster and route all traffic internally.
+Services 将网络流量引入 Kubernetes，您可以拥有多个具有不同公共 IP 地址的 LoadBalancer 服务，以使您的 Web 应用程序可供全世界使用。这样做会给管理带来麻烦，因为这意味着为每个应用程序分配一个新的 IP 地址，并将地址映射到您的 DNS 提供商的应用程序。将流量转移到正确的应用程序是一个路由问题，但您可以使用 Ingress 在 Kubernetes 内部管理它。 Ingress 使用一组规则将域名和请求路径映射到应用程序，因此您可以为整个集群使用一个 IP 地址并在内部路由所有流量。
 
-Routing by domain name is an old problem that has usually been solved with a reverse proxy, and Kubernetes uses a pluggable architecture for Ingress. You define the routing rules as standard resources and deploy your choice of reverse proxy to receive traffic and act on the rules. All the major reverse proxies have Kubernetes support, along with a new species of container-aware reverse proxy. They all have different capabilities and working models, and in this chapter, you’ll learn how you can use Ingress to host multiple apps in your cluster with two of the most popular:Nginx and Traefik.
+域名路由是一个老问题，通常已经用反向代理解决了，而 Kubernetes 对 Ingress 使用了可插拔的架构。您将路由规则定义为标准资源，并部署您选择的反向代理来接收流量并根据规则执行操作。所有主要的反向代理都有 Kubernetes 支持，以及一种新的容器感知反向代理。它们都有不同的功能和工作模型，在本章中，您将学习如何使用 Ingress 在集群中托管多个应用程序，其中两个应用程序是最流行的：Nginx 和 Traefik。
 
 ## 15.1 Kubernetes 如何使用 Ingress 路由流量
 
-We’ve used Nginx as a reverse proxy several times in this book already (17, by my count), but we’ve always used it for one application at a time. We had a reverse proxy to cache responses from the Pi app in chapter 6 and another for the randomnumber API in chapter 13. Ingress moves the reverse proxy into a central role, running it as a component called the ingress controller, but the approach is the same: the proxy receives external traffic from a LoadBalancer Service, and it fetches content from apps using ClusterIP Services. 图 15.1 shows the architecture.
+我们已经在本书中多次使用 Nginx 作为反向代理（据我统计 17 次），但我们总是一次将它用于一个应用程序。我们在第 6 章中使用了一个反向代理来缓存来自 Pi 应用程序的响应，在第 13 章中使用了另一个用于缓存随机数 API 的响应。Ingress 将反向代理移至中心角色，将其作为称为 ingress 控制器的组件运行，但方法是相同：代理从 LoadBalancer 服务接收外部流量，并使用 ClusterIP 服务从应用程序中获取内容。图 15.1 显示了架构。
 
 ![图15.1](./images/Figure15.1.png)
-<center>图 15.1 Ingress controllers are the entry point to the cluster, routing traffic based on Ingress rules. </center>
+<center>图 15.1 Ingress 控制器是集群的入口点，根据 Ingress 规则路由流量。</center>
 
-The important thing in this diagram is the ingress controller, which is the pluggable reverse proxy—it could be one of a dozen options including Nginx, HAProxy, Contour, and Traefik. The Ingress object stores routing rules in a generic way, and the controller feeds those rules into the proxy. Proxies have different feature sets, and the Ingress spec doesn’t attempt to model every possible option, so controllers add support for those features using annotations. You’ll learn in this chapter that the core functionality of routing and HTTPS support is simple to work with, but the complexity is in the ingress controller deployment and its additional features.
+这张图中最重要的是 ingress 控制器，它是可插入的反向代理——它可能是 Nginx、HAProxy、Contour 和 Traefik 等十几个选项之一。 Ingress 对象以通用方式存储路由规则，控制器将这些规则提供给代理。代理具有不同的功能集，并且 Ingress 规范不会尝试对每个可能的选项进行建模，因此控制器使用注释添加对这些功能的支持。您将在本章中了解到，路由和 HTTPS 支持的核心功能使用起来很简单，但复杂性在于 ingress 控制器部署及其附加功能。
 
-We’ll start by running the basic Hello, World web app from way back in chapter 2, keeping it as an internal component with a ClusterIP Service and using the Nginx ingress controller to route traffic.
+我们将从运行第 2 章中的基本 Hello, World Web 应用程序开始，将其作为具有 ClusterIP 服务的内部组件，并使用 Nginx ingress 控制器来路由流量。
 
-TRY IT NOW
-Run the Hello, World app, and confirm that it’s accessible only inside the cluster or externally using a port-forward in kubectl.
+立即尝试,运行 Hello, World 应用程序，并确认它只能在集群内部或外部使用 kubectl 中的端口转发访问。
 
-   ```
-   # switch to this chapter’s folder:
-   cd ch15
-   # deploy the web app:
-   kubectl apply -f hello-kiamol/
-   # confirm the Service is internal to the cluster:
-   kubectl get svc hello-kiamol
-   # start a port-forward to the app:
-   kubectl port-forward svc/hello-kiamol 8015:80
-   # browse to http://localhost:8015
-   # then press Ctrl-C/Cmd-C to exit the port-forward
-   ```
+```
+# 进入本章目录:
+cd ch15
+# 部署 web app:
+kubectl apply -f hello-kiamol/
+# 确认服务是集群内部的:
+kubectl get svc hello-kiamol
+# 启动到应用程序的端口转发:
+kubectl port-forward svc/hello-kiamol 8015:80
+# 访问 http://localhost:8015
+# 然后按Ctrl-C/Cmd-C退出端口转发
+```
 
-There’s nothing new in the Deployment or Service specs for that application—no special labels or annotations, no new fields you haven’t already worked with. You can see in figure 15.2 that the Service has no external IP address, and I can access the app only while I have a port-forward running.
+该应用程序的部署或服务规范中没有任何新内容——没有特殊标签或注释，没有您尚未使用过的新字段。您可以在图 15.2 中看到该服务没有外部 IP 地址，只有在运行端口转发时我才能访问该应用程序。
 
 ![图15.2](./images/Figure15.2.png)
-<center>ClusterIP Services make an app available internally—it can go public with Ingress. </center>
+<center>ClusterIP 服务使应用程序在内部可用——它可以通过 Ingress 公开。</center>
 
-To make the app available using Ingress rules, we need an ingress controller. Controllers manage other objects. You know that Deployments manage ReplicaSets and ReplicaSets manage Pods. Ingress controllers are slightly different; they run in standard Pods and monitor Ingress objects. When they see any changes, they update the rules in the proxy We’ll start with the Nginx ingress controller, which is part of the wider Kubernetes project. There’s a production-ready Helm chart for the controller, but I’m using a much simpler deployment. Even so, there are a few security components in the manifest that we haven’t covered yet, but I won’t go through them now. (There are comments in the YAML if you want to investigate.)
+要使用 Ingress 规则使应用程序可用，我们需要一个 Ingress 控制器。控制器管理其他对象。你知道 Deployments 管理 ReplicaSets 和ReplicaSets 管理 Pod。Ingress 控制器略有不同；它们在标准 Pod 中运行并监控 Ingress 对象。当他们看到任何变化时，他们会更新代理中的规则，我们将从 Nginx ingress 控制器开始，它是更广泛的 Kubernetes 项目的一部分。控制器有一个生产就绪的 Helm chart，但我使用的部署要简单得多。即便如此，清单中仍有一些我们尚未涵盖的安全组件，但我现在不会详细介绍它们。 （如果您想调查，YAML 中有注释。）
 
-TRY IT NOW
-Deploy the Nginx ingress controller. This uses the standard HTTP and HTTPS ports in the Service, so you need to have ports 80 and 443 available on your machine.
+立即尝试,部署 Nginx ingress 控制器。这使用服务中的标准 HTTP 和 HTTPS 端口，因此您的计算机上需要有可用的端口 80 和 443。
 
-   ```
-   # create the Deployment and Service for the Nginx ingress controller:
-   kubectl apply -f ingress-nginx/
-   # confirm the service is publicly available:
-   kubectl get svc -n kiamol-ingress-nginx
-   # get the URL for the proxy:
-   kubectl get svc ingress-nginx-controller -o jsonpath='http://{.status
-   .loadBalancer.ingress[0].*}' -n kiamol-ingress-nginx
-   # browse to the URL—you’ll get an error
-   ```
+```
+# 为Nginx Ingress 控制器创建部署和服务:
+kubectl apply -f ingress-nginx/
+# 确认该服务是公开可用的:
+kubectl get svc -n kiamol-ingress-nginx
+# 获取代理的URL:
+kubectl get svc ingress-nginx-controller -o jsonpath='http://{.status.loadBalancer.ingress[0].*}' -n kiamol-ingress-nginx
+# 访问 URL—你将发现 error
+```
 
-When you run this exercise, you’ll see a 404 error page when you browse. That proves the Service is receiving traffic and directing it to the ingress controller, but there aren’t any routing rules yet so Nginx has no content to show, and it returns the default not-found page. My output is shown in figure 15.3, where you can see the Service is using the standard HTTP port.
+当你运行这个练习时，你会在浏览时看到一个 404 错误页面。这证明服务正在接收流量并将其定向到 ingress 控制器，但是还没有任何路由规则，因此 Nginx 没有内容可显示，它返回默认的未找到页面。我的输出如图 15.3 所示，您可以在其中看到服务正在使用标准 HTTP 端口。
 
 ![图15.3](./images/Figure15.3.png)
-<center>图 15.3 Ingress controllers receive incoming traffic, but they need routing rules to know what to do with it. </center>
+<center>图 15.3 控制器接收传入流量，但它们需要路由规则来知道如何处理它 </center>
 
-Now that we have an application running and an ingress controller, we just need to deploy an Ingress object with routing rules to tell the controller which application Service to use for each incoming request. Listing 15.1 shows the simplest rule for an Ingress object, which will route every request coming into the cluster to the Hello, World application.
+现在我们有一个正在运行的应用程序和一个 Ingress 控制器，我们只需要部署一个带有路由规则的 ingress 对象来告诉控制器每个传入请求使用哪个应用程序服务。清单 15.1 显示了 Ingress 对象的最简单规则，它将每个进入集群的请求路由到 Hello, World 应用程序。
 
-> Listing 15.1 localhost.yaml, a routing rule for the Hello, World app
+> 清单 15.1 localhost.yaml，Hello, World 应用程序的路由规则
 
 ```
-apiVersion: networking.k8s.io/v1beta1 # Beta API versions mean the spec
-kind: Ingress # isn’t final and could change.
+apiVersion: networking.k8s.io/v1beta1 # Beta API版本意味着规范不是最终的，可能会改变。
+kind: Ingress 
 metadata:
-name: hello-kiamol
+  name: hello-kiamol
 spec:
-rules:
-- http: # Ingress is only for HTTP/S traffic
-paths:
-- path: / # Maps every incoming request
-backend: # to the hello-kiamol Service
-serviceName: hello-kiamol
-servicePort: 80
+  rules:
+  - http: # Ingress 仅用于HTTP/S流量
+      paths:
+        - path: / # 将每个传入请求映射到hello-kiamol服务
+          backend:
+            serviceName: hello-kiamol
+            servicePort: 80
 ```
 
-The ingress controller is watching for new and changed Ingress objects, so when you deploy any, it will add the rules to the Nginx configuration. In Nginx terms, it will set up a proxy server where the hello-kiamol Service is the upstream—the source of the content—and it will serve that content for incoming requests to the root path.
+Ingress 控制器正在监视新的和更改的 ingress 对象，因此当您部署任何对象时，它会将规则添加到 Nginx 配置中。在 Nginx 术语中，它将设置一个代理服务器，其中 hello-kiamol 服务是上游（内容的来源），它将为根路径的传入请求提供该内容。
 
-TRY IT NOW 
-Create the Ingress rule that publishes the Hello, World app through the ingress controller.
+立即尝试,创建通过 ingress 控制器发布 Hello, World 应用程序的入口规则。
 
-   ```
-   # deploy the rule:
-   kubectl apply -f hello-kiamol/ingress/localhost.yaml
-   # confirm the Ingress object is created:
-   kubectl get ingress
-   # refresh your browser from the previous exercise
-   ```
-Well, that was simple—map a path to the backend Service for the application in an Ingress object, and the controller takes care of everything else. My output in figure 15.4 shows the localhost address, which previously returned a 404 error, now returns the Hello, World app in all its glory.
+```
+# 部署 rule:
+kubectl apply -f hello-kiamol/ingress/localhost.yaml
+# 确认Ingress对象已经创建:
+kubectl get ingress
+# 从前面的练习中刷新浏览器
+```
+
+好吧，这很简单——在 Ingress 对象中为应用程序映射到后端服务的路径，控制器负责处理其他所有事情。我在图 15.4 中的输出显示了本地主机地址，它之前返回了 404 错误，现在返回了 Hello, World 应用程序的所有荣耀。
 
 ![图15.4](./images/Figure15.4.png)
-<center>图 15.4 Ingress object rules link the Ingress controller to the app Service. </center>
+<center>图 15.4 Ingress 对象规则将 Ingress 控制器链接到应用服务。</center>
 
-Ingress is usually a centralized service in the cluster, like logging and monitoring. An admin team might deploy and manage the Ingress controller, whereas each product team owns the Ingress objects that route traffic to their apps. This process creates the potential for collisions—Ingress rules do not have to be unique, and one team’s update could end up redirecting all of another team’s traffic to some other app. Inpractice that doesn’t happen because those apps will be hosted at different domains, and the Ingress rules will include a domain name to restrict their scope.
+Ingress 通常是集群中的集中服务，例如日志记录和监控。管理团队可能会部署和管理 Ingress 控制器，而每个产品团队都拥有将流量路由到其应用程序的 Ingress 对象。这个过程可能会产生冲突—— ingress 规则不必是唯一的，一个团队的更新最终可能会将另一个团队的所有流量重定向到其他应用程序。这种情况不会发生，因为这些应用程序将托管在不同的域中，并且 Ingress 规则将包含一个域名来限制它们的范围。
 
 ## 15.2 使用 Ingress rules 路由 Http 流量
 
