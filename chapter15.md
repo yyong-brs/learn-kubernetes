@@ -94,147 +94,144 @@ Ingress 通常是集群中的集中服务，例如日志记录和监控。管理
 
 ## 15.2 使用 Ingress rules 路由 Http 流量
 
-Ingress works only for web traffic—HTTP and HTTPS requests—because it needs to use the route specified in the request to match it to a backend service. The route in an HTTP request contains two parts: the host and the path. The host is the domain name, like www.manning.com, and the path is the location of the resource, like /dotd for the Deal of the Day page. Listing 15.2 shows an update to the Hello, World Ingress object that uses a specific host name. Now the routing rules will apply only if the incoming request is for the host hello.kiamol.local.
+Ingress 仅适用于 Web 流量（HTTP 和 HTTPS 请求），因为它需要使用请求中指定的路由将其与后端服务相匹配。 HTTP 请求中的路由包含两部分：主机和路径。主机是域名，如 www.manning.com，路径是资源的位置，如每日交易页面的 /dotd。清单 15.2 显示了对使用特定主机名的 Hello, World Ingress 对象的更新。现在，仅当传入请求是针对主机 hello.kiamol.local 时，路由规则才适用。
 
-> Listing 15.2 hello.kiamol.local.yaml, specifying a host domain for Ingress rules
+> 清单 15.2 hello.kiamol.local.yaml，为 Ingress 规则指定主机域
 
 ```
 spec:
-rules:
-- host: hello.kiamol.local # Restricts the scope of the
-http: # rules to a specific domain
-paths:
-- path: / # All paths in that domain will
-backend: # be fetched from the same Service.
-serviceName: hello-kiamol
-servicePort: 80
+  rules:
+  - host: hello.kiamol.local # 将规则的范围限制到特定的域
+    http:
+      paths:
+      - path: / # 该域中的所有路径都将从同一个服务中获取。
+        backend: 
+          serviceName: hello-kiamol
+          servicePort: 80
 ```
-When you deploy this code, you won’t be able to access the app because the domain name hello.kiamol.local doesn’t exist. Web requests normally look up the IP address for a domain name from a public DNS server, but all computers also have their own local list in a hosts file. In the next exercise, you’ll deploy the updated Ingress object and register the domain name in your local hosts file—you’ll need admin access in your terminal session for that.
 
-TRY IT NOW 
-Editing the hosts file is restricted. You’ll need to use the “Run as Administrator” option for your terminal session in Windows and have scripts enabled with the Set-ExecutionPolicy command. Be ready to enter your admin (sudo) password in Linux or macOS.
+当您部署此代码时，您将无法访问应用程序，因为域名 hello.kiamol.local 不存在。 Web 请求通常从公共 DNS 服务器查找域名的 IP 地址，但所有计算机在主机文件中也有自己的本地列表。在下一个练习中，您将部署更新的 Ingress 对象并在本地主机文件中注册域名——为此您需要在终端会话中具有管理员访问权限。
 
-   ```
-   # add domain to hosts—on Windows:
-   ./add-to-hosts.ps1 hello.kiamol.local ingress-nginx
-   # OR on Linux/macOS:
-   chmod +x add-to-hosts.sh && ./add-to-hosts.sh hello.kiamol.local
-   ingress-nginx
-   # update the Ingress object, adding the host name:
-   kubectl apply -f hello-kiamol/ingress/hello.kiamol.local.yaml
-   # confirm the update:
-   kubectl get ingress
-   # browse to http://hello.kiamol.local
-   ```
+立即尝试 编辑主机文件受到限制。您需要为 Windows 中的终端会话使用“以管理员身份运行”选项，并使用 Set-ExecutionPolicy 命令启用脚本。准备好在 Linux 或 macOS 中输入您的管理员 (sudo) 密码。
 
-In this exercise, the existing Ingress object is updated, so there’s still only one routing rule for the ingress controller to map. Now that rule is restricted to an explicit domain name. You can see in figure 15.5 that the request to hello.kiamol.local returns the app, and I’ve also browsed to the ingress controller at localhost, which returns a 404 error because there are no rules for the localhost domain.
+```
+# 添加域到主机- Windows上:
+./add-to-hosts.ps1 hello.kiamol.local ingress-nginx
+# 或者 Linux/macOS:
+chmod +x add-to-hosts.sh && ./add-to-hosts.sh hello.kiamol.local
+ingress-nginx
+# 更新Ingress对象，添加主机名:
+kubectl apply -f hello-kiamol/ingress/hello.kiamol.local.yaml
+# 确认更新:
+kubectl get ingress
+# 访问 http://hello.kiamol.local
+```
+
+在本练习中，现有的 Ingress 对象已更新，因此仍然只有一个路由规则供 ingress 控制器映射。现在该规则仅限于显式域名。您可以在图 15.5 中看到对 hello.kiamol.local 的请求返回了应用程序，我还浏览了位于 localhost 的 ingress 控制器，它返回了 404 错误，因为没有 localhost 域的规则。
 
 ![图15.5](./images/Figure15.5.png)
-<center>图 15.5 You can publish apps by domain name with Ingress rules and use them locally by editing your hosts file. </center>
+<center>图 15.5 您可以使用 Ingress 规则通过域名发布应用程序，并通过编辑您的主机文件在本地使用它们</center>
+路由是一个基础架构级别的问题，但与我们在本书的这一部分看到的其他共享服务一样，它在轻量级容器中运行，因此您可以在开发、测试和生产环境中使用完全相同的设置。这使您可以使用友好的域名在非生产集群中运行多个应用程序，而不必使用不同的端口—— ingress 控制器的服务为每个应用程序使用标准的 HTTP 端口。
 
-Routing is an infrastructure-level concern, but like the other shared services we’ve seen in this section of the book, it runs in lightweight containers so you can use
-xactly the same setup in development, test, and production environments. That lets you run multiple apps in your nonproduction cluster with friendly domain names, without having to use different ports—the Service for the ingress controller uses the standard HTTP port for every app.
+如果你想在你的实验室环境中运行具有不同域的多个应用程序，你需要摆弄你的主机文件。通常，所有域都将解析为 127.0.0.1，这是您机器的本地地址。组织可能在测试环境中运行自己的 DNS 服务器，因此任何人都可以从公司网络访问 hello.kiamol.test，它将解析为在数据中心运行的测试集群的 IP 地址。然后，在生产中，DNS 解析来自公共 DNS 服务，因此 hello.kiamol.net 解析为在云中运行的 Kubernetes 集群。
 
-You need to fiddle with your hosts file if you want to run multiple apps with different domains in your lab environment. Typically, all the domains will resolve to 127.0.0.1, which is your machine’s local address. Organizations might run their own DNS server in a test environment, so anyone can access hello.kiamol.test from the company network, and it will resolve to the IP address of the test cluster, running in the data center. Then, in production, the DNS resolution is from a public DNS service, so hello.kiamol.net resolves to a Kubernetes cluster running in the cloud.
+您可以在 Ingress 规则中组合主机名和路径，为您的应用程序提供一组一致的地址，尽管您可以在后端使用不同的组件。您可能有一个 REST API 和一个在单独的 Pod 中运行的网站，您可以使用 Ingress 规则使 API 在子域 (api.rng.com) 上可用或作为主域 (rng.com/api) 上的路径.清单 15.3 显示了第 9 章中简单版本化 Web 应用程序的 Ingress 规则，其中应用程序的两个版本都可以从一个域获得。
 
-You can combine host names and paths in Ingress rules to present a consistent set of addresses for your application, although you could be using different components in the backend. You might have a REST API and a website running in separate Pods, and you could use Ingress rules to make the API available on a subdomain (api.rng.com) or as a path on the main domain (rng.com/api). Listing 15.3 shows Ingress rules for the simple versioned web app from chapter 9, where both versions of the app are available from one domain.
-
-> Listing 15.3 vweb/ingress.yaml, Ingress rules with host name and paths
+> 清单 15.3 vweb/ingress.yaml，带有主机名和路径的入口规则
 
 ```
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-name: vweb # Configures a specific feature
-annotations: # in Nginx
-nginx.ingress.kubernetes.io/rewrite-target: /
+  name: vweb # 在Nginx中配置一个特定的特性
+  annotations: 
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-rules:
-- host: vweb.kiamol.local # All rules apply to this domain.
-http:
-paths:
-- path: / # Requests to the root path are
-backend: # proxied from the version 2 app.
-serviceName: vweb-v2
-servicePort: 80
-- path: /v1 # Requests to the /v1 path are
-backend: # proxied from the version 1 app.
-serviceName: vweb-v1
-servicePort: 80
+  rules:
+  - host: vweb.kiamol.local # 所有规则适用于此域。
+    http:
+      paths:
+      - path: / # 对根路径的请求是由版本2应用程序代理的。
+        backend: 
+          serviceName: vweb-v2
+          servicePort: 80
+      - path: /v1 # 对/v1路径的请求是从版本1应用程序代理的。
+        backend: 
+          serviceName: vweb-v1
+          servicePort: 80
 ```
-Modeling paths adds complexity because you’re presenting a fake URL, which needs to be modified to match the real URL in the service. In this case, the ingress controller will respond to requests for http://vweb.kiamol.local/v1 and fetch the content from the vweb-v1 service. But the application doesn’t have any content at /v1, so the proxy needs to rewrite the incoming URL—that’s what the annotation does in listing 15.3. It’s a basic example that ignores the path in the request and always uses the root path in the backend. You can’t express URL rewrites with the Ingress spec, so it needs custom support from the ingress controller. A more realistic rewrite rule would use regular expressions to map the requested path to the target path.
 
-We’ll deploy this simple version to avoid any regular expressions and see how the ingress controller uses routing rules to identify the backend service and modify the request path.
+建模路径增加了复杂性，因为您呈现的是虚假 URL，需要对其进行修改以匹配服务中的真实 URL。在这种情况下，ingress 控制器将响应 http://vweb.kiamol.local/v1 的请求并从 vweb-v1 服务获取内容。但是应用程序在 /v1 中没有任何内容，因此代理需要重写传入的 URL——清单 15.3 中的注释就是这样做的。这是一个忽略请求中的路径并始终使用后端中的根路径的基本示例。您不能使用 Ingress 规范来表达 URL 重写，因此它需要来自 ingress 控制器的自定义支持。更现实的重写规则将使用正则表达式将请求的路径映射到目标路径。
 
-TRY IT NOW 
-Deploy a new app with a new Ingress rule, and add a new domain to your hosts file to see the ingress controller serving multiple applications from the same domain.
+我们将部署这个简单版本以避免任何正则表达式，并查看 ingress 控制器如何使用路由规则来识别后端服务并修改请求路径。
 
-   ```
-   # add the new domain name—on Windows:
-   ./add-to-hosts.ps1 vweb.kiamol.local ingress-nginx
-   # OR on Linux/macOS:
-   ./add-to-hosts.sh vweb.kiamol.local ingress-nginx
-   # deploy the app, Service, and Ingress:
-   kubectl apply -f vweb/
-   # confirm the Ingress domain:
-   kubectl get ingress
-   # browse to http://vweb.kiamol.local
-   # and http://vweb.kiamol.local/v1
-   ```
-In figure 15.6, you can see that two separate apps are made available at the same domain name, using the request path to route between different components, which are different versions of the application in this exercise.
+立即尝试,使用新的 Ingress 规则部署一个新应用程序，并向您的主机文件添加一个新域，以查看 ingress控制器为来自同一域的多个应用程序提供服务。
+
+```
+# 在Windows上添加新的域名:
+./add-to-hosts.ps1 vweb.kiamol.local ingress-nginx
+# 或者在 Linux/macOS:
+./add-to-hosts.sh vweb.kiamol.local ingress-nginx
+# 部署 app, Service, and Ingress:
+kubectl apply -f vweb/
+# 确认 Ingress domain:
+kubectl get ingress
+# 访问http://vweb.kiamol.local
+# 以及 http://vweb.kiamol.local/v1
+```
+
+在图 15.6 中，您可以看到两个单独的应用程序在同一个域名下可用，使用请求路径在不同组件之间进行路由，这些组件是本练习中应用程序的不同版本。
 
 ![图15.6](./images/Figure15.6.png)
-<center>图 15.6 Ingress routing on the host name and path presents multiple apps on the same domain name. </center>
+<center>图 15.6 主机名和路径上的 Ingress 路由显示了同一域名上的多个应用程序. </center>
 
-Mapping the routing rules is the most complicated part of publishing a new app to your ingress controller, but it does give you a lot of control. The Ingress rules are the public face of your app, and you can use them to compose several components—or to restrict access to features. In this section of the book, we’ve seen that apps work better in Kubernetes if they have health endpoints for container probes and metrics endpoints for Prometheus to scrape, but those shouldn’t be publicly available. You canuse Ingress to control that, using exact path mappings, so only paths that are explicitly
 
-listed are available outside of the cluster. Listing 15.4 shows an example of that for the to-do list app. It’s abridged because the downside with this approach is that you need to specify every path you want to publish, so any paths not specified are blocked.
+映射路由规则是将新应用发布到 ingress 控制器中最复杂的部分，但它确实给了你很多控制权。 Ingress 规则是您应用程序的公开面孔，您可以使用它们来组合多个组件——或限制对功能的访问。在本书的这一部分，我们已经看到，如果应用程序具有用于容器探测的健康端点和用于 Prometheus 抓取的指标端点，那么它们在 Kubernetes 中运行得更好，但这些应用程序不应该公开可用。你可以使用 Ingress 来控制它，使用精确的路径映射，所以只有明确的路径列出的在集群外可用。清单 15.4 显示了待办事项列表应用程序的示例。它被删减了，因为这种方法的缺点是您需要指定要发布的每个路径，因此任何未指定的路径都会被阻止。
 
-> Listing 15.4 ingress-exact.yaml, using exact path matching to restrict access
+> 清单 15.4 ingress-exact.yaml，使用精确路径匹配来限制访问
 
 ```
 rules:
-- host: todo.kiamol.local
-http:
-paths:
-- pathType: Exact # Exact matching means only the /new
-path: /new # path is matched—there are other
-backend: # rules for the /list and root paths.
-serviceName: todo-web
-servicePort: 80
-- pathType: Prefix # Prefix matching means any path that
-path: /static # starts with /static will be mapped,
-backend: # including subpaths like /static/app.css.
-serviceName: todo-web
-servicePort: 80
+  - host: todo.kiamol.local
+    http:
+      paths:
+      - pathType: Exact # 精确匹配意味着只匹配/new路径—对于/list和根路径还有其他规则。
+        path: /new 
+        backend: 
+          serviceName: todo-web
+          servicePort: 80
+      - pathType: Prefix # 前缀匹配意味着任何以/static开头的路径都将被映射，包括/static/app.css这样的子路径。
+        path: /static
+        backend: 
+          serviceName: todo-web
+          servicePort: 80
 ```
-The to-do list app has several paths that shouldn’t be available outside of the clusteras well as /metrics, there’s a /config endpoint that lists all of the application configurations and a diagnostics page. None of those paths is included in the new Ingress spec, and we can see that they’re effectively blocked when the rules are applied. The PathType field is a later addition to the Ingress spec, so your Kubernetes cluster needs to be running at least version 1.18; otherwise, you’ll get an error in this exercise.
 
-TRY IT NOW 
-Deploy the to-do list app with an Ingress spec that allows all access, and then update it with exact path matching, and confirm that the sensitive paths are no longer available.
+待办事项列表应用程序有几个不应该在集群外部可用的路径以及 /metrics，有一个 /config 端点列出了所有应用程序配置和一个诊断页面。这些路径都没有包含在新的 Ingress 规范中，我们可以看到在应用规则时它们被有效地阻止了。 PathType 字段是后来添加到 Ingress 规范中的，因此您的 Kubernetes 集群至少需要运行 1.18 版本；否则，您将在本练习中出错。
 
-   ```
-   # add a new domain for the app—on Windows:
-   ./add-to-hosts.ps1 todo.kiamol.local ingress-nginx
-   # OR on Linux/macOS:
-   ./add-to-hosts.sh todo.kiamol.local ingress-nginx
-   # deploy the app with an Ingress object that allows all paths:
-   kubectl apply -f todo-list/
-   # browse to http://todo.kiamol.local/metrics
-   # update the Ingress with exact paths:
-   kubectl apply -f todo-list/update/ingress-exact.yaml
-   # browse again—the app works, but metrics and diagnostics blocked
-   ```
+立即尝试,使用允许所有访问的 Ingress 规范部署待办事项列表应用程序，然后使用精确路径匹配更新它，并确认敏感路径不再可用。
 
-You’ll see when you run this exercise that all of the sensitive paths are blocked when you deploy the updated Ingress rules. My output is shown in figure 15.7. It’s not a perfect solution, but you can extend your ingress controller to show a friendly 404 error page instead of the Nginx default. (Docker has a nice example: try `https://www.docker.com/not-real-url`.) The app still shows a menu for the diagnostics page because it’s not an app setting that removes the page; it’s happening earlier in the process.
+```
+# 在Windows上为应用程序添加一个新域:
+./add-to-hosts.ps1 todo.kiamol.local ingress-nginx
+# 或者在 Linux/macOS:
+./add-to-hosts.sh todo.kiamol.local ingress-nginx
+# 使用允许所有路径的Ingress对象部署应用程序:
+kubectl apply -f todo-list/
+# 访问 http://todo.kiamol.local/metrics
+# 用精确的路径更新Ingress:
+kubectl apply -f todo-list/update/ingress-exact.yaml
+# 再次浏览-应用程序工作，但指标和诊断阻塞
+```
+
+当您运行此练习时，您会看到部署更新的 Ingress 规则时所有敏感路径都被阻止。我的输出如图 15.7 所示。这不是一个完美的解决方案，但您可以扩展 ingress 控制器以显示友好的 404 错误页面，而不是 Nginx 默认值。 （Docker 有一个很好的例子：试试 https://www.docker.com/not-real-url 。）应用程序仍然显示诊断页面的菜单，因为它不是删除页面的应用程序设置；它发生在这个过程的早期。
 
 ![图15.7](./images/Figure15.7.png)
-<center>图 15.7 Exact path matching in Ingress rules can be used to block access to features. </center>
+<center>图 15.7 Ingress 规则中的精确路径匹配可用于阻止对功能的访问。 </center>
 
-The separation between Ingress rules and the ingress controller makes it easy to compare different proxy implementations and see which gives you the combination of features and usability you’re happy with. But it comes with a warning because there isn’t a strict ingress controller specification, and not every controller implements Ingress rules in the same way. Some controllers ignore the PathType field, so if you’re relying on that to build up an access list with exact paths, you may find your site becomes access-all-areas if you switch to a different ingress controller.
+Ingress 规则和 ingress 控制器之间的分离使得比较不同的代理实现变得容易，并查看哪个为您提供了您满意的功能和可用性组合。但它带有警告，因为没有严格的入口控制器规范，并且并非每个控制器都以相同的方式实现入口规则。一些控制器会忽略 PathType 字段，因此如果您依靠它来构建具有确切路径的访问列表，如果您切换到不同的入口控制器，您可能会发现您的站点变成了访问所有区域。
 
-Kubernetes does let you run multiple ingress controllers, and in a complex environment, you may do that to provide different sets of capabilities for different applications.
-
+Kubernetes 确实允许您运行多个入口控制器，并且在复杂的环境中，您可以这样做为不同的应用程序提供不同的功能集。
 ## 15.3 比较 Ingress 控制器
 
 Ingress controllers come in two categories: reverse proxies, which have been around for a long time and work at the network level, fetching content using host names; and modern proxies, which are platform-aware and can integrate with other services (cloud controllers can provision external load balancers). Choosing between them comes down to the feature set and your own technology preferences. If you have an established relationship with Nginx or HAProxy, you can continue that in Kubernetes. Or if you have an established relationship with Nginx or HAProxy, you might be glad to try a more lightweight, modern option.
