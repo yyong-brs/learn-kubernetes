@@ -235,11 +235,14 @@ Kubernetes 确实允许您运行多个入口控制器，并且在复杂的环境
 ## 15.3 比较 Ingress 控制器
 
 Ingress controllers come in two categories: reverse proxies, which have been around for a long time and work at the network level, fetching content using host names; and modern proxies, which are platform-aware and can integrate with other services (cloud controllers can provision external load balancers). Choosing between them comes down to the feature set and your own technology preferences. If you have an established relationship with Nginx or HAProxy, you can continue that in Kubernetes. Or if you have an established relationship with Nginx or HAProxy, you might be glad to try a more lightweight, modern option.
+入口控制器分为两类：反向代理，已经存在了很长时间，工作在网络级别，使用主机名获取内容；和现代代理，它们是平台感知的并且可以与其他服务集成（云控制器可以提供外部负载平衡器）。在它们之间进行选择取决于功能集和您自己的技术偏好。如果您与 Nginx 或 HAProxy 建立了关系，则可以在 Kubernetes 中继续这种关系。或者，如果您与 Nginx 或 HAProxy 建立了良好的关系，您可能会很乐意尝试更轻量级、更现代的选择。
 
 Your ingress controller becomes the single public entry point for all of the apps in your cluster, so it’s a good place to centralize common concerns. All controllers support SSL termination, so the proxy provides the security layer, and you get HTTPS for all of your applications. Most controllers support web application firewalls, so you can provide protection from SQL injection and other common attacks in the proxy layer. Some controllers have special powers—we’ve already used Nginx as a caching proxy, and you can use it for caching at the ingress level, too.
+您的入口控制器成为集群中所有应用程序的单一公共入口点，因此它是集中常见问题的好地方。所有控制器都支持 SSL 终止，因此代理提供了安全层，并且您可以为所有应用程序获取 HTTPS。大多数控制器都支持 Web 应用程序防火墙，因此您可以在代理层提供针对 SQL 注入和其他常见攻击的保护。一些控制器具有特殊的能力——我们已经使用 Nginx 作为缓存代理，您也可以将它用于入口级别的缓存。
 
 TRY IT NOW 
 Deploy the Pi application using Ingress, then update the Ingress object so the Pi app makes use of the Nginx cache in the ingress controller.
+立即尝试 使用 Ingress 部署 Pi 应用程序，然后更新 Ingress 对象，以便 Pi 应用程序使用入口控制器中的 Nginx 缓存。
 
    ```
    # add the Pi app domain to the hosts file—Windows:
@@ -257,13 +260,15 @@ Deploy the Pi application using Ingress, then update the Ingress object so the P
    ```
 
 You’ll see in this exercise that the ingress controller is a powerful component in the cluster. You can add caching to your app just by specifying new Ingress rules—no updates to the application itself and no new components to manage. The only requirement is that the HTTP responses from your app include the right caching headers, which they should anyway. 图 15.8 shows my output, where the Pi calculation took 1.2 seconds, but the response came from the ingress controller’s cache, so the page loaded pretty much instantly.
+您将在本练习中看到入口控制器是集群中的一个强大组件。您只需指定新的 Ingress 规则即可将缓存添加到您的应用程序中——无需更新应用程序本身，也无需管理新组件。唯一的要求是来自您的应用程序的 HTTP 响应包含正确的缓存标头，无论如何它们都应该包含这些标头。图 15.8 显示了我的输出，其中 Pi 计算耗时 1.2 秒，但响应来自入口控制器的缓存，因此页面几乎立即加载。
 
 ![图15.8](./images/Figure15.8.png)
-<center>图 15.8 If your ingress controller supports response caching, that’s an easy performance boost. </center>
+<center>图 15.8 如果你的入口控制器支持响应缓存，那很容易提升性能. </center>
 
 Not every ingress controller provides a response cache, so that’s not a specific part of the Ingress spec. Any custom configuration is applied with annotations, which the controller picks up. Listing 15.5 shows the metadata for the updated cache setting you applied in the previous exercise. If you’re familiar with Nginx, you’ll recognize these as the proxy cache settings you would normally set in the configuration file.
+并非每个入口控制器都提供响应缓存，因此这不是入口规范的特定部分。任何自定义配置都会应用注释，控制器会拾取这些注释。清单 15.5 显示了您在上一个练习中应用的更新缓存设置的元数据。如果您熟悉 Nginx，您会认出这些是您通常在配置文件中设置的代理缓存设置。
 
-> Listing 15.5 ingress-with-cache.yaml, using the Nginx cache in the ingress controller
+> 清单 15.5 ingress-with-cache.yaml，在入口控制器中使用 Nginx 缓存
 
 ```
 apiVersion: networking.k8s.io/v1beta1
@@ -277,39 +282,47 @@ proxy_cache static-cache;
 proxy_cache_valid 10m;
 ```
 The configuration in an Ingress object applies to all of its rules, but if you need different features for different parts of your app, you can have multiple Ingress rules. That’s true for the to-do list app, which needs some more help from the ingress controller to work properly at scale. Ingress controllers use load balancing if a Service has many Pods, but the to-do app has some cross-site forgery protection, which breaks if the request to create a new item is sent to a different app container from the one that originally rendered the new item page. Lots of apps have a restriction like this, which proxies solve using sticky sessions.
+Ingress 对象中的配置适用于它的所有规则，但如果您的应用程序的不同部分需要不同的功能，您可以有多个 Ingress 规则。待办事项列表应用程序也是如此，它需要来自入口控制器的更多帮助才能大规模正常工作。如果一个服务有很多 Pod，入口控制器使用负载平衡，但是待办事项应用程序有一些跨站点伪造保护，如果创建新项目的请求被发送到与最初呈现的应用程序容器不同的应用程序容器，它就会中断新项目页面。许多应用程序都有这样的限制，代理使用粘性会话来解决。
 
 Sticky sessions are a mechanism for the ingress controller to send requests from the same end user to the same container, which is often a requirement for older apps where components aren’t stateless. It’s something to avoid where possible because it limits the cluster’s potential for load balancing, so in the to-do list app, we want to restrict it to just one page. 图 15.9 shows the Ingress rules we’ll apply to get differ- ent features for different parts of the app.
+粘性会话是入口控制器将请求从同一最终用户发送到同一容器的一种机制，这通常是组件不是无状态的旧应用程序的要求。这是要尽可能避免的事情，因为它限制了集群负载平衡的潜力，所以在待办事项列表应用程序中，我们希望将其限制在一页上。图 15.9 显示了我们将应用的 Ingress 规则，以获得应用程序不同部分的不同功能。
 
 ![图15.9](./images/Figure15.9.png)
-<center>图 15.9 A domain can be mapped with multiple Ingress rules, using different proxy features. </center>
+<center>图 15.9 一个域可以映射到多个 Ingress 规则，使用不同的代理功能</center>
 
 We can scale up the to-do app now to understand the problem and then apply the updated Ingress rules to fix it.
+我们现在可以扩展待办事项应用程序以了解问题，然后应用更新的 Ingress 规则来修复它。
 
 TRY IT NOW 
 Scale up the to-do application to confirm that it breaks without sticky sessions, and then deploy the updated Ingress rules from figure 15.9 and confirm it all works again.
+立即尝试 扩大待办事项应用程序以确认它在没有粘性会话的情况下中断，然后部署图 15.9 中更新的 Ingress 规则并再次确认一切正常。
 
-   ```
-   # scale up—the controller load-balances between the Pods:
-   kubectl scale deploy/todo-web --replicas 3
-   # wait for the new Pods to start:
-   kubectl wait --for=condition=ContainersReady pod -l app=todo-web
-   # browse to http://todo.kiamol.local/new, and add an item
-   # this will fail and show a 400 error page
-   # print the application logs to see the issue:
-   kubectl logs -l app=todo-web --tail 1 --since 60s
-   # update Ingress to add sticky sessions:
-   kubectl apply -f todo-list/update/ingress-sticky.yaml
-   # browse again, and add a new item—this time it works
-   ```
+```
+# scale up—the controller load-balances between the Pods:
+kubectl scale deploy/todo-web --replicas 3
+# wait for the new Pods to start:
+kubectl wait --for=condition=ContainersReady pod -l app=todo-web
+# browse to http://todo.kiamol.local/new, and add an item
+# this will fail and show a 400 error page
+# print the application logs to see the issue:
+kubectl logs -l app=todo-web --tail 1 --since 60s
+# update Ingress to add sticky sessions:
+kubectl apply -f todo-list/update/ingress-sticky.yaml
+# browse again, and add a new item—this time it works
+```
 You can see my output in figure 15.10, but unless you run the exercise yourself, you’ll have to take my word for which is the “before” and which is the “after” screenshot. Scaling up the application replicas means requests from the ingress controller are load-balanced, which triggers the antiforgery error. Applying sticky sessions stops load balancing on the new item path, so a user’s requests are always routed to the same Pod, and the forgery check passes.
+你可以在图 15.10 中看到我的输出，但除非你自己运行这个练习，否则你必须相信我的话，哪个是“之前”，哪个是“之后”的截图。扩展应用程序副本意味着来自入口控制器的请求是负载平衡的，这会触发防伪错误。应用粘性会话会停止新项目路径上的负载平衡，因此用户的请求总是被路由到同一个 Pod，并且伪造检查通过。
 
 ![图15.10](./images/Figure15.10.png)
-<center>图 15.10 Proxy features can fix problems as well as improve performance. </center>
+<center>图 15.10 代理功能可以解决问题并提高性能. </center>
 
 The Ingress resources for the to-do app use a combination of host, paths, and annotations to set all the rules and the features to apply. Behind the scenes, the job of the controller is to convert those rules into proxy configuration, which in the case of Nginx means writing a config file. The controller features lots of optimizations to minimize the number of file writes and configuration reloads, but as a result, the Nginx configuration file is horribly complex. If you opt for the Nginx ingress controller because you have Nginx experience and you’d be comfortable debugging the config file, you’re in for an unpleasant surprise.
 
+待办事项应用程序的 Ingress 资源使用主机、路径和注释的组合来设置要应用的所有规则和功能。在幕后，控制器的工作是将这些规则转换为代理配置，在 Nginx 的情况下意味着编写配置文件。控制器进行了大量优化，以最大限度地减少文件写入和配置重新加载的次数，但结果是，Nginx 配置文件非常复杂。如果你选择 Nginx 入口控制器是因为你有 Nginx 经验并且你会很舒服地调试配置文件，你会遇到一个不愉快的惊喜。
+
 TRY IT NOW 
 The Nginx configuration is in a file in the ingress controller Pod. Run a command in the Pod to check the size of the file.
+立即尝试 Nginx 配置位于入口控制器 Pod 中的一个文件中。在 Pod 中运行一个命令来检查文件的大小。
 
    ```
    # run the wc command to see how many lines are in the file:
@@ -317,47 +330,53 @@ The Nginx configuration is in a file in the ingress controller Pod. Run a comman
    - sh -c 'wc -l /etc/nginx/nginx.conf'
    ```
 
-图 15.11 shows there are more than 1,700 lines in my Nginx configuration file. If you run cat instead of wc, you’ll find the contents are strange, even if you’re familiar
+图 15.11 shows there are more than 1,700 lines in my Nginx configuration file. If you run cat instead of wc, you’ll find the contents are strange, even if you’re familiar with Nginx. (The controller uses Lua scripts so it can update endpoints without a configuration reload.)
+图 15.11 显示我的 Nginx 配置文件中有 1,700 多行。如果你运行 cat 而不是 wc，你会发现内容很奇怪，即使你很熟悉Nginx。 （控制器使用 Lua 脚本，因此它可以在不重新加载配置的情况下更新端点。）
 
 ![图15.11](./images/Figure15.11.png)
-<center>图 15.11 The generated Nginx configuration file is not made to be human-friendly. </center>
-
-with Nginx. (The controller uses Lua scripts so it can update endpoints without a configuration reload.)
+<center>图 15.11 生成的 Nginx 配置文件不是很人性化. </center>
 
 The ingress controller owns that complexity, but it’s a critical part of your solution, and you need to be happy with how you’ll troubleshoot and debug the proxy. This is when you might want to consider an alternative ingress controller that is platform aware and doesn’t run from a complex configuration file. We’ll look at Traefik in this chapter—it’s an open source proxy that has been gaining popularity since it launched in 2015. Traefik understands containers, and it builds its routing list from the plat- form API, natively supporting Docker and Kubernetes, so it doesn’t have a config file to maintain.
+入口控制器拥有这种复杂性，但它是您解决方案的关键部分，您需要对如何对代理进行故障排除和调试感到满意。这时您可能想要考虑一个替代的入口控制器，它是平台感知的并且不从复杂的配置文件运行。我们将在本章中介绍 Traefik——它是一个开源代理，自 2015 年推出以来越来越受欢迎。Traefik 了解容器，它从平台 API 构建路由列表，原生支持 Docker 和 Kubernetes，所以它没有要维护的配置文件。
 
 Kubernetes supports multiple Ingress controllers running in a single cluster. They’ll be exposed as LoadBalancer Services, so in production, you might have different IP addresses for different ingress controllers, and you’ll need to map domains to Ingress in your DNS configuration. In our lab environment, we’ll be back to using different ports. We’ll start by deploying Traefik with a custom port for the ingress controller Service.
+Kubernetes 支持在单个集群中运行多个 Ingress 控制器。它们将作为 LoadBalancer 服务公开，因此在生产中，不同的入口控制器可能有不同的 IP 地址，并且您需要在 DNS 配置中将域映射到入口。在我们的实验室环境中，我们将重新使用不同的端口。我们将从使用入口控制器服务的自定义端口部署 Traefik 开始。
 
 TRY IT NOW 
 Deploy Traefik as an additional ingress controller in the cluster.
+立即尝试 将 Traefik 部署为集群中的附加入口控制器。
 
-   ```
-   # create the Traefik Deployment, Service, and security resources:
-   kubectl apply -f ingress-traefik/
-   # get the URL for the Traefik UI running in the ingress controller:
-   kubectl get svc ingress-traefik-controller -o
-   jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080' -n
-   kiamol-ingress-traefik
-   # browse to the admin UI to see the routes Traefik has mapped
-   ```
+```
+# create the Traefik Deployment, Service, and security resources:
+kubectl apply -f ingress-traefik/
+# get the URL for the Traefik UI running in the ingress controller:
+kubectl get svc ingress-traefik-controller -o
+jsonpath='http://{.status.loadBalancer.ingress[0].*}:8080' -n
+kiamol-ingress-traefik
+# browse to the admin UI to see the routes Traefik has mapped
+```
+
 You’ll see in that exercise that Traefik has an admin UI. It shows you the routing rules the proxy is using, and as traffic passes through, it can collect and show performance metrics It’s much easier to work with than the Nginx config file. 图 15.12 shows two routers, which are the incoming routes Traefik manages. If you explore the dashboard, you’ll see those aren’t Ingress routes; they’re internal routes for Traefik’s own dashboard—Traefik has not picked up any of the existing Ingress rules in the cluster.
 
+你会在那个练习中看到 Traefik 有一个管理 UI。它向您显示代理正在使用的路由规则，并且当流量通过时，它可以收集并显示性能指标。它比 Nginx 配置文件更容易使用。图 15.12 显示了两个路由器，它们是 Traefik 管理的传入路由。如果您浏览仪表板，您会看到那些不是 Ingress 路由；它们是 Traefik 自己的仪表板的内部路由——Traefik 没有选择集群中任何现有的 Ingress 规则。
+
 ![图15.12](./images/Figure15.12.png)
-<center>图 15.12 Traefik is a container-native proxy that builds routing rules from the platform and has a UI to display them. </center>
+<center>图 15.12 Traefik 是一个容器原生代理，它从平台构建路由规则并有一个 UI 来显示它们. </center>
 
 Why hasn’t Traefik built a set of routing rules for the to-do list or the Pi applications? It would if we had configured it differently, and all the existing routes would be available via the Traefik Service, but that’s not how you use multiple ingress controllers because they would end up fighting over incoming requests. You run more than one controller to provide different proxy capabilities, and you need the application to choose which one to use. You do that with ingress classes, which are a similar concept to storage classes. Traefik has been deployed with a named ingress class, and only Ingress objects that request that class will be routed through Traefik.
+为什么 Traefik 没有为待办事项列表或 Pi 应用程序构建一套路由规则？如果我们以不同的方式配置它，那么所有现有路由都可以通过 Traefik 服务使用，但这不是您使用多个入口控制器的方式，因为它们最终会争夺传入请求。您运行多个控制器以提供不同的代理功能，并且您需要应用程序选择使用哪一个。您可以使用入口类来做到这一点，入口类是与存储类类似的概念。 Traefik 已经部署了一个命名入口类，只有请求该类的入口对象才会通过 Traefik 进行路由。
 
 The ingress class isn’t the only difference between ingress controllers, and you may need to model your routes quite differently for different proxies. 图 15.13 shows how the to-do app needs to be configured in Traefik. There’s no response cache in Traefik so we don’t get caching for static resources, and sticky sessions are configured
 at the Service level, so we need an additional Service for the new item route.
+入口类并不是入口控制器之间的唯一区别，您可能需要为不同的代理完全不同地建模路由。图 15.13 显示了如何在 Traefik 中配置待办事项应用程序。 Traefik 中没有响应缓存，因此我们不会获取静态资源的缓存，并且粘性会话是在服务级别配置的，因此我们需要为新项目路由提供额外的服务。
 
 ![图15.13](./images/Figure15.13.png)
-<center>图 15.13 Ingress controllers work differently, and your route model will need to change accordingly. </center>
+<center>图 15.13 Ingress 控制器的工作方式不同，您的路由模型将需要相应地更改。 </center>
 
-That model is significantly different from the Nginx routing in figure 15.9, so if you do plan to run multiple ingress controllers, you need to appreciate the high risk of misconfiguration, with teams confusing the different capabilities and approaches. Traefik uses annotations on Ingress resources to configure the routing rules. List- ing 15.6 shows a spec for the new-item path, which selects Traefik as the ingress class
+That model is significantly different from the Nginx routing in figure 15.9, so if you do plan to run multiple ingress controllers, you need to appreciate the high risk of misconfiguration, with teams confusing the different capabilities and approaches. Traefik uses annotations on Ingress resources to configure the routing rules. List- ing 15.6 shows a spec for the new-item path, which selects Traefik as the ingress class and uses an annotation for exact path matching, because Traefik doesn’t support the PathType field.
+该模型与图 15.9 中的 Nginx 路由明显不同，因此如果您确实计划运行多个入口控制器，您需要意识到配置错误的高风险，因为团队会混淆不同的功能和方法。 Traefik 使用 Ingress 资源上的注解来配置路由规则。清单 15.6 显示了新项目路径的规范，它选择 Traefik 作为入口类并使用注释进行精确路径匹配，因为 Traefik 不支持 PathType 字段。
 
-and uses an annotation for exact path matching, because Traefik doesn’t support the PathType field.
-
-> Listing 15.6 ingress-traefik.yaml, selecting the ingress class with Traefik annotations
+> 清单 15.6 ingress-traefik.yaml，选择带有 Traefik 注解的入口类
 
 ```
 apiVersion: networking.k8s.io/v1beta1
@@ -378,29 +397,34 @@ serviceName: todo-web-sticky # Uses the Service that has sticky
 servicePort: 80 # sessions configured for Traefik
 ```
 We’ll deploy a new set of Ingress rules using a different host name, so we can route traffic to the same set of to-do list Pods via Nginx or Traefik.
+我们将使用不同的主机名部署一组新的 Ingress 规则，因此我们可以通过 Nginx 或 Traefik 将流量路由到同一组待办事项列表 Pod。
 
 TRY IT NOW 
 Publish the to-do app through the Traefik ingress controller, using the Ingress routes modeled in figure 15.13.
+立即尝试 使用图 15.13 中建模的入口路由，通过 Traefik 入口控制器发布待办事项应用程序。
+   
+```
+# add a new domain for the app—on Windows:
+./add-to-hosts.ps1 todo2.kiamol.local ingress-traefik
+# OR on Linux/macOS:
+./add-to-hosts.sh todo2.kiamol.local ingress-traefik
+# apply the new Ingress rules and sticky Service:
+kubectl apply -f todo-list/update/ingress-traefik.yaml
+# refresh the Traefik admin UI to confirm the new routes
+# browse to http://todo2.kiamol.local:8015
+```
 
-   ```
-   # add a new domain for the app—on Windows:
-   ./add-to-hosts.ps1 todo2.kiamol.local ingress-traefik
-   # OR on Linux/macOS:
-   ./add-to-hosts.sh todo2.kiamol.local ingress-traefik
-   # apply the new Ingress rules and sticky Service:
-   kubectl apply -f todo-list/update/ingress-traefik.yaml
-   # refresh the Traefik admin UI to confirm the new routes
-   # browse to http://todo2.kiamol.local:8015
-   ```
 Traefik watches for events from the Kubernetes API server and refreshes its routing list automatically. When you deploy the new Ingress objects, you’ll see the paths shown as routers in the Traefik dashboard, linked to the backend Services. 图 15.14 shows part of the routing list, together with the to-do app available through the new URL.
+Traefik 监视来自 Kubernetes API 服务器的事件并自动刷新其路由列表。当您部署新的 Ingress 对象时，您会在 Traefik 仪表板中看到显示为路由器的路径，链接到后端服务。图 15.14 显示了路由列表的一部分，以及通过新 URL 可用的待办事项应用程序。
 
 ![图15.14](./images/Figure15.14.png)
-<center>图 15.14 Ingress controllers achieve the same goals from different configuration models. </center>
+<center>图 15.14 Ingress 控制器通过不同的配置模型实现相同的目标。 </center>
 
 If you’re evaluating ingress controllers, you should look at the ease of modeling your application paths, together with the approach to troubleshooting and the performance of the proxy. Dual-running controllers in a dedicated environment helps with that because you can isolate other factors and run comparisons using the same application components. A more realistic app will have more complex Ingress rules, and you’ll want to be comfortable with how the controller implements features like rate limiting, URL rewrites, and client IP access lists.
+如果您正在评估入口控制器，您应该查看应用程序路径建模的难易程度，以及故障排除方法和代理的性能。专用环境中的双运行控制器对此有所帮助，因为您可以隔离其他因素并使用相同的应用程序组件进行比较。更现实的应用程序将具有更复杂的 Ingress 规则，并且您需要熟悉控制器如何实现速率限制、URL 重写和客户端 IP 访问列表等功能。
 
 The other major feature of Ingress is publishing apps over HTTPS without configuring certificates and security settings in your applications. This is one area that is consistent among ingress controllers, and in the next section, we’ll see it with Traefik and Nginx.
-
+Ingress 的另一个主要功能是通过 HTTPS 发布应用程序，而无需在应用程序中配置证书和安全设置。这是入口控制器之间一致的一个区域，在下一节中，我们将在 Traefik 和 Nginx 中看到它。
 ## 15.4 使用 Ingress 通过 HTTPS 保护您的应用程序
 
 Your web apps should be published over HTTPS, but encryption needs server certificates, and certificates are sensitive data items. It’s a good practice to make HTTPS an ingress concern, because it centralizes certificate management. Ingress resources can specify a TLS certificate in a Kubernetes Secret (TLS is Transport Layer Security, the encryption mechanism for HTTPS). Moving TLS away from application teams means you can have a standard approach to provisioning, securing, and renewing certificatesand you won’t have to spend time explaining why packaging certificates inside a container image is a bad idea.
