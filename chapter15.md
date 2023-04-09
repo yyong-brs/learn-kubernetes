@@ -553,27 +553,41 @@ Ingress 的 HTTPS 部分可靠且易于使用，很高兴以高调进入本章�
 ## 15.5 理解 Ingress 及 Ingress 控制器
 
 You’ll almost certainly run an ingress controller in your cluster, because it centralizes routing for domain names and moves TLS certificate management away from the applications. The Kubernetes model uses a common Ingress spec and a pluggable implementation that is very flexible, but the user experience is not straightforward. The Ingress spec records only the most basic routing details, and to use more advanced features from your proxy, you’ll need to add chunks of configuration as annotations.
+您几乎肯定会在集群中运行入口控制器，因为它集中了域名路由并将 TLS 证书管理从应用程序中移开。 Kubernetes 模型使用通用的 Ingress 规范和非常灵活的可插拔实现，但用户体验并不直接。 Ingress 规范仅记录最基本的路由详细信息，要使用代理的更多高级功能，您需要添加配置块作为注释。
 
 Those annotations are not portable, and there is no interface specification for the features an ingress controller must support. There will be a migration project if you want to move from Nginx to Traefik or HAProxy or Contour (an open source project accepted into the CNCF on the very day I wrote this chapter), and you may find the features you need aren’t all available. The Kubernetes community is aware of the limitations of Ingress and is working on a long-term replacement called the Service API, but as of 2021, that’s still in the early stages.
 
+这些注释不可移植，并且没有针对入口控制器必须支持的功能的接口规范。如果你想从 Nginx 迁移到 Traefik 或 HAProxy 或 Contour（在我写这章的那天，一个开源项目被 CNCF 接受），将会有一个迁移项目，你可能会发现你需要的功能并不是全部可用的。 Kubernetes 社区意识到了 Ingress 的局限性，并正在研究称为服务 API 的长期替代品，但截至 2021 年，它仍处于早期阶段。
+
 That’s not to say that Ingress should be avoided—it’s the best option right now, and it’s likely to be the production choice for many years. It’s worth evaluating different ingress controllers and then settling on a single option. Kubernetes supports multiple ingress controllers, but the trouble will really start if you use different implementations and have to manage sets of Ingress rules with incompatible feature sets invoked through incomprehensible annotations. In this chapter, we looked at Nginx and Traefik, which are both good options, but there are plenty of others, including commercial options backed with support contracts.
+这并不是说应该避免使用 Ingress——它是目前最好的选择，而且它可能会成为未来很多年的生产选择。评估不同的入口控制器然后选择一个选项是值得的。 Kubernetes 支持多个入口控制器，但如果您使用不同的实现并且必须管理具有通过难以理解的注释调用的不兼容功能集的入口规则集，那么麻烦就会真正开始。在本章中，我们研究了 Nginx 和 Traefik，它们都是不错的选择，但还有很多其他选择，包括以支持合同为后盾的商业选择。
 
 We’re done with Ingress now, so we can tidy up the cluster to get ready for the lab.
+我们现在已经完成了 Ingress，所以我们可以整理集群为实验室做好准备。
 
 TRY IT NOW 
 Clear down the Ingress namespaces and the application resources.
+立即尝试 清除 Ingress 命名空间和应用程序资源。
 
-   ```
-   kubectl delete ns,all,secret,ingress -l kiamol=ch15
-   ```
+```
+kubectl delete ns,all,secret,ingress -l kiamol=ch15
+```
 
 ## 15.6 实验室
 
 Here is a nice lab for you to do, following the pattern from chapters 13 and 14. Your job is to build the Ingress rules for the Astronomy Picture of the Day app. Simple . . .
-+ Start by deploying the ingress controller in the lab/ingress-nginx folder.
-+ The ingress controller is restricted to look for Ingress objects in one namespace, so you’ll need to figure out which one and deploy the lab/apod/ folder to that namespace.
-+ The web app should be published at www.apod.local and the API at api.apod.local.
-+ We want to prevent distributed denial-of-service attacks, so you should use the rate-limiting feature in the ingress controller to prevent too many requests from the same IP address.
-+ The ingress controller uses a custom class name, so you’ll need to find that, too. This is partly about digging into the ingress controller configuration and partly about
-the documentation for the controller—be aware that there are two Nginx ingress controllers. We’ve used the one from the Kubernetes project in this chapter, but there’s an alternative published by the Nginx project. My solution is ready for you to check against:
+这是一个不错的实验，您可以按照第 13 章和第 14 章中的模式进行操作。您的工作是为 Astronomy Picture of the Day 应用程序构建入口规则。简单的...
+- Start by deploying the ingress controller in the lab/ingress-nginx folder.
+- 首先在 lab/ingress-nginx 文件夹中部署入口控制器。
+- The ingress controller is restricted to look for Ingress objects in one namespace, so you’ll need to figure out which one and deploy the lab/apod/ folder to that namespace.
+- 入口控制器仅限于在一个命名空间中查找入口对象，因此您需要找出是哪一个并将 lab/apod/ 文件夹部署到该命名空间。
+- The web app should be published at www.apod.local and the API at api.apod.local.
+- Web 应用程序应发布在 www.apod.local，API 应发布在 api.apod.local。
+- We want to prevent distributed denial-of-service attacks, so you should use the rate-limiting feature in the ingress controller to prevent too many requests from the same IP address.
+- 我们要防止分布式拒绝服务攻击，因此您应该在入口控制器中使用限速功能来防止来自同一 IP 地址的过多请求。
+- The ingress controller uses a custom class name, so you’ll need to find that, too. 
+- 入口控制器使用自定义类名，因此您也需要找到它。
+
+This is partly about digging into the ingress controller configuration and partly about the documentation for the controller—be aware that there are two Nginx ingress controllers. We’ve used the one from the Kubernetes project in this chapter, but there’s an alternative published by the Nginx project. My solution is ready for you to check against:
 <https://github.com/sixeyed/kiamol/blob/master/ch15/lab/README.md>.
+这部分是关于深入研究入口控制器配置，部分是关于控制器的文档——请注意有两个 Nginx 入口控制器。我们在本章中使用了 Kubernetes 项目中的一个，但 Nginx 项目发布了一个替代方案。我的解决方案已准备好供您检查： https://github.com/sixeyed/kiamol/blob/master/ch15/lab/README.md 。
