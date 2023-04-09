@@ -394,127 +394,105 @@ Traefik 监视来自 Kubernetes API 服务器的事件并自动刷新其路由�
 Ingress 的另一个主要功能是通过 HTTPS 发布应用程序，而无需在应用程序中配置证书和安全设置。这是Ingress 控制器之间一致的一个区域，在下一节中，我们将在 Traefik 和 Nginx 中看到它。
 ## 15.4 使用 Ingress 通过 HTTPS 保护您的应用程序
 
-Your web apps should be published over HTTPS, but encryption needs server certificates, and certificates are sensitive data items. It’s a good practice to make HTTPS an ingress concern, because it centralizes certificate management. Ingress resources can specify a TLS certificate in a Kubernetes Secret (TLS is Transport Layer Security, the encryption mechanism for HTTPS). Moving TLS away from application teams means you can have a standard approach to provisioning, securing, and renewing certificatesand you won’t have to spend time explaining why packaging certificates inside a container image is a bad idea.
 您的 Web 应用程序应通过 HTTPS 发布，但加密需要服务器证书，而证书是敏感数据项。使 HTTPS 成为入口问题是一种很好的做法，因为它集中了证书管理。 Ingress资源可以在Kubernetes Secret中指定一个TLS证书（TLS是Transport Layer Security，HTTPS的加密机制）。将 TLS 远离应用程序团队意味着您可以使用标准方法来配置、保护和更新证书，并且您不必花时间解释为什么将证书打包在容器映像中是个坏主意。
 
-All ingress controllers support loading a TLS certificate from a Secret, but Traefik makes it easier still. If you want to use HTTPS in development and test environments without provisioning any Secrets, Traefik can generate its own self-signed certificate when it runs. You configure that with annotations in the Ingress rules to enable TLS and the default certificate resolver.
 所有Ingress 控制器都支持从 Secret 加载 TLS 证书，但 Traefik 使它更容易。如果您想在开发和测试环境中使用 HTTPS 而无需提供任何 Secrets，Traefik 可以在运行时生成自己的自签名证书。您可以在 Ingress 规则中使用注释对其进行配置，以启用 TLS 和默认证书解析器。
 
-TRY IT NOW 
-Using Traefik’s generated certificate is a quick way to test your app over HTTPS. It’s enabled with more annotations in the Ingress objects.
-立即尝试 使用 Traefik 生成的证书是通过 HTTPS 测试您的应用程序的快速方法。它在 Ingress 对象中启用了更多注释。
+立即尝试,使用 Traefik 生成的证书是通过 HTTPS 测试您的应用程序的快速方法。它在 Ingress 对象中启用了更多注释。
    
 ```
-# update the Ingress to use Traefik’s own certifcate:
+# 更新Ingress以使用Traefik自己的证书:
 kubectl apply -f todo-list/update/ingress-traefik-certResolver.yaml
-# browse to https://todo2.kiamol.local:9443
-# you’ll see a warning in your browser
+# 访问 https://todo2.kiamol.local:9443
+# 您将在浏览器中看到一个警告
 ```
 
-Browsers don’t like self-signed certificates because anyone can create them—there’s no verifiable chain of authority. You’ll see a big warning when you first browse to the site, telling you it’s not safe, but you can proceed, and the to-do list app will load. As shown in figure 15.15, the site is encrypted with HTTPS but with a warning so you know it’s not really secure.
 浏览器不喜欢自签名证书，因为任何人都可以创建它们——没有可验证的授权链。当您第一次浏览该网站时，您会看到一个很大的警告，告诉您它不安全，但您可以继续，待办事项列表应用程序将加载。如图 15.15 所示，该站点使用 HTTPS 加密，但带有警告，因此您知道它并不真正安全。
 
 ![图15.15](./images/Figure15.15.png)
 <center>图 15.15 并非所有 HTTPS 都是安全的——自签名证书适用于开发和测试环境。 </center>
 
-Your organization will probably have its own idea about certificates. If you’re able to own the provisioning process, you can have a fully automated system where your cluster fetches short-lived certificates from a certificate authority (CA), installs them,and renews them when required. Let’s Encrypt is a great choice: it issues free certificates through an easily automated process. Traefik has native integration with Let’s Encrypt; for other ingress controllers, you can use the open source cert-manager tool (`https://cert-manager.io`), which is a CNCF project.
 您的组织可能对证书有自己的想法。如果您能够拥有供应过程，您可以拥有一个完全自动化的系统，您的集群在其中从证书颁发机构 (CA) 获取短期证书，安装它们，并在需要时更新它们。 Let's Encrypt 是一个不错的选择：它通过一个易于自动化的过程颁发免费证书。 Traefik 与 Let's Encrypt 原生集成；对于其他Ingress 控制器，您可以使用开源证书管理器工具 ( https://cert-manager.io )，这是一个 CNCF 项目。
 
-Not everyone is ready for an automated provisioning process, though. Some issuers require a human to download certificate files, or your organization may create certificate files from its own certificate authority for nonproduction domains. Then you’ll need to deploy the TLS certificate and key files as a Secret in the cluster. This scenario is common, so we’ll walk through it in the next exercise, generating a certificate of our own.
 不过，并不是每个人都准备好进行自动配置过程。一些颁发者需要人工下载证书文件，或者您的组织可能会从其自己的证书颁发机构为非生产域创建证书文件。然后，您需要将 TLS 证书和密钥文件部署为集群中的 Secret。这种情况很常见，因此我们将在下一个练习中逐步完成，生成我们自己的证书。
 
-TRY IT NOW 
-Run a Pod that generates a custom TLS certificate, and connect to the Pod to deploy the certificate files as a Secret. The Pod spec is configured to connect to the Kubernetes API server it’s running on.
-立即尝试 运行生成自定义 TLS 证书的 Pod，并连接到 Pod 以将证书文件部署为 Secret。 Pod 规范配置为连接到它运行的 Kubernetes API 服务器。
+立即尝试,运行生成自定义 TLS 证书的 Pod，并连接到 Pod 以将证书文件部署为 Secret。 Pod 规范配置为连接到它运行的 Kubernetes API 服务器。
    
 ```
-# run the Pod—this generates a certificate when it starts:
+# 运行pod——这将在启动时生成证书:
 kubectl apply -f ./cert-generator.yaml
-# connect to the Pod:
+# 连接到 pod:
 kubectl exec -it deploy/cert-generator -- sh
-# inside the Pod, confirm the certificate files have been created:
+# 在Pod中，确认证书文件已经创建:
 ls
-# rename the certificate files—Kubernetes requires specific names:
+# 重命名证书文件——kubernetes需要特定的名称:
 mv server-cert.pem tls.crt
 mv server-key.pem tls.key
-# create and label a Secret from the certificate files:
+# 从证书文件中创建并标记一个Secret :
 kubectl create secret tls kiamol-cert --key=tls.key --cert=tls.crt
 kubectl label secret/kiamol-cert kiamol=ch15
-# exit the Pod:
+# 退出 Pod:
 exit
-# back on the host, confirm the Secret is there:
+# 回到主机上，确认Secret在那里:
 kubectl get secret kiamol-cert --show-labels
 ```
 
-That exercise simulates the situation where someone gives you a TLS certificate as a pair of PEM files, which you need to rename and use as the input to create a TLS Secret in Kubernetes. The certificate generation is all done using a tool called OpenSSL, and the only reason for running it inside a Pod is to package up the tool and the scripts to make it easy to use. 图 15.16 shows my output, with a Secret created in the cluster that can be used by an Ingress object.
 该练习模拟了某人将 TLS 证书作为一对 PEM 文件提供给您的情况，您需要将其重命名并用作在 Kubernetes 中创建 TLS Secret 的输入。证书生成全部使用名为 OpenSSL 的工具完成，在 Pod 中运行它的唯一原因是打包该工具和脚本以使其易于使用。图 15.16 显示了我的输出，其中在集群中创建了一个可供 Ingress 对象使用的 Secret。
 
 ![图15.16](./images/Figure15.16.png)
 <center>图 15.16  如果您从证书颁发者那里获得 PEM 文件，您可以将它们创建为 TLS Secret。 </center>
 
-HTTPS support is simple with an ingress controller. You add a TLS section to your Ingress spec and state the name of the Secret to use— that’s it. Listing 15.7 shows an update to the Traefik ingress, which applies the new certificate to the `todo2.kiamol.local host`.
 HTTPS 支持通过Ingress 控制器很简单。您将 TLS 部分添加到 Ingress 规范并声明要使用的 Secret 的名称——仅此而已。清单 15.7 显示了对 Traefik ingress 的更新，它将新证书应用于 todo2.kiamol.local host 。
 
 > 清单 15.7 ingress-traefik-https.yaml，使用标准的 Ingress HTTPS 特性
 
 ```
 spec:
-rules:
-- host: todo2.kiamol.local
-http:
-paths:
-- path: /new
-backend:
-serviceName: todo-web-sticky
-servicePort: 80
-tls: # The TLS section switches on HTTPS
-- secretName: kiamol-cert # using the certificate in this Secret.
+  rules:
+  - host: todo2.kiamol.local
+    http:
+      paths:
+      - path: /new
+        backend:
+          serviceName: todo-web-sticky
+          servicePort: 80
+  tls: # TLS部分使用这个Secret中的证书开启HTTPS。
+    - secretName: kiamol-cert 
 ```
 
-The TLS field with the Secret name is all you need, and it’s portable across all ingress controllers. When you deploy the updated Ingress rules, the site will be served over HTTPS with your custom certificate. You’ll still get a security warning from the browser because the certificate authority is untrusted, but if your organization has its own CA, then it will be trusted by your machine and the organization’s certificates will be valid.
 带有 Secret 名称的 TLS 字段就是您所需要的，它可以跨所有Ingress 控制器移植。当您部署更新的 Ingress 规则时，该站点将使用您的自定义证书通过 HTTPS 提供服务。你仍然会从浏览器中收到安全警告，因为证书颁发机构不受信任，但如果你的组织有自己的 CA，那么你的机器将信任它，并且组织的证书将有效。
 
-TRY IT NOW 
-Update the to-do list Ingress objects to publish HTTPS using the Traefik ingress controller and your own TLS cert.
-立即尝试 更新待办事项列表入口对象以使用 Traefik Ingress 控制器和您自己的 TLS 证书发布 HTTPS。
+立即尝试,更新待办事项列表 ingress 对象以使用 Traefik Ingress 控制器和您自己的 TLS 证书发布 HTTPS。
 
 ```
-# apply the Ingress update:
+# 应用 Ingress 更新:
 kubectl apply -f todo-list/update/ingress-traefik-https.yaml
-# browse to https://todo2.kiamol.local:9443
-# there’s still a warning, but this time it’s because
-# the KIAMOL CA isn’t trusted
+# 访问 https://todo2.kiamol.local:9443
+# 仍然有一个警告，但这一次是因为KIAMOL CA不可信
 ```
 
-You can see my output in figure 15.17. I’ve opened the certificate details in one screen to confirm this is my own “kiamol” certificate. I accepted the warning in the second screen, and the to-do list traffic is now encrypted with the custom certificate. The script that generates the certificate sets it for all the kiamol.local domains we’ve used in this chapter, so the certificate is valid for the address, but it’s not from a trusted issuer.
 你可以在图 15.17 中看到我的输出。我在一个屏幕上打开了证书详细信息，以确认这是我自己的“kiamol”证书。我接受了第二个屏幕中的警告，待办事项列表流量现在已使用自定义证书加密。这生成证书的脚本将它设置为我们在本章中使用的所有 kiamol.local 域，因此证书对地址有效，但它不是来自受信任的颁发者。
 
 ![图15.17](./images/Figure15.17.png)
 <center>图 15.17 Ingress 控制器可以应用来自 Kubernetes Secrets 的 TLS 证书。如果证书来自受信任的颁发者，则该站点将是安全的 </center>
 
-We’ll switch back to Nginx for the final exercise—using the same certificate with the Nginx ingress controller, just to show that the process is identical. The updated Ingress specs use the same rules as the previous Nginx deployment, but now they add the TLS field with the same Secret name as listing 15.7.
 我们将切换回 Nginx 进行最后的练习——使用与 Nginx Ingress 控制器相同的证书，只是为了表明过程是相同的。更新后的 Ingress 规范使用与之前 Nginx 部署相同的规则，但现在他们添加了与清单 15.7 具有相同 Secret 名称的 TLS 字段。
 
-TRY IT NOW 
-Update the to-do Ingress rules for Nginx, so the app is available using HTTPS over the standard port 443, which the Nginx ingress controller is using.
-立即尝试 更新 Nginx 的待办事项入口规则，以便通过标准端口 443 使用 HTTPS 访问应用程序，Nginx Ingress 控制器正在使用该端口。
+立即尝试，更新 Nginx 的待办事项 ingress 规则，以便通过标准端口 443 使用 HTTPS 访问应用程序，Nginx Ingress 控制器正在使用该端口。
 
 ```
-# update the Ingress resources:
+# 更新 Ingress 资源:
 kubectl apply -f todo-list/update/ingress-https.yaml
-# browse to https://todo.kiamol.local
-# accept the warnings to view the site
-# confirm that the HTTP requests are redirected to HTTPS:
+# 访问 https://todo.kiamol.local
+# 接受警告以查看站点，确认HTTP请求被重定向到HTTPS:
 curl http://todo.kiamol.local
 ```
 
-I cheated when I ran that exercise and added the Kiamol CA to my trusted issuer list in the browser. You can see in figure 15.18 that the site is shown as secure, without any warnings, which is what you’d see for an organization’s own certificates. You can also see that the ingress controller redirects HTTP requests to HTTPS—the 308 redirect response in the curl command is taken care of by Nginx.
 当我运行该练习并将 Kiamol CA 添加到浏览器中我的可信发行者列表时，我作弊了。您可以在图 15.18 中看到该站点显示为安全的，没有任何警告，这是您在组织自己的证书中看到的。你也可以看到Ingress 控制器将 HTTP 请求重定向到 HTTPS——curl 命令中的 308 重定向响应由 Nginx 处理。
 
 ![图15.18](./images/Figure15.18.png)
 <center>图 15.18 TLS 入口配置与 Nginx Ingress 控制器的工作方式相同。</center>
 
-The HTTPS part of Ingress is solid and easy to use, and it’s good to head to the end of the chapter on a high note. But using an ingress controller features a lot of complexity, and in some cases, you’ll spend more time crafting your Ingress rules than you will modeling the deployment of the app.
 Ingress 的 HTTPS 部分可靠且易于使用，很高兴以高调进入本章末尾。但是使用Ingress 控制器具有很多复杂性，在某些情况下，您将花费更多时间来制定入口规则，而不是为应用程序的部署建模。
 
 ## 15.5 理解 Ingress 及 Ingress 控制器
