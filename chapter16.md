@@ -1,10 +1,7 @@
 # 第十六章 使用策略上下文和准入控制保护应用程序
 
-Containers are a lightweight wrapper around application processes. They start quickly and add little overhead to your app because they use the operating system kernel of the machine on which they’re running. That makes them super efficient, but at the cost of strong isolation—containers can be compromised, and a compromised container could provide unrestricted access to the server and to all the other containers running on it. Kubernetes has many features to secure your applications, but none of them are enabled by default. In this chapter, you’ll learn how to use the security controls in Kubernetes and how to set up your cluster so those controls are required for all your workloads.
-
 容器是围绕应用程序进程的轻量级包装器。它们启动迅速并且几乎不会增加应用程序的开销，因为它们使用运行它们的机器的操作系统内核。这使它们非常高效，但代价是强隔离——容器可能会受到损害，而受到损害的容器可能会提供对服务器及其上运行的所有其他容器的不受限制的访问。 Kubernetes 有许多功能可以保护您的应用程序，但默认情况下都没有启用。在本章中，您将学习如何使用 Kubernetes 中的安全控制以及如何设置您的集群，以便您的所有工作负载都需要这些控制。
 
-Securing applications in Kubernetes is about limiting what containers can do, so if an attacker exploits an app vulnerability to run commands in the container, they can’t get beyond that container. We can do this by restricting network access to other containers and the Kubernetes API, restricting mounts of the host’s filesystem, and limiting the operating system features the container can use. We’ll cover the essential approaches, but the security space is large and evolving. This chapter is even longer than the others—you’re about to learn a lot, but it will be only the start of your journey to a secure Kubernetes environment.
 保护 Kubernetes 中的应用程序就是限制容器可以执行的操作，因此如果攻击者利用应用程序漏洞在容器中运行命令，他们将无法越过该容器。我们可以通过限制对其他容器和 Kubernetes API 的网络访问、限制主机文件系统的挂载以及限制容器可以使用的操作系统功能来做到这一点。我们将介绍基本方法，但安全空间很大且不断发展。本章比其他章节更长——您将学到很多东西，但这只是您通往安全 Kubernetes 环境之旅的开始。
 
 ## 16.1 使用网络策略(network policies)保护通信
