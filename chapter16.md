@@ -564,28 +564,20 @@ Open Policy Agent 是一种比自定义验证 webhook 更简洁的应用准入�
 保护你的应用程序就是关闭漏洞利用路径，一个彻底的方法包括我们在本章中介绍的所有工具等等。最后，我们将了解一个安全的 Kubernetes 环境。
 
 ## 16.5 深入了解 Kubernetes 中的安全性
-Build pipelines can be compromised, container images can be modified, containers can run vulnerable software as privileged users, and attackers with access to the Kubernetes API could even take control of your cluster. You won’t know your app is 100% secure until it has been replaced and you can confirm no security breaches occurred during its operation. Getting to that happy place means applying security in depth across your whole software supply chain. This chapter has focused on securing apps at run time, but you should start before that by scanning container images for known vulnerabilities.
-构建管道可能会遭到破坏，容器映像可能会被修改，容器可能会以特权用户身份运行易受攻击的软件，而有权访问 Kubernetes API 的攻击者甚至可能会控制您的集群。在您的应用程序被替换之前，您不会知道它是 100% 安全的，并且您可以确认在其运行期间没有发生安全漏洞。到达那个快乐的地方意味着在整个软件供应链中深入应用安全性。本章的重点是在运行时保护应用程序，但您应该在此之前扫描容器镜像以查找已知漏洞。
 
-Security scanners look inside an image, identify the binaries, and check them on CVE (Common Vulnerabilities and Exposures) databases. Scans tell you if known exploits
-are in the application stack, dependencies, or operating system tools in your image. Commercial scanners have integrations with managed registries (you can use Aqua Security with Azure Container Registry), or you can run your own (Harbor is the CNCF registry project, and it supports the open source scanners Clair and Trivy; Docker Desktop has an integration with Snyk for local scans).
-安全扫描器查看图像内部，识别二进制文件，并在 CVE（常见漏洞和暴露）数据库中检查它们。扫描会告诉您是否存在已知漏洞位于映像中的应用程序堆栈、依赖项或操作系统工具中。商业扫描器与托管注册表集成（您可以将 Aqua Security 与 Azure 容器注册表结合使用），或者您可以运行自己的（Harbor 是 CNCF 注册表项目，它支持开源扫描器 Clair 和 Trivy；Docker Desktop 与Snyk 用于本地扫描）。
+构建管道可能会遭到破坏，容器镜像可能会被修改，容器可能会以特权用户身份运行易受攻击的软件，而有权访问 Kubernetes API 的攻击者甚至可能会控制您的集群。在您的应用程序被替换之前，您不会知道它是 100% 安全的，并且您可以确认在其运行期间没有发生安全漏洞。到达那个快乐的地方意味着在整个软件供应链中深入应用安全性。本章的重点是在运行时保护应用程序，但您应该在此之前扫描容器镜像以查找已知漏洞。
 
-You can set up a pipeline where images are pushed to a production repository only if the scan is clear. Combine that with a repository admission policy, and you can effectively ensure that containers run only if the image is safe. A secure image running in a securely configured container is still a target, though, and you should look at run-time security with a tool that monitors containers for unusual activity and can generate alerts or shut down suspicious behavior. Falco is the CNCF project for run-time security, and there are supported commercial options from Aqua and Sysdig (among others).
-您可以设置一个管道，只有在扫描清晰时图像才会被推送到生产存储库。将其与存储库准入策略相结合，您可以有效地确保容器仅在镜像安全时运行。不过，在安全配置的容器中运行的安全映像仍然是一个目标，您应该使用一种工具来查看运行时安全性，该工具可以监视容器的异常活动，并可以生成警报或关闭可疑行为。 Falco 是用于运行时安全的 CNCF 项目，Aqua 和 Sysdig（以及其他）提供支持的商业选项。
+安全扫描器查看镜像内部，识别二进制文件，并在 CVE（常见漏洞和暴露）数据库中检查它们。扫描会告诉您是否存在已知漏洞位于镜像中的应用程序堆栈、依赖项或操作系统工具中。商业扫描器与托管注册表集成（您可以将 Aqua Security 与 Azure 容器注册表结合使用），或者您可以运行自己的（Harbor 是 CNCF 注册表项目，它支持开源扫描器 Clair 和 Trivy；Docker Desktop 与Snyk 用于本地扫描）。
 
-Overwhelmed? You should think about securing Kubernetes as a road map that starts with the techniques I’ve covered in this chapter. You can adopt security contexts first, then network policies, and then move on to admission control when you’re clear about the rules that matter to you. Role-based access control, which we cover in chapter 17, is the next stage. Security scanning and run-time monitoring are further steps you can take if your organization has enhanced security requirements. But I won’t throw anything more at you now—let’s tidy up and get ready for the lab.
-您可以设置一个管道，只有在扫描清晰时图像才会被推送到生产存储库。将其与存储库准入策略相结合，您可以有效地确保容器仅在镜像安全时运行。不过，在安全配置的容器中运行的安全映像仍然是一个目标，您应该使用一种工具来查看运行时安全性，该工具可以监视容器的异常活动，并可以生成警报或关闭可疑行为。 Falco 是用于运行时安全的 CNCF 项目，Aqua 和 Sysdig（以及其他）提供支持的商业选项。
+您可以设置一个管道，只有在扫描清晰时镜像才会被推送到生产存储库。将其与存储库准入策略相结合，您可以有效地确保容器仅在镜像安全时运行。不过，在安全配置的容器中运行的安全镜像仍然是一个目标，您应该使用一种工具来查看运行时安全性，该工具可以监视容器的异常活动，并可以生成警报或关闭可疑行为。 Falco 是用于运行时安全的 CNCF 项目，Aqua 和 Sysdig（以及其他）提供支持的商业选项。
 
-TRY IT NOW
-Delete all the objects we created.
 现在就试试，删除我们创建的所有对象：
 
-   ```
-   kubectl delete -f opa/constraints/ -f opa/templates/ -f
-   opa/gatekeeper.yaml
-   kubectl delete all,ns,secret,networkpolicy -l kiamol=ch16
-   ```
+```
+kubectl delete -f opa/constraints/ -f opa/templates/ -f
+opa/gatekeeper.yaml
+kubectl delete all,ns,secret,networkpolicy -l kiamol=ch16
+```
 
 ## 16.6 实验室
 At the start of the chapter, I said that volume mounts for host paths are a potential attack vector, but we didn’t address that in the exercises, so we’ll do it in the lab. This is a perfect scenario for admission control, where Pods should be blocked if they use volumes that mount sensitive paths on the host. We’ll use OPA Gatekeeper, and I’ve written the Rego for you, so you just need to write a constraint.
