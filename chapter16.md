@@ -280,160 +280,131 @@ kubectl get svc pi-web -o jsonpath='http://{.status.loadBalancer
 您需要投资以增加应用程序的安全性，但如果您的应用程序平台范围相当小，则可以构建通用配置文件：您可能会发现所有 .NET 应用程序都可以非根用户运行但需要可写文件系统，并且您所有的 Go 应用程序都可以使用只读文件系统运行，但需要添加一些 Linux 功能。那么，挑战在于确保您的配置文件实际得到应用，而 Kubernetes 有一个很好的功能：准入控制（admission control）。
 
 ## 16.3 使用 webhook 阻止和修改工作负载
-Every object you create in Kubernetes goes through a process to check if it’s okay for the cluster to run that object. That process is admission control, and we saw an admission controller at work in chapter 12, trying to deploy a Pod spec that requested more resources than the namespace had available. The ResourceQuota admission controller is a built-in controller, which stops workloads from running if they exceed quotas, and Kubernetes has a plug-in system so you can add your own admission control rules.
 
 您在 Kubernetes 中创建的每个对象都会经过一个过程来检查集群是否可以运行该对象。这个过程就是准入控制，我们在第 12 章中看到了一个准入控制器在工作，它试图部署一个 Pod 规范，该规范请求的资源多于命名空间可用的资源。 ResourceQuota 准入控制器是一个内置控制器，它会在工作负载超过配额时停止运行，并且 Kubernetes 有一个插件系统，因此您可以添加自己的准入控制规则。
 
-
-Two other controllers add that extensibility: the ValidatingAdmissionWebhook, which works like ResourceQuota to allow or block object creation, and the MutatingAdmissionWebhook, which can actually edit object specs, so the object that is created is different from the request. Both controllers work in the same way: you create a configuration object specifying the object life cycles you want to control and a URL for a web server that applies the rules. Figure 16.10 shows how the pieces fit together.
-
 其他两个控制器增加了这种可扩展性：ValidatingAdmissionWebhook，它像 ResourceQuota 一样工作以允许或阻止对象创建，以及 MutatingAdmissionWebhook，它实际上可以编辑对象规范，因此创建的对象与请求不同。两个控制器的工作方式相同：您创建一个配置对象指定要控制的对象生命周期和应用规则的 Web 服务器的 URL。图 16.10 显示了这些片段是如何组合在一起的。
 
+![图16.10](./images/Figure16.10.png)
+<center>图 16.10 Admission webhooks 允许您在创建对象时应用自己的规则。</center>
 
-
-Admission webhooks are hugely powerful because Kubernetes calls into your own code, which can be running in any language you like and can apply whatever rules you need. In this section, we’ll apply some webhooks I’ve written in Node.js. You won’t need to edit any code, but you can see in listing 16.4 that the code isn’t particularly complicated.
 Admission webhooks 非常强大，因为 Kubernetes 调用您自己的代码，这些代码可以以您喜欢的任何语言运行，并且可以应用您需要的任何规则。在本节中，我们将应用一些我用 Node.js 编写的 webhook。您不需要编辑任何代码，但您可以在清单 16.4 中看到代码并不是特别复杂。
 
-## 16.4 validate.js, custom logic for a validating webhook validate.js，用于验证 webhook 的自定义逻辑
+> 清单 16.4 validate.js，用于验证 webhook 的自定义逻辑
 
 ```
-   # the incoming request has the object spec—this checks to see
-   # if the service token mount property is set to false;
-   # if not, the response stops the object from being created:
+   # 传入的请求具有对象规范——这将检查服务令牌挂载属性是否设置为false;
+   # 如果不是，响应将停止创建对象:
    if (object.spec.hasOwnProperty("automountServiceAccountToken")) {
-   admissionResponse.allowed =
-   (object.spec.automountServiceAccountToken == false);
+     admissionResponse.allowed =
+     (object.spec.automountServiceAccountToken == false);
    }
 ```
-![图16.10](./images/Figure16.10.png)
-<center>图 16.10 Admission webhooks let you apply your own rules when objects are created. Admission webhooks 允许您在创建对象时应用自己的规则。</center>
 
-Webhook servers can run anywhere—inside or outside of the cluster—but they must be served on HTTPS. The only complication comes if you want to run webhooks inside your cluster signed by your own certificate authority (CA), because the webhook configuration needs a way to trust the CA. This is a common scenario, so we’ll walk through that complexity in the next exercises.
 Webhook 服务器可以在任何地方运行——集群内部或外部——但它们必须在 HTTPS 上提供服务。如果您想在集群内运行由您自己的证书颁发机构 (CA) 签名的 webhook，唯一的麻烦就来了，因为 webhook 配置需要一种信任 CA 的方法。这是一个常见的场景，所以我们将在接下来的练习中逐步介绍这种复杂性。
 
-TRY IT NOW
-Start by creating a certificate and deploying the webhook server to use that certificate.
 现在就试试，首先创建证书并部署 webhook 服务器以使用该证书。
 
-   ```
-   # run the Pod to generate a certificate:
-   kubectl apply -f ./cert-generator.yaml
-   # when the container is ready, the certificate is done:
-   kubectl wait --for=condition=ContainersReady pod -l app=cert-generator
-   # the Pod has deployed the cert as a TLS Secret:
-   kubectl get secret -l kiamol=ch16
-   # deploy the webhook server, using the TLS Secret:
-   kubectl apply -f admission-webhook/
-   # print the CA certificate:
-   kubectl exec -it deploy/cert-generator -- cat ca.base64
-   ```
+```
+# 运行 Pod 生成 certificate:
+kubectl apply -f ./cert-generator.yaml
+# 当容器 ready, certificate 就生成了:
+kubectl wait --for=condition=ContainersReady pod -l app=cert-generator
+# POD 已经将 cert 部署作为 TLS Secret:
+kubectl get secret -l kiamol=ch16
+# 部署 webhook server, 使用 TLS Secret:
+kubectl apply -f admission-webhook/
+# 输出 CA certificate:
+kubectl exec -it deploy/cert-generator -- cat ca.base64
+```
 
-The last command in that exercise will fill your screen with Base64-encoded text, which you’ll need in the next exercise (don’t worry about writing it down, though; we’ll automate all the steps). You now have the webhook server running, secured by a TLS certificate issued by a custom CA. My output appears in figure 16.11.
 该练习中的最后一个命令将用 Base64 编码的文本填充您的屏幕，您将在下一个练习中需要它（不过不要担心写下来；我们将自动执行所有步骤）。您现在已经运行了 webhook 服务器，它由自定义 CA 颁发的 TLS 证书保护。我的输出如图 16.11 所示。
 
 ![图16.11](./images/Figure16.11.png)
-<center>图 16.11 Webhooks are potentially dangerous, so they need to be secured with HTTPS. Webhooks 具有潜在危险，因此需要使用 HTTPS 对其进行保护。</center>
+<center>图 16.11 Webhooks 具有潜在危险，因此需要使用 HTTPS 对其进行保护。</center>
 
-The Node.js app is running and has two endpoints: a validating webhook, which checks that all Pod specs have the automountServiceAccountToken field set to false, and a mutating webhook, which applies a container SecurityContext set with the runAsNonRoot flag. Those two policies are intended to work together to ensure a base level of security for all applications. Listing 16.5 shows the spec for the ValidatingWebhookConfiguration object.
 Node.js 应用程序正在运行并具有两个端点：一个验证 webhook，它检查所有 Pod 规范是否将 automountServiceAccountToken 字段设置为 false，以及一个变异 webhook，它应用设置了 runAsNonRoot 标志的容器 SecurityContext。这两个策略旨在协同工作以确保所有应用程序的基本安全级别。清单 16.5 显示了 ValidatingWebhookConfiguration 对象的规范。
 
-> Listing 16.5 validatingWebhookConfiguration.yaml, applying a webhook 清单 16.5 validatingWebhookConfiguration.yaml，应用 webhook
+> 清单 16.5 validatingWebhookConfiguration.yaml，应用 webhook
 
 ```
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-name: servicetokenpolicy
+  name: servicetokenpolicy
 webhooks:
-- name: servicetokenpolicy.kiamol.net
-rules: # These are the object
-- operations: [ "CREATE", "UPDATE" ] # types and operations
-apiGroups: [""] # that invoke the
-apiVersions: ["v1"] # webhook—all Pods.
-resources: ["pods"]
-clientConfig:
-service:
-name: admission-webhook # The webhook Service to call
-namespace: default
-path: "/validate" # URL for the webhook
-caBundle: {{ .Values.caBundle }} # The CA certificate
+  - name: servicetokenpolicy.kiamol.net
+    rules: # 这些是
+      - operations: [ "CREATE", "UPDATE" ] # 调用webhook-all pod
+        apiGroups: [""] # 的对象类型和操作。
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        clientConfig:
+          service:
+            name: admission-webhook # 要调用的webhook服务
+            namespace: default
+            path: "/validate" # webhook URL
+          caBundle: {{ .Values.caBundle }} # CA certificate
 ```
 
-Webhook configurations are flexible: you can set the types of operation and the types of object on which the webhook operates. You can have multiple webhooks configured for the same object—validating webhooks are all called in parallel, and any one of them can block the operation. This YAML file is part of a Helm chart that I’m using just for this config object, as an easy way to inject the CA certificate. A more advanced Helm chart would include a job to generate the certificate and deploy the webhook server along with the configurations—but then you wouldn’t see how it all fits together.
-Webhook配置灵活：可以设置操作的类型和webhook操作的对象类型。您可以为同一个对象配置多个 webhooks——验证 webhooks 都是并行调用的，其中任何一个都可以阻止操作。这个 YAML 文件是我为这个配置对象使用的 Helm 图表的一部分，作为注入 CA 证书的简单方法。更高级的 Helm chart 将包括生​​成证书和部署 webhook 服务器以及配置的作业——但是你不会看到它们是如何组合在一起的。
+Webhook 配置灵活：可以设置操作的类型和webhook操作的对象类型。您可以为同一个对象配置多个 webhooks——验证 webhooks 都是并行调用的，其中任何一个都可以阻止操作。这个 YAML 文件是我为这个配置对象使用的 Helm chart 的一部分，作为注入 CA 证书的简单方法。更高级的 Helm chart 将包括生​​成证书和部署 webhook 服务器以及配置的作业——但是你不会看到它们是如何组合在一起的。
 
+现在就试试，部署 webhook 配置，将 CA 证书作为值从生成器 Pod 传递到本地 Helm chart。然后尝试部署一个应用程序，但该策略未通过该策略。
 
-TRY IT NOW
-Deploy the webhook configuration, passing the CA cert from the generator Pod as a value to the local Helm chart. Then try to deploy an app, which fails the policy.
-现在就试试，部署 webhook 配置，将 CA 证书作为值从生成器 Pod 传递到本地 Helm 图表。然后尝试部署一个应用程序，但该策略未通过该策略。
+```
+# 安装 configuration object:
+helm install validating-webhook admission-webhook/helm/validating-
+webhook/ --set caBundle=$(kubectl exec -it deploy/cert-generator
+-- cat ca.base64)
+# 确认已创建:
+kubectl get validatingwebhookconfiguration
+# 部署一个app:
+kubectl apply -f vweb/v1.yaml
+# 检查 webhook logs:
+kubectl logs -l app=admission-webhook --tail 3
+# 显示 app ReplicaSet status :
+kubectl get rs -l app=vweb-v1
+# 查看详情:
+kubectl describe rs -l app=vweb-v1
+```
 
-   ```
-   # install the configuration object:
-   helm install validating-webhook admission-webhook/helm/validating-
-   webhook/ --set caBundle=$(kubectl exec -it deploy/cert-generator
-   -- cat ca.base64)
-   # confirm it’s been created:
-   kubectl get validatingwebhookconfiguration
-   # try to deploy an app:
-   kubectl apply -f vweb/v1.yaml
-   # check the webhook logs:
-   kubectl logs -l app=admission-webhook --tail 3
-   # show the ReplicaSet status for the app:
-   kubectl get rs -l app=vweb-v1
-   # show the details:
-   kubectl describe rs -l app=vweb-v1
-   ```
-
-In this exercise, you can see the strength and the limitation of validating webhooks. The webhook operates at the Pod level, and it stops Pods from being created if they don’t match the service token rule. But it’s the ReplicaSet and the Deployment that try to create the Pod, and they don’t get blocked by the admission controller, so you have to dig a bit deeper to find why the app isn’t running. My output is shown in figure 16.12, where the describe command is abridged to show just the error line.
-在本练习中，您可以看到验证 webhook 的优势和局限性。 webhook 在 Pod 级别运行，如果 Pod 与服务令牌规则不匹配，它会停止创建 Pod。但尝试创建 Pod 的是 ReplicaSet 和 Deployment，它们不会被准入控制器阻止，因此您必须更深入地挖掘才能找到应用程序未运行的原因。我的输出如图 16.12 所示，其中 describe 命令被删节以仅显示错误行。
-
-You need to think carefully about the objects and operations you want your webhook to act on. This validation could happen at the Deployment level instead, which would give a better user experience, but it would miss Pods created directly or by other types of controllers. It’s also important to return a clear message in the webhook response, so users know how to fix the issue. The ReplicaSet will just keep trying to create the Pod and failing (it’s tried 18 times on my cluster while I’ve been writing this), but the failure message tells me what to do, and this one is easy to fix.
-您需要仔细考虑您希望 webhook 执行的对象和操作。这种验证可以在 Deployment 级别进行，这将提供更好的用户体验，但它会错过直接创建的 Pod 或由其他类型的控制器创建的 Pod。在 webhook 响应中返回一条明确的消息也很重要，这样用户就知道如何解决问题。 ReplicaSet 将继续尝试创建 Pod 并失败（在我写这篇文章时它在我的集群上尝试了 18 次），但失败消息告诉我该怎么做，而且这个很容易修复。
+在本练习中，您可以看到验证 webhook 的优势和局限性。 webhook 在 Pod 级别运行，如果 Pod 与服务令牌规则不匹配，它会停止创建 Pod。但尝试创建 Pod 的是 ReplicaSet 和 Deployment，它们不会被准入控制器阻止，因此您必须更深入地挖掘才能找到应用程序未运行的原因。我的输出如图 16.12 所示，其中 describe 命令被删减以仅显示错误行。
 
 ![图16.12](./images/Figure16.12.png)
-<center>图 16.2 Validating webhooks can block object creation, whether it was instigated by a user or a controller. 验证 webhook 可以阻止对象的创建，无论它是由用户还是控制器发起的。</center>
+<center>图 16.2 验证 webhook 可以阻止对象的创建，无论它是由用户还是控制器发起的。</center>
 
+您需要仔细考虑您希望 webhook 执行的对象和操作。这种验证可以在 Deployment 级别进行，这将提供更好的用户体验，但它会错过直接创建的 Pod 或由其他类型的控制器创建的 Pod。在 webhook 响应中返回一条明确的消息也很重要，这样用户就知道如何解决问题。 ReplicaSet 将继续尝试创建 Pod 并失败（在我写这篇文章时它在我的集群上尝试了 18 次），但失败消息告诉我该怎么做，而且这个很容易修复。
 
-
-One of the problems with admission webhooks is that they score very low on discoverability. You can use kubectl to check if there are any validating webhooks configured, but that doesn’t tell you anything about the actual rules, so you need to have that documented outside of the cluster. The situation gets even more confusing with mutating webhooks, because if they work as expected, they give users a different object from the one they tried to create. In the next exercise, you’ll see that a wellintentioned mutating webhook can break applications.
 admission webhooks 的问题之一是它们在可发现性方面的得分非常低。您可以使用 kubectl 检查是否配置了任何验证 webhook，但这并没有告诉您任何关于实际规则的信息，因此您需要在集群外部记录这些内容。变异的 webhook 使情况变得更加混乱，因为如果它们按预期工作，它们会为用户提供与他们试图创建的对象不同的对象。在下一个练习中，您将看到一个善意的变异 webhook 可以破坏应用程序。
 
-TRY IT NOW
-Configure a mutating webhook using the same webhook server but a different URL path. This webhook adds security settings to Pod specs. Deploy another app, and you’ll see the changes from the webhook stop the app from running.
 现在就试试，使用相同的 webhook 服务器但不同的 URL 路径配置可变 webhook。此 webhook 将安全设置添加到 Pod 规范。部署另一个应用程序，您会看到来自 webhook 的更改使应用程序停止运行。
 
-   ```
-   # deploy the webhook configuration:
-   helm install mutating-webhook admission-webhook/helm/mutating-webhook/
-   --set caBundle=$(kubectl exec -it deploy/cert-generator -- cat
-   ca.base64)
-   # confirm it’s been created:
-   kubectl get mutatingwebhookconfiguration
-   # deploy a new web app:
-   kubectl apply -f vweb/v2.yaml
-   # print the webhook server logs:
-   kubectl logs -l app=admission-webhook --tail 5
-   # show the status of the ReplicaSet:
-   kubectl get rs -l app=vweb-v2
-   # show the details:
-   kubectl describe pod -l app=vweb-v2
-   ```
+```
+# 部署 webhook configuration:
+helm install mutating-webhook admission-webhook/helm/mutating-webhook/
+--set caBundle=$(kubectl exec -it deploy/cert-generator -- cat
+ca.base64)
+# 确认已创建:
+kubectl get mutatingwebhookconfiguration
+# 部署一个新的 web app:
+kubectl apply -f vweb/v2.yaml
+# 输出 webhook server logs:
+kubectl logs -l app=admission-webhook --tail 5
+# 查看 ReplicaSet 状态:
+kubectl get rs -l app=vweb-v2
+# 查看详情:
+kubectl describe pod -l app=vweb-v2
+```
 
-Oh dear. The mutating webhook adds a SecurityContext to the Pod spec with the runAsNonRoot field set to true. That flag tells Kubernetes not to run any containers in the Pod if they’re configured to run as root—which this app is, because it’s based on the official Nginx image, which does use root. As you can see in figure 16.13, describing the Pod tells you what the problem is, but it doesn’t state that the spec has been mutated. Users will be highly confused when they check their YAML again and find no runAsNonRoot field.
-哦亲爱的。可变 webhook 将 SecurityContext 添加到 Pod 规范，其中 runAsNonRoot 字段设置为 true。该标志告诉 Kubernetes 不要在 Pod 中运行任何容器，如果它们被配置为以 root 运行——这个应用程序就是这样，因为它基于官方 Nginx 图像，它确实使用 root。正如你在图 16.13 中看到的，描述 Pod 告诉你问题是什么，但它并没有说明规范已经改变。当用户再次检查他们的 YAML 并发现没有 runAsNonRoot 字段时，他们会非常困惑。
-
-The logic inside a mutating webhook is entirely up to you—you can accidentally change objects to set an invalid spec they will never deploy. It’s a good idea to have a more restrictive object selector for your webhook configurations. Listing 16.5 applies to every Pod, but you can add namespace and label selectors to narrow the scope. This webhook has been built with sensible rules, and if the Pod spec already contains a runAsNonRoot value, the webhook leaves it alone, so apps can be modeled to explicitly require the root user.
-变异 webhook 中的逻辑完全取决于您——您可能会不小心更改对象以设置它们永远不会部署的无效规范。为您的 webhook 配置设置一个限制性更强的对象选择器是个好主意。清单 16.5 适用于每个 Pod，但您可以添加名称空间和标签选择器来缩小范围。这个 webhook 是用合理的规则构建的，如果 Pod 规范已经包含一个 runAsNonRoot 值，webhook 就不会管它，所以应用程序可以被建模为明确需要 root 用户。
-
-Admission controller webhooks are a useful tool to know about, and they let you do some cool things. You can add sidecar containers to Pods with mutating webhooks, so you could use a label to identify all the apps that write log files and have a webhook automatically add a logging sidecar to those Pods. Webhooks can be dangerous, which is something you can mitigate with good testing and selective rules in your config objects, but they will always be invisible because the logic is hidden inside the webhook server.
-Admission Controller webhooks 是一个有用的工具，可以让你做一些很酷的事情。您可以使用可变 webhook 将 sidecar 容器添加到 Pod，这样您就可以使用标签来识别所有写入日志文件的应用程序，并让 webhook 自动将日志记录 sidecar 添加到这些 Pod。 Webhooks 可能很危险，您可以通过配置对象中的良好测试和选择性规则来缓解这种情况，但它们将始终不可见，因为逻辑隐藏在 webhook 服务器内部。
+哦亲爱的。可变 webhook 将 SecurityContext 添加到 Pod 规范，其中 runAsNonRoot 字段设置为 true。该标志告诉 Kubernetes 不要在 Pod 中运行任何容器，如果它们被配置为以 root 运行——这个应用程序就是这样，因为它基于官方 Nginx 镜像，它确实使用 root。正如你在图 16.13 中看到的，描述 Pod 告诉你问题是什么，但它并没有说明规范已经改变。当用户再次检查他们的 YAML 并发现没有 runAsNonRoot 字段时，他们会非常困惑。
 
 ![图16.13](./images/Figure16.13.png)
-<center>图 16.13 Mutating webhooks can cause application failures, which are difficult to debug. 变异的 webhooks 会导致应用程序故障，这很难调试。</center>
+<center>图 16.13 变异的 webhooks 会导致应用程序故障，这很难调试。</center>
 
+变异 webhook 中的逻辑完全取决于您——您可能会不小心更改对象以设置它们永远不会部署的无效规范。为您的 webhook 配置设置一个限制性更强的对象选择器是个好主意。清单 16.5 适用于每个 Pod，但您可以添加命名空间和标签选择器来缩小范围。这个 webhook 是用合理的规则构建的，如果 Pod 规范已经包含一个 runAsNonRoot 值，webhook 就不会管它，所以应用程序可以被建模为明确需要 root 用户。
 
+Admission Controller webhooks 是一个有用的工具，可以让你做一些很酷的事情。您可以使用可变 webhook 将 sidecar 容器添加到 Pod，这样您就可以使用标签来识别所有写入日志文件的应用程序，并让 webhook 自动将日志记录 sidecar 添加到这些 Pod。 Webhooks 可能很危险，您可以通过配置对象中的良好测试和选择性规则来缓解这种情况，但它们将始终不可见，因为逻辑隐藏在 webhook 服务器内部。
 
-In the next section, we’ll look at an alternative approach that uses validating webhooks under the hood but wraps them in a management layer. Open Policy Agent (OPA) lets you define your rules in Kubernetes objects, which are discoverable in the cluster and don’t require custom code.
 在下一节中，我们将研究另一种方法，该方法在底层使用验证 webhook，但将它们包装在管理层中。 Open Policy Agent (OPA) 允许您在 Kubernetes 对象中定义规则，这些对象在集群中是可发现的并且不需要自定义代码。
 
 ## 16.4 使用 Open Policy Agent 控制准入
