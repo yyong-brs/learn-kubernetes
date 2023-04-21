@@ -6,206 +6,164 @@
 
 ## 16.1 使用网络策略(network policies)保护通信
 
-Restricting network access is one of the simplest ways to secure your applications. Kubernetes has a flat networking model, where every Pod can reach every other Pod by its IP address, and Services are accessible throughout the cluster. There’s no reason why the Pi web application should access the to-do list database, or why the Hello, World web app should use the Kubernetes API, but by default, they can. You learned in chapter 15 how you can use Ingress resources to control access to HTTP routes, but that applies only to external traffic coming into the cluster. You also need to control access within the cluster, and for that, Kubernetes offers network policies.
+限制网络访问是保护应用程序的最简单方法之一。 Kubernetes 有一个扁平的网络模型，其中每个 Pod 都可以通过其 IP 地址访问每个其他 Pod，并且服务可以在整个集群中访问。 Pi web 应用程序没有理由访问待办事项列表数据库，或者 Hello, World web 应用程序为什么应该使用 Kubernetes API，但默认情况下，它们可以。您在第 15 章中学习了如何使用 Ingress 资源来控制对 HTTP 路由的访问，但这仅适用于进入集群的外部流量。您还需要控制集群内的访问，为此，Kubernetes 提供了网络策略(Network policy)。
 
-限制网络访问是保护应用程序的最简单方法之一。 Kubernetes 有一个扁平的网络模型，其中每个 Pod 都可以通过其 IP 地址访问每个其他 Pod，并且服务可以在整个集群中访问。 Pi web 应用程序没有理由访问待办事项列表数据库，或者 Hello, World web 应用程序为什么应该使用 Kubernetes API，但默认情况下，它们可以。您在第 15 章中学习了如何使用 Ingress 资源来控制对 HTTP 路由的访问，但这仅适用于进入集群的外部流量。您还需要控制集群内的访问，为此，Kubernetes 提供了网络策略。
-
-Network policies work like firewall rules, blocking traffic to or from Pods at the port level. The rules are flexible and use label selectors to identify objects. You can deploy a blanket deny-all policy to stop outgoing traffic from all Pods, or you can deploy a policy that restricts incoming traffic to a Pod’s metrics port so it can be accessed only from Pods in the monitoring namespace. Figure 16.1 shows how that looks in the cluster.
 网络策略像防火墙规则一样工作，在端口级别阻止进出 Pod 的流量。规则很灵活，使用标签选择器来识别对象。您可以部署一揽子拒绝所有策略来阻止所有 Pod 的传出流量，或者您可以部署一个策略来限制传入流量到 Pod 的指标端口，以便只能从监控命名空间中的 Pod 访问它。图 16.1 显示了它在集群中的样子。
 
 ![图16.1](./images/Figure16.1.png)
-<center>图 16.1 Network policy rules are granular—you can apply clusterwide defaults with Pod overrides.网络策略规则是细粒度的——您可以应用集群范围内的默认设置和 Pod 覆盖。 </center>
-
-NetworkPolicy objects are separate resources, which means they could be modeled outside of the application by a security team, or they could be built by the product team. Or, of course, each team might think the other team has it covered, and apps make it to production without any policies, which is a problem. We’ll deploy an app that has slipped through with no policies and look at the problems it has.
+<center>图 16.1 网络策略规则是细粒度的——您可以应用集群范围内的默认设置和 Pod 覆盖。 </center>
 
 NetworkPolicy 对象是独立的资源，这意味着它们可以由安全团队在应用程序外部建模，也可以由产品团队构建。或者，当然，每个团队都可能认为另一个团队已经涵盖了它，并且应用程序在没有任何策略的情况下投入生产，这是一个问题。我们将部署一个没有策略的应用程序，并查看它存在的问题。
 
-TRY IT NOW
-Deploy the Astronomy Picture of the Day (APOD) app, and confirm that the app components can be accessed by any Pod.
 现在就试试，部署 Astronomy Picture of the Day (APOD) 应用程序，并确认任何 Pod 都可以访问该应用程序组件。
 
-   ```
-   # switch to the chapter folder:
-   cd ch16
-   # deploy the APOD app:
-   kubectl apply -f apod/
-   # wait for it to be ready:
-   kubectl wait --for=condition=ContainersReady pod -l app=apod-web
-   # browse to the Service on port 8016 if you want to see today’s
-   # picture
-   # now run a sleep Pod:
-   kubectl apply -f sleep.yaml
-   # confirm that the sleep Pod can use the API:
-   kubectl exec deploy/sleep -- curl -s http://apod-api/image
-   # read the metrics from the access log:
-   kubectl exec deploy/sleep -- sh -c 'curl -s http://apod-log/metrics |
-   head -n 2'
-   ```
+```
+# 进入本章节目录:
+cd ch16
+# 部署 APOD app:
+kubectl apply -f apod/
+# 等待运行:
+kubectl wait --for=condition=ContainersReady pod -l app=apod-web
+# 通过 8016端口访问 service ,查看今天的图片
+# 现在运行一个 sleep Pod:
+kubectl apply -f sleep.yaml
+# 确认 sleep pod 可以使用 API:
+kubectl exec deploy/sleep -- curl -s http://apod-api/image
+# 查看 access log 的 metrics 信息:
+kubectl exec deploy/sleep -- sh -c 'curl -s http://apod-log/metrics |
+head -n 2'
+```
 
-You can clearly see the issue in this exercise—the whole of the cluster is wide open, so from the sleep Pod, you can access the APOD API and the metrics from the access log component Figure 16.2 shows my output. Let’s be clear that there’s nothing special about the sleep Pod; it’s just a simple way to demonstrate the problem. Any container in the cluster can do the same.
-你可以清楚地看到这个练习中的问题——整个集群是完全开放的，所以你可以从睡眠 Pod 访问 APOD API 和来自访问日志组件的指标图 16.2 显示了我的输出。让我们明确一点，没有什么特别的关于睡眠舱；这只是演示问题的一种简单方法。集群中的任何容器都可以做同样的事情。
+你可以清楚地看到这个练习中的问题——整个集群是完全开放的，所以你可以从 sleep Pod 访问 APOD API 和来自访问日志组件的指标图 ,16.2 显示了我的输出。让我们明确一点，没有什么特别的关于 sleep pod；这只是演示问题的一种简单方法。集群中的任何容器都可以做同样的事情。
 
 ![图16.2](./images/Figure16.2.png)
-<center>图 16.2 The downside of Kubernetes’s flat networking model is that every Pod is accessible.  Kubernetes 扁平网络模型的缺点是每个 Pod 都是可访问的。</center>
+<center>图 16.2 Kubernetes 扁平网络模型的缺点是每个 Pod 都是可访问的。</center>
 
-
-
-Pods should be isolated so they receive traffic only from the components that need to access them, and they send traffic only to components they need to access. Network policies model that with ingress rules (don’t confuse them with Ingress resources), which restrict incoming traffic, and egress rules, which restrict outgoing traffic. In the APOD app, the only component that should have access to the API is the web app. Listing 16.1 shows this as an ingress rule in a NetworkPolicy object.
 Pod 应该是隔离的，以便它们只从需要访问它们的组件接收流量，并且它们只将流量发送到它们需要访问的组件。网络策略使用限制传入流量的入口规则（不要将它们与入口资源混淆）和限制传出流量的出口规则建模。在 APOD 应用程序中，唯一应该有权访问 API 的组件是 Web 应用程序。清单 16.1 将其显示为 NetworkPolicy 对象中的入口规则。
 
-> Listing 16.1 networkpolicy-api.yaml, restricting access to Pods by their labels 清单 16.1 networkpolicy-api.yaml，通过标签限制对 Pod 的访问
+> 清单 16.1 networkpolicy-api.yaml，通过标签限制对 Pod 的访问
 
 ```
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-name: apod-api
+  name: apod-api
 spec:
-podSelector: # This is the Pod where the rule applies.
-matchLabels:
-app: apod-api
-ingress: # Rules default to deny, so this rule
-- from: # denies all ingress except where the
-- podSelector: # source of the traffic is a Pod with
-matchLabels: # the apod-web label.
-app: apod-web
-ports: # This restriction is by port.
-- port: api # The port is named in the API Pod spec.
+  podSelector: # 规则生效的 POD
+    matchLabels:
+      app: apod-api
+  ingress: # 规则默认是拒绝策略, 所以这个规则 this rule
+    from: # 拒绝所有的流入流量 除了
+    - podSelector: # 来自匹配标签 apod-web 的 pod 流量
+      matchLabels:
+        app: apod-web
+    ports: # 限定端口
+    - port: api # 这个端口名字是 API pod 中 spec 中配置的
 ```
-
-The NetworkPolicy spec is fairly straightforward, and rules can be deployed in advance of the application so it’s secure as soon as the Pods start. Ingress and egress rules follow the same pattern, and both can use namespace selectors as well as Pod selectors. You can create global rules and then override them with more fine-grained rules at the application level.
 
 NetworkPolicy 规范相当简单，并且可以在应用程序之前部署规则，因此一旦 Pod 启动它就是安全的。入口和出口规则遵循相同的模式，并且都可以使用命名空间选择器和 Pod 选择器。您可以创建全局规则，然后在应用程序级别使用更细粒度的规则覆盖它们。
 
-One big problem with network policy—when you deploy the rules, they probably won’t do anything. Just like Ingress objects need an ingress controller to act on them, NetworkPolicy objects rely on the network implementation in your cluster to enforce them. When you deploy this policy in the next exercise, you’ll probably be disappointed to find the APOD API is still not restricted to the web app.
-
 网络策略的一个大问题——当你部署规则时，它们可能不会做任何事情。就像 Ingress 对象需要一个入口控制器来对它们进行操作一样，NetworkPolicy 对象依赖于集群中的网络实现来强制执行它们。当您在下一个练习中部署此策略时，您可能会失望地发现 APOD API 仍不限于 Web 应用程序。
 
-TRY IT NOW
-Apply the network policy, and see if your cluster actually enforces it.
 现在就试试， 应用网络策略，看看您的集群是否真正执行了它。
 
-   ```
-   # create the policy:
-   kubectl apply -f apod/update/networkpolicy-api.yaml
-   # confirm it is there:
-   kubectl get networkpolicy
-   # try to access the API from the sleep Pod—this is not permitted
-   # by the policy:
-   kubectl exec deploy/sleep -- curl http://apod-api/image
-   ```
+```
+# 创建 policy:
+kubectl apply -f apod/update/networkpolicy-api.yaml
+# 确认已创建:
+kubectl get networkpolicy
+# 尝试从 sleep pod 访问 API—这是不被策略所允许的:
+kubectl exec deploy/sleep -- curl http://apod-api/image
+```
 
-You can see in figure 16.3 that the sleep Pod can access the API—the NetworkPolicy that limits ingress to the web Pods is completely ignored. I’m running this on Docker Desktop, but you’ll get the same results with a default setup in K3s, AKS, or EKS.
-
-您可以在图 16.3 中看到睡眠 Pod 可以访问 API——限制进入 Web Pod 的 NetworkPolicy 被完全忽略。我在 Docker Desktop 上运行它，但你会在 K3s、AKS 或 EKS 中使用默认设置获得相同的结果。
+您可以在图 16.3 中看到 sleep Pod 可以访问 API——限制进入 Web Pod 的 NetworkPolicy 被完全忽略。我在 Docker Desktop 上运行它，但你会在 K3s、AKS 或 EKS 中使用默认设置获得相同的结果。
 
 ![图16.3](./images/Figure16.3.png)
-<center>图 16.3 The network setup in your Kubernetes cluster may not enforce network policies.  Kubernetes 集群中的网络设置可能不会强制执行网络策略 </center>
-
-The networking layer in Kubernetes is pluggable, and not every network plugin supports NetworkPolicy enforcement. The simple networks in standard cluster deployments don’t have support, so you get into this tricky situation where you can deploy all your NetworkPolicy objects, but you don’t know whether they’re being enforced unless you test them. Cloud platforms have different levels of support here. You can specify a network policy option when you create an AKS cluster; with EKS, you need to manually install a different network plugin after you create the cluster.
+<center>图 16.3 Kubernetes 集群中的网络设置可能不会强制执行网络策略 </center>
 
 Kubernetes 中的网络层是可插入的，并非每个网络插件都支持 NetworkPolicy 实施。标准集群部署中的简单网络不受支持，因此您会陷入这种棘手的情况，您可以部署所有 NetworkPolicy 对象，但除非您对其进行测试，否则您不知道它们是否被强制执行。云平台在这里有不同级别的支持。您可以在创建 AKS 群集时指定网络策略选项；使用 EKS，您需要在创建集群后手动安装不同的网络插件。
 
-This is all very frustrating for you following along with these exercises (and me writing them), but it causes a much more dangerous disconnect for organizations
-using Kubernetes in production. You should look to adopt security controls early in the build cycle, so NetworkPolicy rules are applied in your development and test envi-
-ronments to run the app with a close-to-production configuration. A misconfigured network policy can easily break your app, but you won’t know that if your nonproduction environments don’t enforce policy.
-
 这对你进行这些练习（以及我编写它们）来说非常令人沮丧，但它会给组织带来更危险的脱节在生产中使用 Kubernetes。您应该在构建周期的早期采用安全控制，以便在您的开发和测试环境中应用 NetworkPolicy 规则使用接近生产的配置运行应用程序的环境。错误配置的网络策略很容易破坏您的应用程序，但如果您的非生产环境不执行策略，您将不会知道这一点。
-
-If you want to see NetworkPolicy in action, the next exercise creates a custom cluster using Kind with Calico, an open source network plugin that enforces policy. You’ll need Docker and the Kind command line installed for this. Be warned: This exercise alters the Linux configuration for Docker and will make your original cluster unusable. Docker Desktop users can fix everything with the Reset Kubernetes button, and Kind users can replace their old cluster with a new one, but other setups might not be so lucky. It’s fine to skip these exercises and just read through my output; we’ll switch back to your normal cluster in the next section.
 
 如果您想了解 NetworkPolicy 的实际应用，下一个练习将使用 Kind 和 Calico 创建一个自定义集群，Calico 是一个实施策略的开源网络插件。为此，您需要安装 Docker 和 Kind 命令行。请注意：此练习会更改 Docker 的 Linux 配置，并会使您的原始集群无法使用。 Docker Desktop 用户可以使用 Reset Kubernetes 按钮修复所有问题，Kind 用户可以用新集群替换旧集群，但其他设置可能就没那么幸运了。跳过这些练习并通读我的输出就可以了；我们将在下一节中切换回您的普通集群。
 
-TRY IT NOW
-Create a new cluster with Kind, and deploy a custom network plugin.
 现在就试试，使用 Kind 创建一个新集群，并部署一个自定义网络插件。
-   ```
-   # install the Kind command line using instructions at
-   # https://kind.sigs.k8s.io/docs/user/quick-start/
-   # create a new cluster with a custom Kind configuration:
-   kind create cluster --image kindest/node:v1.18.4 --name kiamol-ch16
-   --config kind/kind-calico.yaml
-   # install the Calico network plugin:
-   kubectl apply -f kind/calico.yaml
-   # wait for Calico to spin up:
-   kubectl wait --for=condition=ContainersReady pod -l k8s-app=calico-
-   node -n kube-system
-   # confirm your new cluster is ready:
-   kubectl get nodes
-   ```
+   
+```
+# install the Kind command line using instructions at
+# https://kind.sigs.k8s.io/docs/user/quick-start/
+# create a new cluster with a custom Kind configuration:
+# 按照说明安装 kind 命令行https://kind.sigs.k8s.io/docs/user/quick-start/ 使用自定义类配置创建新群集
+kind create cluster --image kindest/node:v1.18.4 --name kiamol-ch16
+--config kind/kind-calico.yaml
+# 安装 Calico 网络 plugin:
+kubectl apply -f kind/calico.yaml
+# 等待 Calico 启动:
+kubectl wait --for=condition=ContainersReady pod -l k8s-app=calico-
+node -n kube-system
+# 确认集群已 ready:
+kubectl get nodes
+```
 
-My output in figure 16.4 is abbreviated; you’ll see many more objects being created in the Calico deployment. At the end, I have a new cluster that enforces network policy. Unfortunately, the only way to know if your cluster uses a network plugin that does enforce policy is to set up your cluster with a network plugin that you know enforces policy.
 我在图 16.4 中的输出是缩写的；您会看到在 Calico 部署中创建了更多对象。最后，我有一个执行网络策略的新集群。不幸的是，要知道您的集群是否使用执行策略的网络插件的唯一方法是使用您知道执行策略的网络插件设置您的集群。
 
-Now we can try again. This cluster is completely new, with nothing running, but, of course, Kubernetes manifests are portable, so we can quickly deploy the APOD app again and try it out. (Kind supports multiple clusters running different Kubernetes versions with different configurations, so it’s a great option for test environments, but it’s not as developer-friendly as Docker Desktop or K3s).
-现在我们可以再试一次。这个集群是全新的，没有任何运行，但是，当然，Kubernetes 清单是可移植的，所以我们可以快速再次部署 APOD 应用程序并进行试用。 （Kind 支持运行具有不同配置的不同 Kubernetes 版本的多个集群，因此它是测试环境的绝佳选择，但它不像 Docker Desktop 或 K3s 那样对开发人员友好）。
-
-TRY IT NOW
-Repeat the APOD and sleep deployments, and confirm that the network policy blocks unauthorized traffic.
-现在就试试，重复 APOD 和睡眠部署，并确认网络策略阻止未经授权的流量。
-
-   ```
-   # deploy the APOD app to the new cluster:
-   kubectl apply -f apod/
-   # wait for it to spin up:
-   kubectl wait --for=condition=ContainersReady pod -l app=apod-web
-   # deploy the sleep Pod:
-   kubectl apply -f sleep.yaml
-   # confirm the sleep Pod has access to the APOD API:
-   kubectl exec deploy/sleep -- curl -s http://apod-api/image
-   # apply the network policy:
-   kubectl apply -f apod/update/networkpolicy-api.yaml
-   ```
-
 ![图16.4](./images/Figure16.4.png)
-<center>图 16.4 Installing Calico gives you a cluster with network policy support—at the cost of your other cluster.  安装 Calico 为您提供了一个具有网络策略支持的集群——以您的其他集群为代价。</center>
+<center>图 16.4 安装 Calico 为您提供了一个具有网络策略支持的集群——以您的其他集群为代价。</center>
+
+现在我们可以再试一次。这个集群是全新的，没有任何运行应用，但是，当然，Kubernetes 清单是可移植的，所以我们可以快速再次部署 APOD 应用程序并进行试用。 （Kind 支持运行具有不同配置的不同 Kubernetes 版本的多个集群，因此它是测试环境的绝佳选择，但它不像 Docker Desktop 或 K3s 那样对开发人员友好）。
+
+现在就试试，重复 APOD 和sleep 部署，并确认网络策略阻止未经授权的流量。
 
 ```
-      # confirm the sleep Pod can’t access the API:
-   kubectl exec deploy/sleep -- curl -s http://apod-api/image
-   # confirm the APOD web app still can:
-   kubectl exec deploy/apod-web -- wget -O- -q http://apod-api/image
+# 部署 APOD app 到新集群:
+kubectl apply -f apod/
+# 等待启动:
+kubectl wait --for=condition=ContainersReady pod -l app=apod-web
+# 部署 sleep Pod:
+kubectl apply -f sleep.yaml
+# 确认  sleep Pod 可以访问 APOD API:
+kubectl exec deploy/sleep -- curl -s http://apod-api/image
+# 创建 network policy:
+kubectl apply -f apod/update/networkpolicy-api.yaml
 ```
 
-Figure 16.5 shows what we expected the first time around: only the APOD web app can access the API, and the sleep app times out when it tries to connect because the network plugin blocks the traffic.
-图 16.5 显示了我们第一次的预期：只有 APOD 网络应用程序可以访问 API，并且睡眠应用程序在尝试连接时超时，因为网络插件阻止了流量。
 
-Network policies are an important security control in Kubernetes, and they’re attractive to infrastructure teams who are used to firewalls and segregated networks. But you need to understand where policies fit in your developer workflow if you do choose to adopt them. If engineers run their own clusters without enforcement and you apply policy only later in the pipeline, your environments have very different configurations, and something will get broken.
+```
+# 确认 sleep Pod 无法访问 API:
+kubectl exec deploy/sleep -- curl -s http://apod-api/image
+# 确认 APOD web app 仍然可以:
+kubectl exec deploy/apod-web -- wget -O- -q http://apod-api/image
+```
+
+图 16.5 显示了我们第一次的预期：只有 APOD 网络应用程序可以访问 API，并且 sleep 应用程序在尝试连接时超时，因为网络插件阻止了流量。
+
+![图16.5](./images/Figure16.5.png)
+<center>图 16.5 Calico 强制执行策略，因此只允许从 Web Pod 到 API Pod 的流量。</center>
 
 网络策略是 Kubernetes 中重要的安全控制，它们对习惯于防火墙和隔离网络的基础设施团队很有吸引力。但是，如果您确实选择采用政策，则需要了解政策在哪些方面适合您的开发人员工作流程。如果工程师在没有强制执行的情况下运行他们自己的集群，而您只是在管道的后期应用策略，那么您的环境具有非常不同的配置，并且某些东西会被破坏。
 
-![图16.5](./images/Figure16.5.png)
-<center>图 16.5 Calico enforces policy so traffic to the API Pod is allowed only from the web Pod.   Calico 强制执行策略，因此只允许从 Web Pod 到 API Pod 的流量。</center>
-
-I’ve covered only the basic details of the NetworkPolicy API here, because the complexity is more in the cluster configuration than in the policy resources. If you want to explore further, there’s a great GitHub repository full of network policy recipes published by Ahmet Alp Balkan, an engineer at Google: <https://github.com/ahmetb/kubernetes-network-policy-recipes>.
 我在这里只介绍了 NetworkPolicy API 的基本细节，因为集群配置比策略资源更复杂。如果您想进一步探索，有一个很棒的 GitHub 存储库，其中包含由 Google 工程师 Ahmet Alp Balkan 发布的网络策略配方： https://github.com/ahmetb/kubernetes-network-policy-recipes 。
 
-Now let’s clear up the new cluster and see if your old cluster still works.
 现在让我们清理新集群，看看你的旧集群是否仍然有效。
 
-TRY IT NOW
-Remove the Calico cluster, and see if the old cluster is still accessible.
 现在就试试，删除 Calico 集群，并查看旧集群是否仍可访问。
 
-   ```
-   # delete the new cluster:
-   kind delete cluster --name kiamol-ch16
-   # list your Kubernetes contexts:
-   kubectl config get-contexts
-   # switch back to your previous cluster:
-   kubectl config set-context <your_old_cluster_name>
-   # see if you can connect:
-   kubectl get nodes
-   ```
-
-Your previous cluster is probably no longer accessible because of the network changes Calico made, even though Calico isn’t running now. Figure 16.6 shows me about to hit the Reset Kubernetes button in Docker Desktop; if you’re using Kind, you’ll need to delete and recreate your original cluster, and if you’re using something else and it doesn’t work . . . I did warn you.
+```
+# 删除新集群:
+kind delete cluster --name kiamol-ch16
+# 查看你的 Kubernetes contexts:
+kubectl config get-contexts
+# 切换到之前的集群:
+kubectl config set-context <your_old_cluster_name>
+# 查看:
+kubectl get nodes
+```
 
 由于 Calico 所做的网络更改，您之前的集群可能无法再访问，即使 Calico 现在没有运行。图 16.6 显示我即将点击 Docker Desktop 中的 Reset Kubernetes 按钮；如果您使用的是 Kind，则需要删除并重新创建您的原始集群，如果您使用的是其他集群并且它不起作用。 . .我确实警告过你。
 
 ![图16.6](./images/Figure16.6.png)
-<center>图 16.6 Calico running in a container was able to reconfigure my network and break things. 在容器中运行的 Calico 能够重新配置我的网络并破坏一切。</center>
+<center>图 16.6 在容器中运行的 Calico 能够重新配置我的网络并破坏一切。</center>
 
-Now that we’re all back to normal (hopefully), we can move on to securing containers themselves, so applications don’t have privileges like reconfiguring the network stack.
 现在我们都恢复正常了（希望如此），我们可以继续保护容器本身，这样应用程序就没有像重新配置网络堆栈这样的特权了。
 
 ## 16.2 使用安全上下文(security contets)限制容器功能
