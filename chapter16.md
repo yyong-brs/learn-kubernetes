@@ -580,13 +580,12 @@ kubectl delete all,ns,secret,networkpolicy -l kiamol=ch16
 ```
 
 ## 16.6 实验室
-At the start of the chapter, I said that volume mounts for host paths are a potential attack vector, but we didn’t address that in the exercises, so we’ll do it in the lab. This is a perfect scenario for admission control, where Pods should be blocked if they use volumes that mount sensitive paths on the host. We’ll use OPA Gatekeeper, and I’ve written the Rego for you, so you just need to write a constraint.
+
 在本章开头，我说过主机路径的卷挂载是一个潜在的攻击向量，但我们没有在练习中解决这个问题，所以我们将在实验室中进行。这是准入控制的完美场景，如果 Pod 使用在主机上挂载敏感路径的卷，则应该阻止它们。我们将使用 OPA Gatekeeper，我已经为您编写了 Rego，因此您只需编写一个约束即可。
 
-+ Start by deploying gatekeeper.yaml in the lab folder. 首先在实验室文件夹中部署 gatekeeper.yaml。
-+ Then deploy the constraint template in `restrictedPaths-template.yaml` you’ll need to look at the spec to see how to build your constraint. 然后在 restrictedPaths-template.yaml 中部署约束模板，您需要查看规范以了解如何构建约束。
-+ Write and deploy a constraint that uses the template and restricts these host paths: /, /bin, and /etc. The constraint should apply only to Pods with the label kiamol=ch16-lab. 编写并部署使用模板并限制这些主机路径的约束：/、/bin 和 /etc。该约束应仅适用于标签为 kiamol=ch16-lab 的 Pod。
-+ Deploy sleep.yaml in the lab folder. Your constraint should prevent the Pod from being created because it uses restricted volume mounts. 在实验室文件夹中部署 sleep.yaml。您的约束应该阻止创建 Pod，因为它使用受限的卷安装。
+- 首先在实验室文件夹中部署 gatekeeper.yaml。
+- 然后在 restrictedPaths-template.yaml 中部署约束模板，您需要查看规范以了解如何构建约束。
+- 编写并部署使用模板并限制这些主机路径的约束：/、/bin 和 /etc。该约束应仅适用于标签为 kiamol=ch16-lab 的 Pod。
+- 在实验室文件夹中部署 sleep.yaml。您的约束应该阻止创建 Pod，因为它使用受限的卷安装。
 
-This one is fairly straightforward, although you’ll need to read about match expressions, which is how Gatekeeper implements label selectors. My solution is up on GitHub: <https://github.com/sixeyed/kiamol/blob/master/ch16/lab/README.md>.
-这一个相当简单，尽管您需要阅读匹配表达式，这就是 Gatekeeper 实现标签选择器的方式。我的解决方案在 GitHub 上： https://github.com/sixeyed/kiamol/blob/master/ch16/lab/README.md 。
+这一个相当简单，尽管您需要阅读匹配表达式，这就是 Gatekeeper 实现标签选择器的方式。我的解决方案在 GitHub 上： https://github.com/yyong-brs/learn-kubernetes/tree/master/kiamol/ch16/lab/README.md 。
