@@ -167,141 +167,117 @@ kubectl get nodes
 现在我们都恢复正常了（希望如此），我们可以继续保护容器本身，这样应用程序就没有像重新配置网络堆栈这样的特权了。
 
 ## 16.2 使用安全上下文(security contets)限制容器功能
-Container security is really about Linux security and the access model for the container user (Windows Server containers have a different user model that doesn’t have the same issues). Linux containers usually run as the root super-admin account, and unless you explicitly configure the user, root inside the container is root on the host, too. If an attacker can break out of a container running as root, they’re in charge of your server now. That’s a problem for all container runtimes, but Kubernetes adds a few more problems of its own.
 
 容器安全性实际上是关于 Linux 安全性和容器用户的访问模型（Windows Server 容器具有不同的用户模型，但不存在相同的问题）。 Linux 容器通常以 root 超级管理员帐户运行，除非您明确配置用户，否则容器内的 root 也是主机上的 root。如果攻击者可以突破以 root 身份运行的容器，他们现在就可以控制您的服务器。这是所有容器运行时的问题，但 Kubernetes 本身又增加了一些问题。
 
-In the next exercise, you’ll run the Pi web application with a basic Deployment configuration. That container image is packaged on top of the official .NET Core application run-time image from Microsoft. The Pod spec isn’t deliberately insecure, but you’ll see that the defaults aren’t encouraging.
+在下一个练习中，您将使用基本部署配置运行 Pi Web 应用程序。该容器镜像打包在 Microsoft 的官方 .NET Core 应用程序运行时镜像之上。 Pod 规范并非故意不安全，但您会发现默认设置并不令人鼓舞。
 
-在下一个练习中，您将使用基本部署配置运行 Pi Web 应用程序。该容器映像打包在 Microsoft 的官方 .NET Core 应用程序运行时映像之上。 Pod 规范并非故意不安全，但您会发现默认设置并不令人鼓舞。
-
-TRY IT NOW
-Run a simple application, and check the default security situation.
 现在就试试，运行一个简单的应用程序，并检查默认的安全情况。
 
-   ```
-   # deploy the app:
-   kubectl apply -f pi/
-   # wait for the container to start:
-   kubectl wait --for=condition=ContainersReady pod -l app=pi-web
-   # print the name of the user in the Pod container:
-   kubectl exec deploy/pi-web -- whoami
-   # try to access the Kubernetes API server:
-   kubectl exec deploy/pi-web -- sh -c 'curl -k -s
-   https://kubernetes.default | grep message'
-   # print the API access token:
-   kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
-   serviceaccount/token
-   ```
-
-The behavior is scary: the app runs as root, it has access to the Kubernetes API server, and it even has a token set up so it can authenticate with Kubernetes. Figure 16.7 shows it all in action. Running as root magnifies any exploit an attacker can find in the application code or the runtime. Having access to the Kubernetes API means an attacker doesn’t even need to break out of the container—they can use the token to query the API and do interesting things, like fetch the contents of Secrets (depending on the access permissions for the Pod, which you’ll learn about in chapter 17).
+```
+# 部署 app:
+kubectl apply -f pi/
+# 等待容器启动:
+kubectl wait --for=condition=ContainersReady pod -l app=pi-web
+# 输出 pod 容器的用户名:
+kubectl exec deploy/pi-web -- whoami
+# 尝试访问 Kubernetes API server:
+kubectl exec deploy/pi-web -- sh -c 'curl -k -s
+https://kubernetes.default | grep message'
+# 输出 API access token:
+kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
+serviceaccount/token
+```
 
 行为很可怕：应用程序以 root 身份运行，它可以访问 Kubernetes API 服务器，它甚至设置了一个令牌，以便它可以通过 Kubernetes 进行身份验证。图 16.7 展示了这一切。以 root 身份运行会放大攻击者可以在应用程序代码或运行时中找到的任何漏洞。访问 Kubernetes API 意味着攻击者甚至不需要突破容器——他们可以使用令牌查询 API 并做一些有趣的事情，比如获取 Secrets 的内容（取决于 Pod 的访问权限） ，您将在第 17 章中了解）。
 
-Kubernetes provides multiple security controls at the Pod and container levels, but they’re not enabled by default because they could break your app. You can run containers as a different user, but some apps work only if they’re running as root. You can drop Linux capabilities to restrict what the container can do, but then some app features could fail. This is where automated testing comes in, because you can increasingly tighten the security around your apps, running tests at each stage to confirm everything still works.
-
-Kubernetes 在 Pod 和容器级别提供多种安全控制，但默认情况下未启用它们，因为它们可能会破坏您的应用程序。您可以以不同的用户身份运行容器，但某些应用程序只有在以根用户身份运行时才能运行。您可以删除 Linux 功能以限制容器可以执行的操作，但某些应用程序功能可能会失败。这就是自动化测试的用武之地，因为您可以越来越多地加强应用程序的安全性，在每个阶段运行测试以确认一切仍然有效。
-
 ![图16.7](./images/Figure16.7.png)
-<center>图 16.7 If you’ve heard the phrase “secure by default,” it wasn’t said about Kubernetes. 如果您听说过“默认安全”这句话，那么它并不是关于 Kubernetes 的</center>
+<center>图 16.7 如果您听说过“默认安全”这句话，那么它并不是关于 Kubernetes 的</center>
 
-The main control you’ll use is the SecurityContext field, which applies security at the Pod and container levels. Listing 16.2 shows a Pod SecurityContext that explicitly sets the user and the Linux group (a collection of users), so all of the containers in the Pod run as the unknown user rather than root.
+Kubernetes 在 Pod 和容器级别提供多种安全控制，但默认情况下未启用它们，因为它们可能会破坏您的应用程序。您可以以不同的用户身份运行容器，但某些应用程序只有在以 root 用户身份运行时才能运行。您可以删除 Linux 功能以限制容器可以执行的操作，但某些应用程序功能可能会失败。这就是自动化测试的用武之地，因为您可以越来越多地加强应用程序的安全性，在每个阶段运行测试以确认一切仍然有效。
+
 您将使用的主要控件是 SecurityContext 字段，它在 Pod 和容器级别应用安全性。清单 16.2 显示了一个明确设置用户和 Linux 组（用户集合）的 Pod SecurityContext，因此 Pod 中的所有容器都以未知用户而不是 root 身份运行。
 
-> Listing 16.2 deployment-podsecuritycontext.yaml, running as a specific user 清单 16.2 deployment-podsecuritycontext.yaml，作为特定用户运行
+> 清单 16.2 deployment-podsecuritycontext.yaml，作为特定用户运行
 
 ```
-spec: # This is the Pod spec in the Deployment.
-securityContext: # These controls apply to all Pod containers.
-runAsUser: 65534 # Runs as the “unknown” user
-runAsGroup: 3000 # Runs with a nonexistent group
+spec: # 这是 deployment 的spec
+  securityContext: # 此控制生效到所有POd 的容器
+    runAsUser: 65534 # 以 “unknown” 用户运行
+    runAsGroup: 3000 # 以不存在的 group 运行
 ```
 
-That’s simple enough, but moving away from root has repercussions, and the Pi spec needs a few more changes. The app listens on port 80 inside the container, and Linux requires elevated permissions to listen on that port. Root has the permission, but the new user doesn’t, so the app will fail to start. It needs some additional configuration in an environment variable to set the app to listen on port 5001 instead, which is valid for the new user. This is the sort of detail you need to drive out for each app or each class of application, and you’ll find the requirements only when the app stops working.
-这很简单，但是离开 root 会产生影响，并且 Pi 规范需要做更多的改变。该应用程序在容器内侦听端口 80，而 Linux 需要提升权限才能侦听该端口。 Root有权限，新用户没有权限，所以应用会启动失败。它需要在环境变量中进行一些额外的配置，以将应用程序设置为侦听端口 5001，这对新用户有效。这是您需要为每个应用程序或每个类别的应用程序推出的那种细节，只有当应用程序停止工作时，您才会找到这些要求。
+这很简单，但是离开 root 会产生影响，并且 Pi spec 需要做更多的改变。该应用程序在容器内侦听端口 80，而 Linux 需要提升权限才能侦听该端口。 Root有权限，新用户没有权限，所以应用会启动失败。它需要在环境变量中进行一些额外的配置，以将应用程序设置为侦听端口 5001，这对新用户有效。这是您需要为每个应用程序或每个类别的应用程序推出的那种细节，只有当应用程序停止工作时，您才会找到这些要求。
 
 
-TRY IT NOW
-Deploy the secured Pod spec. This uses a nonroot user and an unrestricted port, but the port mapping in the Service hides that detail from consumers.
 现在就试试，部署受保护的 Pod 规范。这使用非 root 用户和不受限制的端口，但服务中的端口映射向消费者隐藏了该详细信息。
 
-   ```
-   # add the nonroot SecurityContext:
-   kubectl apply -f pi/update/deployment-podsecuritycontext.yaml
-   # wait for the new Pod:
-   kubectl wait --for=condition=ContainersReady pod -l app=pi-web
-   # confirm the user:
-   kubectl exec deploy/pi-web -- whoami
-   # list the API token files:
-   kubectl exec deploy/pi-web -- ls -l /run/secrets/kubernetes.io/
-   serviceaccount/token
-   # print out the access token:
-   kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
-   serviceaccount/token
-   ```
-
-Running as a nonroot user addresses the risk of an application exploit escalating into a full server takeover, but as shown in figure 16.8, it doesn’t solve all the problems. The Kubernetes API token is mounted with permissions for any account to read it, so an attacker could still use the API in this setup. What they can do with the API depends on how your cluster is configured—in early versions of Kubernetes, they’d be able to do everything. The identity to access the API server is different from the Linux user, and it might have administrator rights in the cluster, even though the container process is running as a least-privilege user.
+```
+# 添加非 root SecurityContext:
+kubectl apply -f pi/update/deployment-podsecuritycontext.yaml
+# 等待新 Pod 启动:
+kubectl wait --for=condition=ContainersReady pod -l app=pi-web
+# 确认用户:
+kubectl exec deploy/pi-web -- whoami
+# 查看 API token 文件:
+kubectl exec deploy/pi-web -- ls -l /run/secrets/kubernetes.io/
+serviceaccount/token
+# 输出 access token
+kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
+serviceaccount/token
+```
 
 以非 root 用户身份运行解决了应用程序漏洞升级为完全服务器接管的风险，但如图 16.8 所示，它并没有解决所有问题。 Kubernetes API 令牌的安装权限允许任何帐户读取它，因此攻击者仍然可以在此设置中使用该 API。他们可以用 API 做什么取决于你的集群是如何配置的——在 Kubernetes 的早期版本中，他们可以做任何事情。访问 API 服务器的身份与 Linux 用户不同，它可能在集群中具有管理员权限，即使容器进程以最低权限用户身份运行。
 
-An option in the Pod spec stops Kubernetes from mounting the access token, which you should include for every app that doesn’t actually need to use the Kubernetes API—which will be pretty much everything, except workloads like ingress controllers, which need to find Service endpoints. It’s a safe option to set, but the next level of run-time control will need more testing and evaluation. The SecurityContext field in the container spec allows for more fine-grained control than at the Pod level. Listing 16.3 shows a set of options that work for the Pi app
-
-Pod 规范中的一个选项阻止 Kubernetes 安装访问令牌，你应该为每个实际上不需要使用 Kubernetes API 的应用程序包含访问令牌——这几乎是所有的东西，除了像入口控制器这样的工作负载，它需要找到服务端点。这是一个安全的设置选项，但下一级运行时控制将需要更多的测试和评估。容器规范中的 SecurityContext 字段允许比 Pod 级别更细粒度的控制。清单 16.3 显示了一组适用于 Pi 应用程序的选项
-
 ![图16.8](./images/Figure16.8.png)
-<center>图 16.8 You need an in-depth security approach to Kubernetes; one setting is not enough. 您需要一种深入的 Kubernetes 安全方法；一种设置是不够的。</center>
+<center>图 16.8 您需要一种深入的 Kubernetes 安全方法；一种设置是不够的。</center>
 
-> Listing 16.3 deployment-no-serviceaccount-token.yaml, tighter security policies 清单 16.3 deployment-no-serviceaccount-token.yaml，更严格的安全策略
+Pod spec 中的一个选项阻止 Kubernetes 安装访问令牌，你应该为每个实际上不需要使用 Kubernetes API 的应用程序包含访问令牌——这几乎是所有的东西，除了像入口控制器这样的工作负载，它需要找到服务端点。这是一个安全的设置选项，但下一级运行时控制将需要更多的测试和评估。容器 spec 中的 SecurityContext 字段允许比 Pod 级别更细粒度的控制。清单 16.3 显示了一组适用于 Pi 应用程序的选项
+
+> 清单 16.3 deployment-no-serviceaccount-token.yaml，更严格的安全策略
 
 ```
 spec:
-automountServiceAccountToken: false # Removes the API token
-securityContext: # Applies to all containers
-runAsUser: 65534
-runAsGroup: 3000
-containers:
-- image: kiamol/ch05-pi
-# …
-securityContext: # Applies for this container
-allowPrivilegeEscalation: false # The context settings block
-capabilities: # the process from escalating to
-drop: # higher privileges and drops
-- all # all additional capabilities.
+  automountServiceAccountToken: false # 卸掉 API token
+  securityContext: # 生效到所有 containers
+    runAsUser: 65534
+    runAsGroup: 3000
+  containers:
+  - image: kiamol/ch05-pi
+    # …
+    securityContext: # 仅针对当前容器
+      allowPrivilegeEscalation: false # 上下文设置阻止进程
+      capabilities: # 升级到更高的权限，
+        drop: # 并删除所有附加功能。
+          - all
 ```
-
-The capabilities field lets you explicitly add and remove Linux kernel capabilities. This app works happily with all capabilities dropped, but other apps will need some added back in. One feature this app doesn’t support is the readOnlyRootFilesystem option. That’s a powerful one to include if your app can work with a read-only filesystem, because it means attackers can’t write files, so they can’t download malicious scripts or binaries. How far you take this depends on the security profile of your organization. You can mandate that all apps need to run as nonroot, with all capabilities dropped and with a read-only filesystem, but that might mean you need to rewrite most of your apps.
 
 capabilities 字段允许您显式添加和删除 Linux 内核功能。此应用程序可以在所有功能被删除的情况下正常运行，但其他应用程序将需要重新添加一些功能。此应用程序不支持的一项功能是 readOnlyRootFilesystem 选项。如果您的应用程序可以使用只读文件系统，那么这是一个强大的功能，因为这意味着攻击者无法写入文件，因此他们无法下载恶意脚本或二进制文件。你能走多远取决于你的组织的安全配置文件。您可以要求所有应用程序都需要以非 root 用户身份运行，放弃所有功能并使用只读文件系统，但这可能意味着您需要重写大部分应用程序。
 
-A pragmatic approach is to secure your existing apps as tightly as you can at the container level and make sure you have security in depth around the rest of your policies and processes. The final spec for the Pi app is not perfectly secure, but it’s a big improvement on the defaults—and the application still works.
-
 一种务实的方法是在容器级别尽可能严密地保护现有应用程序，并确保围绕其余策略和流程提供深入的安全保护。 Pi 应用程序的最终规范并不完全安全，但它是对默认设置的重大改进——应用程序仍然可以运行。
 
-TRY IT NOW
-Update the Pi app with the final security configuration.
 现在就试试，使用最终的安全配置更新 Pi 应用程序。
 
-   ```
-   # update to the Pod spec in listing 16.3:
-   kubectl apply -f pi/update/deployment-no-serviceaccount-token.yaml
-   # confirm the API token doesn’t exist:
-   kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
-   serviceaccount/token
-   # confirm that the API server is still accessible:
-   kubectl exec deploy/pi-web -- sh -c 'curl -k -s
-   https://kubernetes.default | grep message'
-   # get the URL, and check that the app still works:
-   kubectl get svc pi-web -o jsonpath='http://{.status.loadBalancer
-   .ingress[0].*}:8031'
-   ```
-
-As shown in figure 16.9, the app can still reach the Kubernetes API server, but it has no access token, so an attacker would need to do more work to send valid API requests. Applying a NetworkPolicy to deny ingress to the API server would remove that option altogether.
+```
+# 更新清单 16.3 中的 pod spec:
+kubectl apply -f pi/update/deployment-no-serviceaccount-token.yaml
+# 确认 API token 不存在了:
+kubectl exec deploy/pi-web -- cat /run/secrets/kubernetes.io/
+serviceaccount/token
+# 确认 API Server 任然可以访问:
+kubectl exec deploy/pi-web -- sh -c 'curl -k -s
+https://kubernetes.default | grep message'
+# 获得 url 检查 app 任然正常工作:
+kubectl get svc pi-web -o jsonpath='http://{.status.loadBalancer
+.ingress[0].*}:8031'
+```
 
 如图 16.9 所示，应用程序仍然可以访问 Kubernetes API 服务器，但它没有访问令牌，因此攻击者需要做更多的工作才能发送有效的 API 请求。应用 NetworkPolicy 拒绝进入 API 服务器将完全删除该选项。
 
-You need to invest in adding security to your apps, but if you have a reasonably small range of application platforms, you can build up generic profiles: you might find that all your .NET apps can run as nonroot but need a writable filesystem, and all your Go apps can run with a read-only filesystem but need some Linux capabilities added. The challenge, then, is in making sure your profiles actually are applied, and Kubernetes has a nice feature for that: admission control.
+![图16.9](./images/Figure16.9.png)
+<center>图 16.9 受保护的应用程序对用户来说是一样的，但对攻击者来说乐趣却少得多。</center>
 
-您需要投资以增加应用程序的安全性，但如果您的应用程序平台范围相当小，则可以构建通用配置文件：您可能会发现所有 .NET 应用程序都可以非根用户运行但需要可写文件系统，并且您所有的 Go 应用程序都可以使用只读文件系统运行，但需要添加一些 Linux 功能。那么，挑战在于确保您的配置文件实际得到应用，而 Kubernetes 有一个很好的功能：准入控制。
+您需要投资以增加应用程序的安全性，但如果您的应用程序平台范围相当小，则可以构建通用配置文件：您可能会发现所有 .NET 应用程序都可以非根用户运行但需要可写文件系统，并且您所有的 Go 应用程序都可以使用只读文件系统运行，但需要添加一些 Linux 功能。那么，挑战在于确保您的配置文件实际得到应用，而 Kubernetes 有一个很好的功能：准入控制（admission control）。
 
 ## 16.3 使用 webhook 阻止和修改工作负载
 Every object you create in Kubernetes goes through a process to check if it’s okay for the cluster to run that object. That process is admission control, and we saw an admission controller at work in chapter 12, trying to deploy a Pod spec that requested more resources than the namespace had available. The ResourceQuota admission controller is a built-in controller, which stops workloads from running if they exceed quotas, and Kubernetes has a plug-in system so you can add your own admission control rules.
@@ -312,9 +288,6 @@ Every object you create in Kubernetes goes through a process to check if it’s 
 Two other controllers add that extensibility: the ValidatingAdmissionWebhook, which works like ResourceQuota to allow or block object creation, and the MutatingAdmissionWebhook, which can actually edit object specs, so the object that is created is different from the request. Both controllers work in the same way: you create a configuration object specifying the object life cycles you want to control and a URL for a web server that applies the rules. Figure 16.10 shows how the pieces fit together.
 
 其他两个控制器增加了这种可扩展性：ValidatingAdmissionWebhook，它像 ResourceQuota 一样工作以允许或阻止对象创建，以及 MutatingAdmissionWebhook，它实际上可以编辑对象规范，因此创建的对象与请求不同。两个控制器的工作方式相同：您创建一个配置对象指定要控制的对象生命周期和应用规则的 Web 服务器的 URL。图 16.10 显示了这些片段是如何组合在一起的。
-
-![图16.9](./images/Figure16.9.png)
-<center>图 16.9 The secured app is the same for users but much less fun for attackers. 受保护的应用程序对用户来说是一样的，但对攻击者来说乐趣却少得多。</center>
 
 
 
