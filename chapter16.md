@@ -408,192 +408,164 @@ Admission Controller webhooks 是一个有用的工具，可以让你做一些�
 在下一节中，我们将研究另一种方法，该方法在底层使用验证 webhook，但将它们包装在管理层中。 Open Policy Agent (OPA) 允许您在 Kubernetes 对象中定义规则，这些对象在集群中是可发现的并且不需要自定义代码。
 
 ## 16.4 使用 Open Policy Agent 控制准入
-OPA is a unified approach to writing and implementing policies. The goal is to provide a standard language for describing all kinds of policy and integrations to apply policies in different platforms. You can describe data access policies and deploy them in SQL databases, and you can describe admission control policies for Kubernetes objects. OPA is another CNCF project that provides a much cleaner alternative to custom validating webhooks with OPA Gatekeeper.
+
 OPA 是编写和实施策略的统一方法。目标是提供一种标准语言来描述各种策略和集成，以在不同平台上应用策略。你可以描述数据访问策略并将它们部署在 SQL 数据库中，你可以描述 Kubernetes 对象的准入控制策略。 OPA 是另一个 CNCF 项目，它为使用 OPA Gatekeeper 的自定义验证 webhooks 提供了更简洁的替代方案。
 
-OPA Gatekeeper features three parts: you deploy the Gatekeeper components in your cluster, which include a webhook server and a generic ValidatingWebhookConfiguration; then you create a constraint template, which describes the admission control policy; and then you create a specific constraint based on the template. It’s a flexible approach where you can build a template for the policy “all Pods must have the expected labels” and then deploy a constraint to say which labels are needed in which namespace.
 OPA Gatekeeper 具有三个部分：您在集群中部署 Gatekeeper 组件，其中包括一个 webhook 服务器和一个通用的 ValidatingWebhookConfiguration；然后创建一个约束模板，它描述了准入控制策略；然后根据模板创建特定约束。这是一种灵活的方法，您可以为“所有 Pod 必须具有预期的标签”策略构建一个模板，然后部署一个约束来说明在哪个命名空间中需要哪些标签。
 
-We’ll start by removing the custom webhooks we added and deploying OPA Gatekeeper, ready to apply some admission policies.
 我们将首先删除我们添加的自定义 webhook 并部署 OPA Gatekeeper，准备应用一些准入策略。
 
-TRY IT NOW
-Uninstall the webhook components, and deploy Gatekeeper.
 现在就试试，卸载 webhook 组件，并部署 Gatekeeper。
 
+```
+# 卸载:
+helm uninstall mutating-webhook
+helm uninstall validating-webhook
+# 删除 Node.js webhook server:
+kubectl delete -f admission-webhook/
+# 部署 Gatekeeper:
+kubectl apply -f opa/
+```
 
-   ```
-   # remove the webhook configurations created with Helm:
-   helm uninstall mutating-webhook
-   helm uninstall validating-webhook
-   # remove the Node.js webhook server:
-   kubectl delete -f admission-webhook/
-   # deploy Gatekeeper:
-   kubectl apply -f opa/
-   ```
-
-I’ve abbreviated my output in figure 16.14—when you run the exercise, you’ll see the OPA Gatekeeper deployment installs many more objects, including things we haven’t come across yet called CustomResourceDefinitions (CRDs). We’ll cover those in more detail in chapter 20 when we look at extending Kubernetes, but for now, it’s enough to know that CRDs let you define new types of object that Kubernetes stores and manages for you.
 我在图 16.14 中简化了我的输出——当您运行该练习时，您会看到 OPA Gatekeeper 部署安装了更多的对象，包括我们尚未遇到的称为 CustomResourceDefinitions (CRD) 的对象。当我们着眼于扩展 Kubernetes 时，我们将在第 20 章中更详细地介绍这些内容，但就目前而言，知道 CRD 可以让您定义 Kubernetes 为您存储和管理的新对象类型就足够了。
 
-Gatekeeper uses CRDs so you can create templates and constraints as ordinary Kubernetes objects, defined in YAML and deployed with kubectl. The template contains the generic policy definition in a language called Rego (pronounced “ray-go”). It’s an expressive language that lets you evaluate the properties of some input object to check if they meet your requirements. It’s another thing to learn, but Rego has some big advantages: policies are fairly easy to read, and they live in your YAML files, so they’re not hidden in the code of a custom webhook; and there are lots of sample Rego policies to enforce the kind of rules we’ve looked at in this chapter. Listing 16.6 shows a Rego policy that requires objects to have labels.
+![图16.14](./images/Figure16.14.png)
+<center>图 16.14 OPA Gatekeeper 负责处理运行 webhook 服务器的所有棘手部分。</center>
+
 Gatekeeper 使用 CRD，因此您可以创建模板和约束作为普通 Kubernetes 对象，在 YAML 中定义并使用 kubectl 部署。该模板包含使用称为 Rego（发音为“ray-go”）的语言的通用策略定义。它是一种表达性语言，可让您评估某些输入对象的属性以检查它们是否满足您的要求。学习是另一回事，但 Rego 有一些很大的优势：策略相当容易阅读，并且它们存在于您的 YAML 文件中，因此它们不会隐藏在自定义 webhook 的代码中；并且有很多示例 Rego 策略来执行我们在本章中看到的那种规则。清单 16.6 显示了要求对象具有标签的 Rego 策略。
 
-![图16.14](./images/Figure16.14.png)
-<center>图 16.14 OPA Gatekeeper takes care of all the tricky parts of running a webhook server. OPA Gatekeeper 负责处理运行 webhook 服务器的所有棘手部分。</center>
-
-> Listing 16.6 requiredLabels-template.yaml, a basic Rego policy 清单 16.6 requiredLabels-template.yaml，一个基本的 Rego 策略
+> 清单 16.6 requiredLabels-template.yaml，一个基本的 Rego 策略
 
 ```
-# This fetches all the labels on the object and all the
-# required labels from the constraint; if required labels
-# are missing, that’s a violation that blocks object creation.
+# 这将获取对象上的所有标签以及约束中所需的所有标签;
+# 如果缺少必需的标签，就会妨碍对象的创建.
 violation[{"msg": msg, "details": {"missing_labels": missing}}] {
-provided := {label | input.review.object.metadata.labels[label]}
-required := {label | label := input.parameters.labels[_]}
-missing := required - provided
-count(missing) > 0
-msg := sprintf("you must provide labels: %v", [missing])
+  provided := {label | input.review.object.metadata.labels[label]}
+  required := {label | label := input.parameters.labels[_]}
+  missing := required - provided
+  count(missing) > 0
+  msg := sprintf("you must provide labels: %v", [missing])
 }
 ```
 
-You deploy that policy with Gatekeeper as a constraint template, and then you deploy a constraint object that enforces the template. In this case, the template, called RequiredLabels, uses parameters to define the labels that are required. Listing 16.7 shows a specific constraint for all Pods to have app and version labels.
 您使用 Gatekeeper 部署该策略作为约束模板，然后部署强制执行该模板的约束对象。在这种情况下，名为 RequiredLabels 的模板使用参数来定义所需的标签。清单 16.7 显示了所有 Pod 具有应用和版本标签的特定约束。
 
-> Listing 16.7 requiredLabels.yaml, a constraint from a Gatekeeper template 清单 16.7 requiredLabels.yaml，来自 Gatekeeper 模板的约束
+> 清单 16.7 requiredLabels.yaml，来自 Gatekeeper 模板的约束
 
 ```
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: RequiredLabels # The API and Kind identify this as
-metadata: # a Gatekeeper constraint from the
-name: requiredlabels-app # RequiredLabels template.
+kind: RequiredLabels # API和Kind将其识别为RequiredLabels模板中的Gatekeeper约束。
+metadata: 
+  name: requiredlabels-app 
 spec:
-match:
-kinds:
-- apiGroups: [""]
-kinds: ["Pod"] # The constraint applies to all Pods.
-parameters:
-labels: ["app", "version"] # Requires two labels to be set
+  match:
+  kinds:
+    - apiGroups: [""]
+      kinds: ["Pod"] # 该约束适用于所有pod
+  parameters:
+    labels: ["app", "version"] # 需要设置两个标签
 ```
 
-This is much easier to read, and you can deploy many constraints from the same template. The OPA approach lets you build a standard policy library, which users can apply in their application specs without needing to dig into the Rego. In the next exercise, you’ll deploy the constraint from listing 16.7 with another constraint that requires all Deployments, Services, and ConfigMaps to have a kiamol label. Then you’ll try to deploy a version of the to-do app that fails all those policies.
 这更容易阅读，并且您可以从同一个模板部署许多约束。 OPA 方法允许您构建一个标准策略库，用户可以在他们的应用程序规范中应用该库，而无需深入研究 Rego。在下一个练习中，您将部署清单 16.7 中的约束和另一个要求所有 Deployments、Services 和 ConfigMaps 都具有 kiamol 标签的约束。然后，您将尝试部署一个不符合所有这些政策的待办事项应用程序版本。
 
-TRY IT NOW
-Deploy required label policies with Gatekeeper, and see how they are applied.
 现在就试试，使用 Gatekeeper 部署所需的标签策略，并查看它们的应用方式。
 
+```
+# 首先创建约束模板:
+kubectl apply -f opa/templates/requiredLabels-template.yaml
+# 然后创建约束:
+kubectl apply -f opa/constraints/requiredLabels.yaml
+# 待办事项列表规范不符合策略:
+kubectl apply -f todo-list/
+# 确认应用程序没有部署:
+kubectl get all -l app=todo-web
+```
 
-   ```
-   # create the constraint template first:
-   kubectl apply -f opa/templates/requiredLabels-template.yaml
-   # then create the constraint:
-   kubectl apply -f opa/constraints/requiredLabels.yaml
-   # the to-do list spec doesn’t meet the policies:
-   kubectl apply -f todo-list/
-   # confirm the app isn’t deployed:
-   kubectl get all -l app=todo-web
-   ```
-
-You can see in figure 16.15 that this user experience is clean—the objects we’re trying to create don’t have the required labels, so they get blocked, and we see the message from the Rego policy in the output from kubectl.
 您可以在图 16.15 中看到这种用户体验很干净——我们尝试创建的对象没有所需的标签，因此它们被阻止了，我们在 kubectl 的输出中看到了来自 Rego 策略的消息。
 
-Gatekeeper evaluates constraints using a validating webhook, and it’s very obvious when failures arise in the object you’re creating. It’s a bit less clear when objects created by controllers fail validation, because the controller itself can be fine. We saw that in section 16.3, and because Gatekeeper uses the same validation mechanism, it has the same issue. You’ll see that if you update the to-do app so the Deployment meets the label requirements but the Pod spec doesn’t.
+![图16.15](./images/Figure16.15.png)
+<center>图 16.15 部署失败显示从 Rego 策略返回的明确错误消息。</center>
+
 Gatekeeper 使用验证 webhook 评估约束，当您创建的对象出现故障时，这一点非常明显。当控制器创建的对象验证失败时不太清楚，因为控制器本身可能没问题。我们在 16.3 节中看到，由于 Gatekeeper 使用相同的验证机制，因此存在相同的问题。您会看到，如果您更新待办事项应用程序，那么 Deployment 会满足标签要求，但 Pod 规范不会。
 
-TRY IT NOW
-Deploy an updated to-do list spec, which has the correct labels for all objects except the Pod.
 现在就试试，部署更新的待办事项列表规范，其中包含除 Pod 之外的所有对象的正确标签。
 
-   ```
-   # deploy the updated manifest:
-   kubectl apply -f todo-list/update/web-with-kiamol-labels.yaml
-   # show the status of the ReplicaSet:
-   kubectl get rs -l app=todo-web
-   ```
+```
+# 部署更新的清单:
+kubectl apply -f todo-list/update/web-with-kiamol-labels.yaml
+# 显示ReplicaSet的状态:
+kubectl get rs -l app=todo-web
+```
 
-![图16.15](./images/Figure16.15.png)
-<center>图 16.15 Deployment failures show a clear error message returned from the Rego policy. 部署失败显示从 Rego 策略返回的明确错误消息。</center>
 
 ```
-   # print the detail:
+   # 输出 detail:
    kubectl describe rs -l app=todo-web
-   # remove the to-do app in preparation for the next exercise:
+   # 删除待办事项应用程序，为下一个练习做准备:
    kubectl delete -f todo-list/update/web-with-kiamol-labels.yaml
 ```
 
-You’ll find in this exercise that the admission policy worked, but you see the problem only when you dig into the description for the failing ReplicaSet, as in figure 16.16. That’s not such a great user experience. You could fix this with a more sophisticated policy that applies at the Deployment level and checks labels in the Pod template—that could be done with extended logic in the Rego for the constraint template.
 在本练习中，您会发现准入策略有效，但只有当您深入了解失败的 ReplicaSet 的描述时，您才会发现问题，如图 16.16 所示。那不是很好的用户体验。您可以使用更复杂的策略来解决此问题，该策略适用于 Deployment 级别并检查 Pod 模板中的标签——这可以通过约束模板的 Rego 中的扩展逻辑来完成。
 
-We’ll finish this section with the following set of admission policies that cover some more production best practices, all of which help to make your apps more secure:
-我们将以下面一组涵盖更多生产最佳实践的准入政策来结束本节，所有这些都有助于提高您的应用程序的安全性：
-+ All Pods must have container probes defined. This is for keeping your apps healthy, but a failed healthcheck could also indicate unexpected activity from an attack. 所有 Pod 都必须定义容器探测器。这是为了保持您的应用程序健康，但失败的健康检查也可能表明来自攻击的意外活动。
-
 ![图16.16](./images/Figure16.16.png)
-<center>图 16.16 OPA Gatekeeper makes for a better process, but it’s still a wrapper around validating webhooks. OPA Gatekeeper 实现了更好的流程，但它仍然是验证 webhook 的包装器。 </center>
+<center>图 16.16 OPA Gatekeeper 实现了更好的流程，但它仍然是验证 webhook 的包装器。 </center>
 
-+ Pods can run containers only from approved image repositories. Restricting containers to a set of “golden” repositories with secured production images ensures malicious payloads can’t be deployed. Pod 只能从已批准的镜像存储库运行容器。将容器限制在一组具有安全生产映像的“黄金”存储库中，可确保无法部署恶意负载。
-+ All containers must have memory and CPU limits set. This prevents a compromised container maxing out the compute resources of the node and starving all the other Pods. 所有容器都必须设置内存和 CPU 限制。这可以防止受损容器最大化节点的计算资源并使所有其他 Pod 挨饿。
+我们将以下面一组涵盖更多生产最佳实践的准入政策来结束本节，所有这些都有助于提高您的应用程序的安全性：
+- 所有 Pod 都必须定义容器探测器。这是为了保持您的应用程序健康，但失败的健康检查也可能表明来自攻击的意外活动。
+- Pod 只能从已批准的镜像存储库运行容器。将容器限制在一组具有安全生产镜像的“黄金”存储库中，可确保无法部署恶意负载。
+- 所有容器都必须设置内存和 CPU 限制。这可以防止受损容器最大化节点的计算资源并使所有其他 Pod 挨饿。
 
-These generic policies apply to pretty much every organization. You can add to them with constraints that require network policies for every app and security contexts for every Pod. As you’ve learned in this chapter, not all rules are universal, so you might need to be selective on how you apply those constraints. In the next exercise, you’ll apply the production constraint set to a single namespace.
 这些通用政策几乎适用于每个组织。您可以向它们添加约束，要求每个应用程序的网络策略和每个 Pod 的安全上下文。正如您在本章中了解到的，并非所有规则都是通用的，因此您可能需要选择如何应用这些约束。在下一个练习中，您将把生产约束集应用到单个命名空间。
 
-TRY IT NOW
-Deploy a new set of constraints and a version of the to-do app where the Pod spec fails most of the policies.
 现在就试试，部署一组新的约束和一个待办应用程序版本，其中 Pod 规范不符合大多数策略。
 
-   ```
-   # create templates for the production constraints:
-   kubectl apply -f opa/templates/production/
-   # create the constraints:
-   kubectl apply -f opa/constraints/production/
-   # deploy the new to-do spec:
-   kubectl apply -f todo-list/production/
-   # confirm the Pods aren’t created:
-   kubectl get rs -n kiamol-ch16 -l app=todo-web
-   # show the error details:
-   kubectl describe rs -n kiamol-ch16 -l app=todo-web
-   ```
+```
+# 为生产约束创建模板:
+kubectl apply -f opa/templates/production/
+# 创建约束:
+kubectl apply -f opa/constraints/production/
+# 部署新的待办事项规范:
+kubectl apply -f todo-list/production/
+# 确认pod没有创建:
+kubectl get rs -n kiamol-ch16 -l app=todo-web
+#显示错误细节:
+kubectl describe rs -n kiamol-ch16 -l app=todo-web
+```
 
-Figure 16.17 shows that the Pod spec fails all the rules except one—my image repository policy allows any images from Docker Hub in the kiamol organization, so the todo app image is valid. But there’s no version label, no health probes, and no resource limits, and this spec is not fit for production.
-图 16.17 显示 Pod 规范不符合所有规则，除了一个——我的图像存储库策略允许来自 kiamol 组织中的 Docker Hub 的任何图像，因此待办事项应用程序图像是有效的。但是没有版本标签，没有健康探测，也没有资源限制，这个规范不适合生产。
+图 16.17 显示 Pod 规范不符合所有规则，除了一个——我的镜像存储库策略允许来自 kiamol 组织中的 Docker Hub 的任何镜像，因此待办事项应用程序镜像是有效的。但是没有版本标签，没有健康探测，也没有资源限制，这个规范不适合生产。
 
 ![图16.17](./images/Figure16.17.png)
-<center>图 16.17 All constraints are evaluated, and you see the full list of errors in the Rego output. 计算所有约束，您可以在 Rego 输出中看到完整的错误列表。 </center>
+<center>图 16.17 计算所有约束，您可以在 Rego 输出中看到完整的错误列表。 </center>
 
-Just to prove those policies are achievable and OPA Gatekeeper will actually let the todo app run, you can apply an updated spec that meets all the rules for production. If you compare the YAML files in the production folder and the update folder, you’ll see the new spec just adds the required fields to the Pod template; there are no significant changes in the app.
 只是为了证明这些政策是可以实现的，并且 OPA Gatekeeper 实际上会让待办事项应用程序运行，您可以应用满足所有生产规则的更新规范。如果比较生产文件夹和更新文件夹中的 YAML 文件，您会看到新规范只是将必填字段添加到 Pod 模板；应用程序没有重大变化。
 
-TRY IT NOW
-Apply a production-ready version of the to-do spec, and confirm the app really runs.
 现在就试试，应用待办事项规范的生产就绪版本，并确认应用程序真正运行。
 
-   ```
-   # this spec meets all production policies:
-   kubectl apply -f todo-list/production/update
-   # wait for the Pod to start:
-   kubectl wait --for=condition=ContainersReady pod -l app=todo-web -n
-   kiamol-ch16
-   # confirm it’s running:
-   kubectl get pods -n kiamol-ch16 --show-labels
-   # get the URL for the app and browse:
-   kubectl get svc todo-web -n kiamol-ch16 -o jsonpath='http://{.status
-   .loadBalancer.ingress[0].*}:8019'
-   ```
+```
+# 此规范满足所有生产策略:
+kubectl apply -f todo-list/production/update
+# 等待Pod启动:
+kubectl wait --for=condition=ContainersReady pod -l app=todo-web -n
+kiamol-ch16
+# 确认它正在运行:
+kubectl get pods -n kiamol-ch16 --show-labels
+# 获取应用程序的URL并浏览:
+kubectl get svc todo-web -n kiamol-ch16 -o jsonpath='http://{.status
+.loadBalancer.ingress[0].*}:8019'
+```
 
-Figure 16.18 shows the app running, after the updated deployment has been permitted by OPA Gatekeeper.图 16.18 显示了在 OPA Gatekeeper 允许更新部署后应用程序正在运行。
+图 16.18 显示了在 OPA Gatekeeper 允许更新部署后应用程序正在运行。
 
-Open Policy Agent is a much cleaner way to apply admission controls than custom validating webhooks, and the sample policies we’ve looked at are only some simple ideas to get you started. Gatekeeper doesn’t have mutation functionality, but you can combine it with your own webhooks if you have a clear case to modify specs. You could use constraints to ensure every Pod spec includes an application-profile label and then mutate specs based on your profiles—setting your .NET Core apps to run as a nonroot user and switching to a read-only filesystem for all your Go apps.
+![图16.18](./images/Figure16.18.png)
+<center>图 16.18 约束很强大，但您需要确保应用程序能够真正遵守。  </center>
+
 Open Policy Agent 是一种比自定义验证 webhook 更简洁的应用准入控制的方法，我们查看的示例策略只是一些简单的想法，可以帮助您入门。 Gatekeeper 没有突变功能，但如果您有明确的修改规范的案例，您可以将其与您自己的 webhooks 结合使用。您可以使用约束来确保每个 Pod 规范都包含一个应用程序配置文件标签，然后根据您的配置文件改变规范——将您的 .NET Core 应用程序设置为以非根用户身份运行，并为所有 Go 应用程序切换到只读文件系统。
 
-Securing your apps is about closing down exploit paths, and a thorough approach includes all the tools we’ve covered in this chapter and more. We’ll finish up with a look at a secure Kubernetes landscape.
 保护你的应用程序就是关闭漏洞利用路径，一个彻底的方法包括我们在本章中介绍的所有工具等等。最后，我们将了解一个安全的 Kubernetes 环境。
 
 ## 16.5 深入了解 Kubernetes 中的安全性
 Build pipelines can be compromised, container images can be modified, containers can run vulnerable software as privileged users, and attackers with access to the Kubernetes API could even take control of your cluster. You won’t know your app is 100% secure until it has been replaced and you can confirm no security breaches occurred during its operation. Getting to that happy place means applying security in depth across your whole software supply chain. This chapter has focused on securing apps at run time, but you should start before that by scanning container images for known vulnerabilities.
 构建管道可能会遭到破坏，容器映像可能会被修改，容器可能会以特权用户身份运行易受攻击的软件，而有权访问 Kubernetes API 的攻击者甚至可能会控制您的集群。在您的应用程序被替换之前，您不会知道它是 100% 安全的，并且您可以确认在其运行期间没有发生安全漏洞。到达那个快乐的地方意味着在整个软件供应链中深入应用安全性。本章的重点是在运行时保护应用程序，但您应该在此之前扫描容器镜像以查找已知漏洞。
-
-![图16.18](./images/Figure16.18.png)
-<center>图 16.18 Constraints are powerful, but you need to make sure apps can actually comply.约束很强大，但您需要确保应用程序能够真正遵守。  </center>
 
 Security scanners look inside an image, identify the binaries, and check them on CVE (Common Vulnerabilities and Exposures) databases. Scans tell you if known exploits
 are in the application stack, dependencies, or operating system tools in your image. Commercial scanners have integrations with managed registries (you can use Aqua Security with Azure Container Registry), or you can run your own (Harbor is the CNCF registry project, and it supports the open source scanners Clair and Trivy; Docker Desktop has an integration with Snyk for local scans).
